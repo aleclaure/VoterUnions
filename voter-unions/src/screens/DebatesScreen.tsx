@@ -4,7 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { Debate } from '../types';
 
-export const DebatesScreen = ({ navigation }: any) => {
+interface DebateWithUnion extends Debate {
+  unions?: { name: string };
+}
+
+export const DebatesScreen = ({ navigation }: {navigation: any}) => {
   const { data: debates, isLoading } = useQuery({
     queryKey: ['debates'],
     queryFn: async () => {
@@ -14,11 +18,11 @@ export const DebatesScreen = ({ navigation }: any) => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as Debate[];
+      return data as DebateWithUnion[];
     },
   });
 
-  const renderDebate = ({ item }: { item: any }) => (
+  const renderDebate = ({ item }: { item: DebateWithUnion }) => (
     <TouchableOpacity
       style={styles.debateCard}
       onPress={() => navigation.navigate('DebateDetail', { debateId: item.id })}
@@ -31,8 +35,8 @@ export const DebatesScreen = ({ navigation }: any) => {
         {item.description}
       </Text>
       <View style={styles.debateMeta}>
-        <Text style={styles.metaText}>{item.unions?.name}</Text>
-        <Text style={styles.metaText}>{item.argument_count} arguments</Text>
+        <Text style={styles.metaText}>{item.unions?.name || 'Unknown Union'}</Text>
+        <Text style={styles.metaText}>{item.argument_count || 0} arguments</Text>
       </View>
     </TouchableOpacity>
   );

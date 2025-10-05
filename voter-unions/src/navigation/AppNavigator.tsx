@@ -7,6 +7,11 @@ import { UnionsScreen } from '../screens/UnionsScreen';
 import { DebatesScreen } from '../screens/DebatesScreen';
 import { VoteScreen } from '../screens/VoteScreen';
 import { ProgressScreen } from '../screens/ProgressScreen';
+import { UnionDetailScreen } from '../screens/UnionDetailScreen';
+import { CreateUnionScreen } from '../screens/CreateUnionScreen';
+import { DebateDetailScreen } from '../screens/DebateDetailScreen';
+import { CreateDebateScreen } from '../screens/CreateDebateScreen';
+import { CandidateDetailScreen } from '../screens/CandidateDetailScreen';
 import { useAuth } from '../hooks/useAuth';
 import { Text } from 'react-native';
 
@@ -23,7 +28,7 @@ const MainTabs = () => {
       }}
     >
       <Tab.Screen
-        name="Unions"
+        name="UnionsTab"
         component={UnionsScreen}
         options={{
           tabBarLabel: 'Unions',
@@ -31,7 +36,7 @@ const MainTabs = () => {
         }}
       />
       <Tab.Screen
-        name="Debates"
+        name="DebatesTab"
         component={DebatesScreen}
         options={{
           tabBarLabel: 'Debates',
@@ -39,7 +44,7 @@ const MainTabs = () => {
         }}
       />
       <Tab.Screen
-        name="Vote"
+        name="VoteTab"
         component={VoteScreen}
         options={{
           tabBarLabel: 'Vote',
@@ -47,7 +52,7 @@ const MainTabs = () => {
         }}
       />
       <Tab.Screen
-        name="Progress"
+        name="ProgressTab"
         component={ProgressScreen}
         options={{
           tabBarLabel: 'Progress',
@@ -55,6 +60,19 @@ const MainTabs = () => {
         }}
       />
     </Tab.Navigator>
+  );
+};
+
+const MainStack = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Tabs" component={MainTabs} />
+      <Stack.Screen name="UnionDetail" component={UnionDetailScreen} />
+      <Stack.Screen name="CreateUnion" component={CreateUnionScreen} />
+      <Stack.Screen name="DebateDetail" component={DebateDetailScreen} />
+      <Stack.Screen name="CreateDebate" component={CreateDebateScreen} />
+      <Stack.Screen name="CandidateDetail" component={CandidateDetailScreen} />
+    </Stack.Navigator>
   );
 };
 
@@ -71,7 +89,7 @@ export const AppNavigator = () => {
         {!user ? (
           <Stack.Screen name="Auth" component={AuthScreen} />
         ) : (
-          <Stack.Screen name="Main" component={MainTabs} />
+          <Stack.Screen name="Main" component={MainStack} />
         )}
       </Stack.Navigator>
     </NavigationContainer>
