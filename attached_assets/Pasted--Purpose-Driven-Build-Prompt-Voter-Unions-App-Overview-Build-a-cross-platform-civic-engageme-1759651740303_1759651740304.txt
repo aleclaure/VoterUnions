@@ -1,0 +1,69 @@
+⚡️ Purpose-Driven Build Prompt: Voter Unions App
+
+🧭 Overview
+
+Build a cross-platform civic engagement app using JavaScript with Expo that can be deployed to iOS and Android through Expo’s managed workflow.
+Use Supabase as the backend for authentication, real-time data, storage, and analytics.
+
+The goal is to create a Voter Unions Platform — a digital space where communities organize politically around shared values.
+The experience should combine the discussion depth of Reddit with the team coordination of Discord, all centered on grassroots democracy, debate, and collective action.
+
+⸻
+
+🏛 Core Systems & Features
+
+1. Union Pages
+	•	Serve as community hubs for local or issue-based voter unions.
+	•	Contain:
+	•	Public Feeds for open updates, statements, and campaigns.
+	•	Private Channels for internal organizing, voting prep, and messaging.
+	•	Role Management: define access levels such as admin, delegate, member, and observer.
+	•	Each union maintains its own identity, member count, and verified voter list (stored securely in Supabase).
+
+2. Debate Section
+	•	Structured space for policy debates and deliberation.
+	•	Include:
+	•	Argument threads tagged by issue area (e.g., Housing, Climate, Labor Rights).
+	•	Voting, reply chains, and reaction metrics (agree/disagree/neutral).
+	•	Visibility filters (most active, most persuasive, latest).
+	•	Encourage evidence-based, respectful debate as the foundation for group decisions.
+
+3. Voting & Pledging System
+	•	Let each union coordinate real-world influence:
+	•	Pledge votes for candidates who align with chosen policies.
+	•	Flag opposing candidates or policies that conflict with union goals.
+	•	Show a “representation dashboard” visualizing:
+	•	% of members pledged,
+	•	policies supported,
+	•	and total voter power represented.
+	•	Serve as a bridge between online consensus and real political outcomes.
+
+4. Progress & Collaboration Tools
+	•	Track progress of collective campaigns:
+	•	Milestone dashboard for petitions, outreach, or legislative goals.
+	•	Collaborative drafting tools (built via Supabase storage and JavaScript editors) for creating public position statements.
+	•	Send finalized documents as official policy stances from the union to candidates or offices.
+	•	Encourage transparency, accountability, and steady progress toward real outcomes.
+
+⸻
+
+🌍 Mission & Vision
+
+This app exists to transform online discussion into real-world action.
+Its purpose is to help working-class voters organize intelligently and collectively, forming voter unions that:
+	•	debate ideas, not identities,
+	•	coordinate votes instead of fragmenting them, and
+	•	fight systemic corruption, not one another.
+
+The platform promotes unity, transparency, and empowerment — turning civic frustration into organized democratic power.
+
+⸻
+
+🔩 Technical Intent (For AI Agents or Developers)
+
+When implementing, prioritize:
+	•	Expo Go compatibility first, then prepare for EAS iOS/Android builds.
+	•	Supabase handles: auth, storage, realtime sync, and role-based access.
+	•	Structure code modularly: UnionPage.js, DebatePage.js, VotePage.js, ProgressDashboard.js.
+	•	Use a scalable design system and shared component library to maintain visual consistency.
+	•	Keep architecture lightweight, offline-capable, and fast — designed for civic usability and reliability under network stress.

@@ -1,0 +1,139 @@
+Awesome—here’s a drop-in “build parameters & constraints” prompt you can paste into any AI coding agent so the project stays 100% Expo-Go–compatible now, and cleanly graduates to EAS iOS/Android builds later.
+
+⸻
+
+🔧 Build Parameters & Constraints (Expo + Supabase)
+
+Follow all of the rules below while building this app. The app MUST run in Expo Go during development and build reliably with EAS Build for both iOS and Android later.
+
+0) Project Baseline
+	•	Use the latest stable Expo SDK (managed workflow). Do not eject unless explicitly instructed.
+	•	Language: TypeScript (strict mode). Target ES2020+.
+	•	State: React Query (TanStack) + lightweight local state (Zustand or Context).
+	•	Navigation: @react-navigation/native with native stack + bottom tabs. Properly configure gesture handler & reanimated per Expo docs.
+	•	Runtime: Hermes enabled.
+	•	Package policy: no unmaintained libs, no custom native modules that don’t work in Expo Go. If a native dependency is required later, gate it behind expo-dev-client and feature flags.
+
+1) Expo Go Compatibility Rules
+	•	Only use Expo-supported packages (e.g., expo-notifications, expo-secure-store, expo-file-system, expo-sharing, expo-haptics, expo-image, expo-blur, expo-clipboard).
+	•	Forbidden while in Expo Go: any third-party module that requires npx expo prebuild or custom native code. If absolutely needed, wrap behind a canUseNativeFeature() check and provide a pure-JS fallback.
+	•	Media, camera, and file features must use Expo equivalents (expo-camera, expo-image-picker, expo-file-system).
+	•	Do not modify android/ or ios/ folders unless we intentionally prebuild (later milestone).
+
+2) App Config & Environments
+	•	Use app.json/app.config.ts with typed config and per-env overrides.
+	•	Secrets: never hardcode. Load from EAS Secrets + .env* via expo-env or react-native-dotenv (JS-only use). Access at runtime via expo-constants.
+	•	Define scheme, deepLinks, and universal links/app links upfront (needed for OAuth and passwordless).
+	•	Set icons/splash/screens in config; provide iOS 1024×1024 icon and adaptive Android icon.
+
+3) Supabase (Auth, DB, Realtime, Storage)
+	•	Official client: @supabase/supabase-js v^latest compatible with RN.
+	•	Auth:
+	•	Support email OTP + OAuth providers that work with RN deep linking.
+	•	Use SecureStore for refresh/access tokens; never AsyncStorage for secrets.
+	•	Handle token rotation; attach interceptors to inject latest access token.
+	•	Realtime:
+	•	Use realtime channels for debates, posts, and presence. Auto-reconnect, exponential backoff, and network awareness (via expo-network).
+	•	Storage:
+	•	Use signed URLs with short TTL; cache media via expo-file-system + ETag.
+	•	RLS:
+	•	Design tables with Row-Level Security; all app reads/writes go through policies. No public anon writes.
+
+4) Core Domains (Feature Contracts)
+	•	Union Pages
+	•	Public feed (read-only for non-members), private channels for members.
+	•	Roles: owner, admin, moderator, member, guest.
+	•	Content model: unions, channels, posts, comments, reactions, attachments.
+	•	Debate
+	•	Threaded arguments with stance metadata (pro/con/neutral).
+	•	Rate limiting + cooldown to avoid spam; per-user per-channel write limits.
+	•	Voting & Pledges
+	•	Entities: policies, candidates, pledges, endorsements.
+	•	Union-scoped tallies with verifiable counts and audit trail.
+	•	Progress Tracking
+	•	Milestones, action items, completion %, assignees, timestamps.
+	•	In-App Docs
+	•	Rich-text (portable JSON such as Markdown or TipTap JSON). Persist versions; allow export to .md and share via deep link.
+
+5) Data & Schema Guardrails
+	•	All tables use UUID v4 PKs; timestamps in UTC with DB defaults.
+	•	Soft-delete with deleted_at column; no hard deletes in app.
+	•	Add composite indexes for read paths (e.g., posts(union_id, created_at desc)).
+	•	Paginate with cursor-based pagination (created_at + id).
+	•	Validation at three layers: client schema (Zod), server policies (RLS), and database constraints.
+
+6) Offline-First & Performance
+	•	Query caching with React Query; stale-while-revalidate.
+	•	Persist cache to disk with encryption for sensitive user scope.
+	•	Optimistic updates for votes/likes/reactions; rollback on failure.
+	•	Avoid large over-fetch: use select column whitelists and range.
+	•	Images: use expo-image with content-size hints; prefetch on Wi-Fi.
+
+7) Error Handling & Observability
+	•	Centralized error boundary and toast system.
+	•	Network & Supabase errors mapped to user-friendly messages.
+	•	Logging: sentry-expo integration in production builds; console logging only in dev.
+	•	Add a diagnostics screen (env, device info, build profile, Supabase region, token age).
+
+8) Security & Abuse Prevention
+	•	Use expo-secure-store for tokens; never log secrets.
+	•	CS/abuse: server-side rate limits; client-side cooldowns; profanity filter (client-side optional, server required).
+	•	Image uploads scanned server-side (bucket policy + size/type limits).
+	•	Feature flags for sensitive/beta features.
+
+9) UX, A11y, and Internationalization
+	•	A11y labels on all interactive elements; support dynamic font sizing.
+	•	RTL-ready layout; start strings with EN and plan for ES (i18n JSON).
+	•	Respect Appearance (light/dark) and Haptics where appropriate.
+
+10) Notifications & Links
+	•	Use expo-notifications. Set up FCM (Android) & APNs (iOS) for EAS builds.
+	•	Channel categories by domain (debates, votes, milestones).
+	•	Deep link targets should restore navigation state to the correct screen with params.
+
+11) Build & Release (EAS)
+	•	Profiles: development, preview, production.
+	•	iOS: set bundle identifier; Android: set applicationId. Keep them stable.
+	•	Automate with EAS Build + EAS Submit; store credentials in EAS.
+	•	OTA updates via EAS Update for JS only; bump runtime when native changes occur.
+	•	Keep app size lean: remove unused fonts/assets; enable asset compression.
+
+12) CI Quality Gates
+	•	Required checks on every PR:
+	•	expo-doctor passes with no blocking issues.
+	•	TypeScript with noImplicitAny, strictNullChecks.
+	•	ESLint + Prettier clean; unit tests for utilities and data mappers.
+	•	Basic instrumentation test: launch app, navigate main tabs, run one Supabase query in a mock env.
+
+13) Developer Experience
+	•	Provide Seed scripts to create a demo union, channels, sample posts, and fake candidates/policies.
+	•	Storybook (Expo-compatible) for atomic UI components.
+	•	.vscode workspace settings for path aliases, format on save.
+
+14) Acceptance Criteria (Must Pass Before Release)
+	1.	Cold start < 2.5s on mid-range Android; tab switch < 200ms.
+	2.	Works in Expo Go on iOS & Android with full core flow:
+	•	Sign in → join union → read/write posts → join debate → pledge vote → see progress.
+	3.	Fresh install handles offline first launch (graceful limited mode).
+	4.	Deep link from push → opens to the exact debate/post/vote screen.
+	5.	Logout clears all sensitive data and cached queries.
+
+15) Deliverables Each Sprint
+	•	Updated ERD & RLS policy list.
+	•	End-to-end demo script + screen recording from Expo Go.
+	•	Changelog with any dependency that would break Expo Go if merged.
+
+⸻
+
+Agent Instructions (literal)
+	•	Adhere strictly to these constraints.
+	•	If a requested dependency is not Expo-Go compatible, propose an Expo alternative or gate it behind expo-dev-client and feature flags for later.
+	•	Before adding any library, explain:
+	1.	Why it’s needed, 2) Expo Go compatibility, 3) Impact on EAS build, 4) Removal plan if deprecated.
+
+⸻
+
+If you want, I can also generate:
+	•	a first-pass Supabase schema (SQL) with RLS policies,
+	•	a typed API layer (supabaseClient.ts, query hooks),
+	•	and a ready-to-run Expo starter with nav scaffolding and the diagnostics screen.
