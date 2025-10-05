@@ -8,6 +8,7 @@ export default {
     userInterfaceStyle: 'automatic',
     newArchEnabled: true,
     scheme: 'voter-unions',
+    jsEngine: 'hermes',
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
@@ -16,6 +17,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.voterunions.app',
+      associatedDomains: ['applinks:voterunions.app'],
     },
     android: {
       adaptiveIcon: {
@@ -25,6 +27,19 @@ export default {
       package: 'com.voterunions.app',
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
+      intentFilters: [
+        {
+          action: 'VIEW',
+          autoVerify: true,
+          data: [
+            {
+              scheme: 'https',
+              host: 'voterunions.app',
+            },
+          ],
+          category: ['BROWSABLE', 'DEFAULT'],
+        },
+      ],
     },
     web: {
       favicon: './assets/favicon.png',
