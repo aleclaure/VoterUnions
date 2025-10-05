@@ -1,168 +1,54 @@
 # Voter Unions - Civic Engagement Platform
 
 ## Overview
-A cross-platform mobile app built with Expo and Supabase that enables communities to organize into voter unions for political engagement, policy debates, and collective action.
-
-## Purpose
-Transform online discussion into real-world political action by helping working-class voters organize collectively through:
-- Structured policy debates
-- Coordinated vote pledging
-- Campaign progress tracking
-- Democratic decision-making
-
-## Current State (2025-10-05)
-- **Status**: MVP Complete and Running
-- **Expo Server**: Active on port 5000
-- **Expo Go Compatible**: All dependencies Expo-supported
-- **Database**: Schema created with RLS policies
-- **Authentication**: Email OTP with SecureStore
-- **Ready for**: Expo Go testing
-
-## Recent Changes (2025-10-05)
-- Complete project setup with Expo SDK 52 and TypeScript strict mode
-- Implemented email OTP authentication via Supabase Auth
-- Created complete navigation: bottom tabs + stack navigator
-- Built all core screens: Unions, Debates, Vote, Progress, detail screens
-- Implemented mutations for creating unions, debates, arguments, pledges
-- Configured React Query with offline-first caching
-- Set up Supabase client with SecureStore token management
-- Created comprehensive database schema with RLS policies
-- All screens functional and ready for testing
-
-## Project Architecture
-
-### Tech Stack
-- **Frontend**: Expo SDK 52 (React Native), TypeScript (strict mode)
-- **Navigation**: React Navigation (bottom-tabs + native-stack)
-- **State Management**: React Query (TanStack) + Zustand
-- **Backend**: Supabase (Auth, PostgreSQL, Realtime, Storage)
-- **Security**: expo-secure-store for token storage, RLS policies
-- **Offline Support**: React Query with offline-first network mode
-
-### Directory Structure
-```
-voter-unions/
-├── src/
-│   ├── components/     # Reusable UI components
-│   ├── screens/        # Screen components
-│   │   ├── AuthScreen.tsx
-│   │   ├── UnionsScreen.tsx
-│   │   ├── UnionDetailScreen.tsx
-│   │   ├── CreateUnionScreen.tsx
-│   │   ├── DebatesScreen.tsx
-│   │   ├── DebateDetailScreen.tsx
-│   │   ├── CreateDebateScreen.tsx
-│   │   ├── VoteScreen.tsx
-│   │   ├── CandidateDetailScreen.tsx
-│   │   └── ProgressScreen.tsx
-│   ├── navigation/     # Navigation configuration
-│   │   └── AppNavigator.tsx
-│   ├── services/       # API clients and services
-│   │   ├── supabase.ts
-│   │   └── queryClient.ts
-│   ├── hooks/          # Custom React hooks
-│   │   └── useAuth.ts
-│   ├── types/          # TypeScript type definitions
-│   │   └── index.ts
-│   ├── stores/         # Zustand stores
-│   │   └── authStore.ts
-│   └── utils/          # Utility functions
-├── assets/             # Images, fonts, icons
-├── app.config.ts       # Expo configuration
-├── supabase-schema.sql # Database schema with RLS
-└── SETUP.md           # Setup instructions
-```
-
-### Implemented Features
-
-#### 1. Authentication
-- Email OTP login/signup
-- Secure token storage with expo-secure-store
-- Auto token refresh
-- Session management with Zustand
-
-#### 2. Union Pages
-- Browse public unions
-- View union details
-- Create new unions (with automatic owner membership)
-- Join public unions
-- Member count tracking
-- Role-based access (owner, admin, moderator, member, guest)
-
-#### 3. Debates
-- Browse debates by union
-- Filter by issue area
-- Create debates (requires union membership)
-- Add arguments with stance selection (pro/con/neutral)
-- Argument display with reaction counts
-- Real-time argument count updates
-
-#### 4. Voting & Pledging
-- Browse candidates and policies
-- Pledge support or opposition
-- Union-scoped pledges
-- Multi-union support (user selects which union to pledge with)
-
-#### 5. Progress Tracking
-- View campaign milestones
-- Track completion percentages
-- Monitor deadlines
-- Union-scoped progress
-
-### Database Schema
-- **Tables**: profiles, unions, union_members, debates, arguments, reactions, candidates, policies, pledges, milestones
-- **Primary Keys**: UUID v4 for all tables
-- **Soft Deletes**: deleted_at column (no hard deletes)
-- **RLS Policies**: Row-level security enabled on all tables
-- **Automatic Counts**: Triggers for member_count, argument_count, reaction_count
-- **Performance**: Composite indexes on query paths
-
-### Security Features
-- Secure token storage (SecureStore, not AsyncStorage)
-- Row Level Security (RLS) policies
-- User-scoped queries
-- No exposed secrets in code
-- Environment variable management
+Voter Unions is a cross-platform mobile application built with Expo and Supabase. Its primary purpose is to empower communities to organize into voter unions, facilitating political engagement, structured policy debates, and collective action. The platform aims to bridge online discussion with real-world political impact by enabling working-class voters to organize, coordinate vote pledging, track campaign progress, and engage in democratic decision-making. The current MVP is complete, fully functional, and ready for testing on Expo Go.
 
 ## User Preferences
 - Expo Go compatibility enforced (no custom native modules)
 - TypeScript strict mode enabled
 - Offline-first architecture
 - Real-time updates for collaborative features
+- Follow all rules below while building this app. The app MUST run in Expo Go during development and build reliably with EAS Build for both iOS and Android later.
+- Only use Expo-supported packages (expo-notifications, expo-secure-store, expo-file-system, expo-sharing, expo-haptics, expo-image, expo-blur, expo-clipboard).
+- Forbidden while in Expo Go: any third-party module that requires npx expo prebuild or custom native code.
+- Media, camera, and file features must use Expo equivalents (expo-camera, expo-image-picker, expo-file-system).
+- Do not modify android/ or ios/ folders unless we intentionally prebuild.
+- Before adding any library, explain:
+  1. Why it's needed
+  2. Expo Go compatibility
+  3. Impact on EAS build
+  4. Removal plan if deprecated
 
-## Setup Instructions
+## System Architecture
+The application is built using Expo SDK 52 with React Native and TypeScript in strict mode. Navigation is handled by React Navigation, utilizing both bottom tabs and a native stack navigator. State management combines React Query (TanStack) for server state and Zustand for local client state. The backend leverages Supabase for authentication, PostgreSQL database, Realtime functionalities, and Storage. Security is a paramount concern, with `expo-secure-store` used for token storage and comprehensive Row-Level Security (RLS) policies implemented in Supabase. The system is designed with an offline-first approach using React Query's capabilities.
 
-### 1. Database Setup
-1. Open Supabase Dashboard → SQL Editor
-2. Copy content from `supabase-schema.sql`
-3. Execute to create all tables, indexes, and RLS policies
+**Key Features:**
+- **Authentication**: Email OTP login/signup, secure token storage with `expo-secure-store`, auto token refresh, and session management via Zustand.
+- **Union Management**: Users can browse public unions, view details, create new unions, join existing ones, and manage members with role-based access control (owner, admin, moderator, member, guest).
+- **Debate System**: Functionality to browse debates by union, filter by issue area, create debates, and add arguments with stance selection (pro/con/neutral). Arguments display reaction counts with real-time updates.
+- **Voting & Pledging**: Users can browse candidates and policies, pledge support or opposition, with pledges scoped to specific unions and supporting multi-union participation.
+- **Progress Tracking**: Features for viewing campaign milestones, tracking completion percentages, and monitoring deadlines, all scoped to individual unions.
 
-### 2. Running the App
-The Expo server is configured and running on port 5000.
+**Database Design:**
+- All tables (`profiles`, `unions`, `union_members`, `debates`, `arguments`, `reactions`, `candidates`, `policies`, `pledges`, `milestones`) use UUID v4 as primary keys.
+- Soft deletes are implemented using a `deleted_at` column.
+- Row-Level Security (RLS) policies are enabled on all tables to enforce data security.
+- Automatic counts for members, arguments, and reactions are managed via database triggers.
+- Performance is optimized with composite indexes on common query paths.
 
-**To test in Expo Go:**
-1. Install Expo Go on your mobile device
-2. Scan the QR code shown in the console
-3. App loads directly in Expo Go
+**UI/UX Decisions:**
+- The application uses a standard mobile UI pattern with bottom tab navigation for core features and stack navigators for detail screens.
+- Strict TypeScript mode and a managed Expo workflow ensure a consistent and robust development environment.
 
-### 3. Environment Variables
-Already configured:
-- `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-
-## Next Steps (Post-MVP)
-- Add OAuth providers (Google, Apple Sign-In)
-- Implement real-time debate subscriptions
-- Add push notifications via expo-notifications
-- Implement image uploads for union profiles
-- Add collaborative document drafting
-- Build admin moderation tools
-- Create EAS production builds
-- Deploy with OTA updates
-
-## Development Notes
-- All dependencies are Expo-compatible
-- No native modules requiring prebuild
-- TypeScript strict mode enforced
-- React Query handles offline caching
-- Supabase RLS enforces data security
+## External Dependencies
+- **Expo SDK 52 (React Native)**: Core framework for mobile app development.
+- **React Navigation**: Handles in-app navigation (bottom tabs and native stack).
+- **React Query (TanStack)**: Manages server state, caching, and offline-first capabilities.
+- **Zustand**: Lightweight library for local state management.
+- **Supabase**:
+    - **Supabase Auth**: For user authentication (Email OTP).
+    - **PostgreSQL**: The relational database backend.
+    - **Supabase Realtime**: For real-time updates (e.g., argument counts).
+    - **Supabase Storage**: For potential future media storage.
+- **expo-secure-store**: Securely stores sensitive data like authentication tokens.
+- **TypeScript**: Provides type safety across the codebase.
