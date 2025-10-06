@@ -1,0 +1,113 @@
+Add descriptions that would make this possible for a expo go JavaScript app that will become a iOS and android app: Here’s the fully updated and expanded version of your Voter Unions App prompt, rewritten to be perfectly clear for a coding agent — including all of your recent edits and UI logic.
+
+⸻
+
+🗳 Voter Unions App — Union Tab Redesign (Final Functional Specification)
+
+1. Overview
+
+The “Unions” section of the app should be redesigned with three main subtabs, accessible through a top banner navigation bar:
+	1.	All Posts — global feed from all unions and their channels.
+	2.	My Unions — user’s personal hub for unions they’ve created or joined, including a channel-based post system.
+	3.	Discover — explore and filter unions by social or political issue areas.
+
+Each subtab should be fully interactive, data-synced, and optimized for navigation without page reloads.
+
+⸻
+
+2. Subtab 1: All Posts (Global Feed)
+
+Purpose: Display all public posts from every union and channel in one unified feed.
+
+Functional details:
+	•	Show all public posts across all unions and channels.
+	•	Include filters for organizing content:
+	•	Sort by most upvotes → least upvotes.
+	•	Sort by most comments → least comments.
+	•	Filter by recency: Today, This Week, This Month.
+	•	Filter by shared channel hashtags across unions (e.g., #climate, #healthcare).
+	•	Clicking on a post takes the user to its original union and channel.
+	•	Fetches posts automatically from the My Unions and public unions databases.
+
+⸻
+
+3. Subtab 2: My Unions (User Hub & Channel System)
+
+Purpose: Allow users to create, manage, and interact with unions and their channels — similar to a Discord-style layout.
+
+A. Layout Structure
+
+This subtab should include two stacked banners at the top:
+	1.	Union Selection Banner (Topmost)
+	•	Shows all unions the user has joined or created.
+	•	Allows users to switch between unions quickly.
+	•	Includes a “Create Union” button.
+	•	When a union is selected, it automatically loads its channels below in the second banner.
+	2.	Channel Banner (Below Unions Banner)
+	•	Displays a list of all channels within the selected union (e.g., #housing, #workers-rights).
+	•	Includes a “Create Channel” button.
+	•	The banner should minimize or collapse after the user selects a channel, to maximize screen space for posts.
+	•	The channels should display as hashtag-style buttons (#channel-name) and be scrollable horizontally if there are many.
+
+B. Channel Content and Posts
+	•	Below the two banners, display all posts from all channels combined for the currently selected union (automatic aggregation).
+	•	Include a “Create Post” button directly under the banners.
+	•	When clicked, the user can:
+	•	Write a post.
+	•	Select one or multiple channels to publish the post to.
+	•	Choose the destination channels from a hashtag selector banner that appears during post creation.
+	•	After posting, the content appears under the corresponding channels and updates the “All Posts” global feed if marked public.
+
+C. Channel Creation & Management
+	•	The “Create Channel” button should open a small modal or input prompt where:
+	•	The user sets the channel’s hashtag name (e.g., #immigration, #climate-action).
+	•	The new channel appears in the channel banner immediately.
+	•	Each channel has its own feed, but users can view all posts combined (default view).
+	•	Channel visibility can be public or members-only.
+
+⸻
+
+4. Subtab 3: Discover (Union Exploration)
+
+Purpose: Let users browse and join other unions by interest or issue.
+
+Functional details:
+	•	Display all available unions in a scrollable list or card grid.
+	•	Each union card should include:
+	•	Union name, description, number of members.
+	•	Primary issue tags (e.g., #climate, #workers-rights).
+	•	A “Join Union” button.
+	•	Add filtering and search functionality:
+	•	Filter unions by key topics:
+	•	Climate Change
+	•	Immigration Rights
+	•	Healthcare
+	•	Workers’ Rights
+	•	Women’s Healthcare
+	•	LGBTQ+ Rights
+	•	Search by name, keywords, or location (optional future feature).
+
+⸻
+
+5. Data & Interaction Flow
+	•	Posts from “My Unions” channels (when marked public) are automatically pulled into the “All Posts” tab feed.
+	•	The “Discover” tab serves as the discovery and joining system — once a user joins a union, it appears in “My Unions.”
+	•	Creating or joining a union dynamically updates all related data (unions banner, channel list, and posts) without reloading.
+	•	Channels are linked via hashtags, allowing for easy cross-union filtering in the “All Posts” tab.
+
+⸻
+
+6. UX & Behavior Summary
+
+Element	Function
+Union Banner	Displays all unions joined/created, with create button.
+Channel Banner	Shows all channels within selected union, collapsible after selecting one.
+Create Channel Button	Opens modal to add new hashtag-based channels.
+Create Post Button	Opens editor + banner to select destination channels.
+Post Filters	Enable sorting by upvotes, comments, recency, or hashtag.
+Cross-Sync	Public posts appear in All Posts feed. Joined unions sync with Discover.
+
+
+⸻
+
+Would you like me to now turn this into a UI wireframe layout (with labeled components and hierarchy) for your coding agent — showing where each banner, button, and post section should appear visually (ideal for Expo/React Native design setup)?
