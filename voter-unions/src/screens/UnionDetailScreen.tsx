@@ -7,7 +7,7 @@ import { Union } from '../types';
 
 export const UnionDetailScreen = ({ route, navigation }: any) => {
   const { unionId } = route.params;
-  const user = useAuthStore((state) => state.user);
+  const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
   const { data: union, isLoading } = useQuery({

@@ -7,7 +7,7 @@ import { Argument, Stance } from '../types';
 
 export const DebateDetailScreen = ({ route, navigation }: any) => {
   const { debateId } = route.params;
-  const user = useAuthStore((state) => state.user);
+  const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [argumentContent, setArgumentContent] = useState('');
   const [selectedStance, setSelectedStance] = useState<Stance>('neutral');

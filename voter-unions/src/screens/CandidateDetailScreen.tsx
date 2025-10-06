@@ -6,7 +6,7 @@ import { useAuthStore } from '../contexts/AuthContext';
 
 export const CandidateDetailScreen = ({ route, navigation }: any) => {
   const { candidateId } = route.params;
-  const user = useAuthStore((state) => state.user);
+  const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
   const { data: candidate, isLoading } = useQuery({

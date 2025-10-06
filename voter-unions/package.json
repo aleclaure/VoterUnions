@@ -1,9 +1,7 @@
 {
   "dependencies": {
     "zod": "^3.25.76",
-    "zustand": "^5.0.8",
     "expo-image": "~2.4.0",
-    "@types/react": "^18.0.0",
     "expo-haptics": "~14.1.4",
     "expo-constants": "~17.1.7",
     "expo-status-bar": "~2.2.3",
@@ -16,8 +14,6 @@
     "@react-navigation/native-stack": "^7.3.27",
     "react-native-safe-area-context": "5.4.0",
     "@tanstack/react-query-persist-client": "^5.90.2",
-    "@react-native-async-storage/async-storage": "2.1.2",
-    "use-sync-external-store": "^1.2.0",
-    "immer": "^9.0.6"
+    "@react-native-async-storage/async-storage": "2.1.2"
   }
 }

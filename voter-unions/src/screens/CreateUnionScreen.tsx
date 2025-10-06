@@ -5,7 +5,7 @@ import { supabase } from '../services/supabase';
 import { useAuthStore } from '../contexts/AuthContext';
 
 export const CreateUnionScreen = ({ navigation }: any) => {
-  const user = useAuthStore((state) => state.user);
+  const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');

@@ -10,7 +10,7 @@ interface UnionMemberData {
 }
 
 export const CreateDebateScreen = ({ navigation }: {navigation: any}) => {
-  const user = useAuthStore((state) => state.user);
+  const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
