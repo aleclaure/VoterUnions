@@ -21,7 +21,7 @@ export const useAuth = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [setSession, setUser, setIsLoading]);
 
   const signInWithOTP = async (email: string) => {
     const { error } = await supabase.auth.signInWithOtp({
