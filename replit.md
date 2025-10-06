@@ -20,10 +20,10 @@ Voter Unions is a cross-platform mobile application built with Expo and Supabase
   4. Removal plan if deprecated
 
 ## System Architecture
-The application is built using Expo SDK 52 with React Native and TypeScript in strict mode. Navigation is handled by React Navigation, utilizing both bottom tabs and a native stack navigator. State management combines React Query (TanStack) for server state and Zustand for local client state. The backend leverages Supabase for authentication, PostgreSQL database, Realtime functionalities, and Storage. Security is a paramount concern, with `expo-secure-store` used for token storage and comprehensive Row-Level Security (RLS) policies implemented in Supabase. The system is designed with an offline-first approach using React Query's capabilities.
+The application is built using Expo SDK 52 with React Native and TypeScript in strict mode. Navigation is handled by React Navigation, utilizing both bottom tabs and a native stack navigator. State management combines React Query (TanStack) for server state and React Context API for authentication state. The backend leverages Supabase for authentication, PostgreSQL database, Realtime functionalities, and Storage. Security is a paramount concern, with `expo-secure-store` used for token storage and comprehensive Row-Level Security (RLS) policies implemented in Supabase. The system is designed with an offline-first approach using React Query's capabilities.
 
 **Key Features:**
-- **Authentication**: Email OTP login/signup, secure token storage with `expo-secure-store`, auto token refresh, and session management via Zustand.
+- **Authentication**: Email OTP login/signup, secure token storage with `expo-secure-store`, auto token refresh, and session management via React Context API with memoized functions for stable references.
 - **Union Management**: Users can browse public unions, view details, create new unions, join existing ones, and manage members with role-based access control (owner, admin, moderator, member, guest).
 - **Debate System**: Functionality to browse debates by union, filter by issue area, create debates, and add arguments with stance selection (pro/con/neutral). Arguments display reaction counts with real-time updates.
 - **Voting & Pledging**: Users can browse candidates and policies, pledge support or opposition, with pledges scoped to specific unions and supporting multi-union participation.
@@ -40,11 +40,14 @@ The application is built using Expo SDK 52 with React Native and TypeScript in s
 - The application uses a standard mobile UI pattern with bottom tab navigation for core features and stack navigators for detail screens.
 - Strict TypeScript mode and a managed Expo workflow ensure a consistent and robust development environment.
 
+## Recent Changes
+- **October 6, 2025**: Migrated authentication state management from Zustand to React Context API to resolve Snackager bundling errors. Zustand was causing @types/react peer dependency conflicts in Expo's cloud bundler. The new AuthContext implementation uses useCallback and useMemo to ensure stable function references, maintaining the same behavior as the previous Zustand store while eliminating the bundling issues.
+
 ## External Dependencies
 - **Expo SDK 52 (React Native)**: Core framework for mobile app development.
 - **React Navigation**: Handles in-app navigation (bottom tabs and native stack).
 - **React Query (TanStack)**: Manages server state, caching, and offline-first capabilities.
-- **Zustand**: Lightweight library for local state management.
+- **React Context API**: For authentication state management (user, session, isLoading).
 - **Supabase**:
     - **Supabase Auth**: For user authentication (Email OTP).
     - **PostgreSQL**: The relational database backend.
