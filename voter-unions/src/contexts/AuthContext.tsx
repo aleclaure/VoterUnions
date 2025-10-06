@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useCallback, useMemo } from 'react';
 import { User } from '@supabase/supabase-js';
 
 interface AuthState {
@@ -14,17 +14,28 @@ interface AuthState {
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<any | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUserState] = useState<User | null>(null);
+  const [session, setSessionState] = useState<any | null>(null);
+  const [isLoading, setIsLoadingState] = useState(true);
 
-  const clearAuth = () => {
-    setUser(null);
-    setSession(null);
-    setIsLoading(false);
-  };
+  const setUser = useCallback((user: User | null) => {
+    setUserState(user);
+  }, []);
 
-  const value: AuthState = {
+  const setSession = useCallback((session: any | null) => {
+    setSessionState(session);
+  }, []);
+
+  const setIsLoading = useCallback((isLoading: boolean) => {
+    setIsLoadingState(isLoading);
+  }, []);
+
+  const clearAuth = useCallback(() => {
+    setUserState(null);
+    setSessionState(null);
+  }, []);
+
+  const value = useMemo<AuthState>(() => ({
     user,
     session,
     isLoading,
@@ -32,7 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession,
     setIsLoading,
     clearAuth,
-  };
+  }), [user, session, isLoading, setUser, setSession, setIsLoading, clearAuth]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
