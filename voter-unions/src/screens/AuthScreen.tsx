@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 
 export const AuthScreen = () => {
@@ -43,7 +44,7 @@ export const AuthScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <Text style={styles.title}>Voter Unions</Text>
       <Text style={styles.subtitle}>Organize. Debate. Act.</Text>
 
@@ -89,7 +90,7 @@ export const AuthScreen = () => {
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 

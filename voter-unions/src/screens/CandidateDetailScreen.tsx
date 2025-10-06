@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../contexts/AuthContext';
@@ -78,23 +79,24 @@ export const CandidateDetailScreen = ({ route, navigation }: any) => {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
         <Text style={styles.loadingText}>Loading...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!candidate) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
         <Text style={styles.errorText}>Candidate not found</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <ScrollView style={styles.container}>
+        <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
@@ -127,14 +129,18 @@ export const CandidateDetailScreen = ({ route, navigation }: any) => {
           </TouchableOpacity>
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  container: {
+    flex: 1,
   },
   header: {
     padding: 16,

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { Union } from '../types';
@@ -35,7 +36,7 @@ export const UnionsScreen = ({ navigation }: any) => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Voter Unions</Text>
         <TouchableOpacity
@@ -59,7 +60,7 @@ export const UnionsScreen = ({ navigation }: any) => {
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 

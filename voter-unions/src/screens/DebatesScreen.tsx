@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { Debate } from '../types';
@@ -42,7 +43,7 @@ export const DebatesScreen = ({ navigation }: {navigation: any}) => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Debates</Text>
         <TouchableOpacity
@@ -66,7 +67,7 @@ export const DebatesScreen = ({ navigation }: {navigation: any}) => {
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
