@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, Switch } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
-import { useAuthStore } from '../stores/authStore';
+import { useAuthStore } from '../contexts/AuthContext';
 
 export const CreateUnionScreen = ({ navigation }: any) => {
   const user = useAuthStore((state) => state.user);

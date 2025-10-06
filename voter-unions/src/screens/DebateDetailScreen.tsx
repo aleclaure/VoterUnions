@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, FlatList } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
-import { useAuthStore } from '../stores/authStore';
+import { useAuthStore } from '../contexts/AuthContext';
 import { Argument, Stance } from '../types';
 
 export const DebateDetailScreen = ({ route, navigation }: any) => {

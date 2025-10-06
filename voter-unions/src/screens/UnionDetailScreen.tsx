@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
-import { useAuthStore } from '../stores/authStore';
+import { useAuthStore } from '../contexts/AuthContext';
 import { Union } from '../types';
 
 export const UnionDetailScreen = ({ route, navigation }: any) => {

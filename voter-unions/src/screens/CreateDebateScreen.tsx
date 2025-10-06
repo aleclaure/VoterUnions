@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
-import { useAuthStore } from '../stores/authStore';
+import { useAuthStore } from '../contexts/AuthContext';
 import { Union } from '../types';
 
 interface UnionMemberData {
