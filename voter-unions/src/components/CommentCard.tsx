@@ -6,6 +6,7 @@ interface CommentCardProps {
     id: string;
     content: string;
     author_email?: string;
+    author_display_name?: string;
     created_at: string;
   };
 }
@@ -29,7 +30,7 @@ export const CommentCard: React.FC<CommentCardProps> = ({ comment }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.author}>{comment.author_email || 'Anonymous'}</Text>
+        <Text style={styles.author}>@{comment.author_display_name || 'Anonymous'}</Text>
         <Text style={styles.timestamp}>{formatDate(comment.created_at)}</Text>
       </View>
       <Text style={styles.content}>{comment.content}</Text>

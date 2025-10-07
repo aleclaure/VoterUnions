@@ -5,6 +5,7 @@ import { Post } from '../types';
 interface PostCardProps {
   post: Post & {
     author_email?: string;
+    author_display_name?: string;
     union_name?: string;
     channels?: { hashtag: string }[];
   };
@@ -45,7 +46,7 @@ export const PostCard: React.FC<PostCardProps> = ({
       activeOpacity={0.7}
     >
       <View style={styles.header}>
-        <Text style={styles.author}>{post.author_email || 'Anonymous'}</Text>
+        <Text style={styles.author}>@{post.author_display_name || 'Anonymous'}</Text>
         <Text style={styles.timestamp}>{formatDate(post.created_at)}</Text>
       </View>
 

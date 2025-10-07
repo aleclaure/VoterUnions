@@ -5,6 +5,7 @@ import { Post, PostReaction, Comment } from '../types';
 
 export interface PostWithDetails extends Post {
   author_email?: string;
+  author_display_name?: string;
   union_name?: string;
   channels?: { hashtag: string; id: string }[];
 }
@@ -43,7 +44,7 @@ export const usePosts = (unionId?: string) => {
         .from('posts')
         .select(`
           *,
-          profiles!posts_author_id_fkey(email),
+          profiles!posts_author_id_fkey(email, display_name),
           unions(name),
           post_channels(
             channels(id, hashtag)
@@ -62,6 +63,7 @@ export const usePosts = (unionId?: string) => {
       return (data || []).map((post: any) => ({
         ...post,
         author_email: post.profiles?.email,
+        author_display_name: post.profiles?.display_name,
         union_name: post.unions?.name,
         channels: (post.post_channels || [])
           .map((pc: any) => pc?.channels)
@@ -79,7 +81,7 @@ export const usePublicPosts = () => {
         .from('posts')
         .select(`
           *,
-          profiles!posts_author_id_fkey(email),
+          profiles!posts_author_id_fkey(email, display_name),
           unions(name),
           post_channels(
             channels(id, hashtag)
@@ -93,6 +95,7 @@ export const usePublicPosts = () => {
       return (data || []).map((post: any) => ({
         ...post,
         author_email: post.profiles?.email,
+        author_display_name: post.profiles?.display_name,
         union_name: post.unions?.name,
         channels: (post.post_channels || [])
           .map((pc: any) => pc?.channels)
@@ -251,7 +254,7 @@ export const usePostComments = (postId: string) => {
         .from('comments')
         .select(`
           *,
-          profiles!comments_author_id_fkey(email)
+          profiles!comments_author_id_fkey(email, display_name)
         `)
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
@@ -261,6 +264,7 @@ export const usePostComments = (postId: string) => {
       return (data || []).map((comment: any) => ({
         ...comment,
         author_email: comment.profiles?.email,
+        author_display_name: comment.profiles?.display_name,
       }));
     },
   });

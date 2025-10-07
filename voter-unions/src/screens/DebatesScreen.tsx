@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { Debate } from '../types';
+import { useProfiles } from '../hooks/useProfile';
 
 interface DebateWithUnion extends Debate {
   unions?: { name: string };
@@ -23,6 +24,22 @@ export const DebatesScreen = ({ navigation }: {navigation: any}) => {
     },
   });
 
+  const userIds = useMemo(() => {
+    const ids = new Set<string>();
+    debates?.forEach(debate => {
+      if (debate.created_by) ids.add(debate.created_by);
+    });
+    return Array.from(ids);
+  }, [debates]);
+
+  const { profiles } = useProfiles(userIds);
+
+  const getDisplayName = (userId: string | null | undefined) => {
+    if (!userId) return 'Anonymous';
+    const profile = profiles[userId];
+    return profile?.display_name || 'Anonymous';
+  };
+
   const renderDebate = ({ item }: { item: DebateWithUnion }) => (
     <TouchableOpacity
       style={styles.debateCard}
@@ -36,6 +53,7 @@ export const DebatesScreen = ({ navigation }: {navigation: any}) => {
         {item.description}
       </Text>
       <View style={styles.debateMeta}>
+        <Text style={styles.metaText}>@{getDisplayName(item.created_by)}</Text>
         <Text style={styles.metaText}>{item.unions?.name || 'Unknown Union'}</Text>
         <Text style={styles.metaText}>{item.argument_count || 0} arguments</Text>
       </View>

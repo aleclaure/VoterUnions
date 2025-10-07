@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../contexts/AuthContext';
 import { Union } from '../types';
+import { useUserProfile } from '../hooks/useProfile';
 
 export const UnionDetailScreen = ({ route, navigation }: any) => {
   const { unionId } = route.params;
@@ -38,6 +39,8 @@ export const UnionDetailScreen = ({ route, navigation }: any) => {
     },
     enabled: !!user,
   });
+
+  const { profile: creatorProfile } = useUserProfile(union?.created_by);
 
   const joinMutation = useMutation({
     mutationFn: async () => {
@@ -91,6 +94,9 @@ export const UnionDetailScreen = ({ route, navigation }: any) => {
       <View style={styles.content}>
         <Text style={styles.title}>{union.name}</Text>
         <Text style={styles.description}>{union.description}</Text>
+        <Text style={styles.creatorText}>
+          Created by @{creatorProfile?.display_name || 'Anonymous'}
+        </Text>
 
         <View style={styles.meta}>
           <Text style={styles.metaText}>{union.member_count} members</Text>
@@ -154,6 +160,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#64748b',
     lineHeight: 24,
+    marginBottom: 12,
+  },
+  creatorText: {
+    fontSize: 14,
+    color: '#64748b',
     marginBottom: 20,
   },
   meta: {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -7,6 +7,7 @@ import { useAuthStore } from '../contexts/AuthContext';
 import { Argument, Stance } from '../types';
 import { useVoteOnArgument, useUserVote } from '../hooks/useArgumentVotes';
 import { useDebateStats } from '../hooks/useDebateStats';
+import { useProfiles } from '../hooks/useProfile';
 
 export const DebateDetailScreen = ({ route, navigation }: any) => {
   const { debateId } = route.params;
@@ -44,6 +45,23 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
       return data as Argument[];
     },
   });
+
+  const userIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (debate?.created_by) ids.add(debate.created_by);
+    debateArguments?.forEach(arg => {
+      if (arg.user_id) ids.add(arg.user_id);
+    });
+    return Array.from(ids);
+  }, [debate, debateArguments]);
+
+  const { profiles } = useProfiles(userIds);
+
+  const getDisplayName = (userId: string | null | undefined) => {
+    if (!userId) return 'Anonymous';
+    const profile = profiles[userId];
+    return profile?.display_name || 'Anonymous';
+  };
 
   const createArgumentMutation = useMutation({
     mutationFn: async () => {
@@ -183,6 +201,7 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
               {argument.stance.toUpperCase()}
             </Text>
           </View>
+          <Text style={styles.argumentAuthor}>@{getDisplayName(argument.user_id)}</Text>
         </View>
         
         <Text style={styles.argumentContent}>{argument.content}</Text>
@@ -271,6 +290,7 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
                       {arg.stance.toUpperCase()}
                     </Text>
                   </View>
+                  <Text style={styles.threadCardAuthor}>@{getDisplayName(arg.user_id)}</Text>
                   <Text style={styles.threadCardContent}>{arg.content}</Text>
                   {arg.source_links && arg.source_links.length > 0 && (
                     <Text style={styles.threadCardSources}>🔗 {arg.source_links.length} source(s)</Text>
@@ -310,6 +330,7 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
             </View>
             <Text style={styles.title}>{debate.title}</Text>
             <Text style={styles.description}>{debate.description}</Text>
+            <Text style={styles.debateCreator}>Created by @{getDisplayName(debate.created_by)}</Text>
             <Text style={styles.unionName}>{debate.unions?.name}</Text>
           </View>
         )}
@@ -509,6 +530,11 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 12,
   },
+  debateCreator: {
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 4,
+  },
   unionName: {
     fontSize: 14,
     color: '#94a3b8',
@@ -587,7 +613,15 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   argumentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  argumentAuthor: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '500',
   },
   stanceBadge: {
     alignSelf: 'flex-start',
@@ -814,6 +848,12 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+  },
+  threadCardAuthor: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+    marginTop: 4,
   },
   threadCardContent: {
     fontSize: 14,

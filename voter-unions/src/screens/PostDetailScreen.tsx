@@ -32,7 +32,7 @@ export const PostDetailScreen = ({ route, navigation }: any) => {
         .from('posts')
         .select(`
           *,
-          profiles!posts_author_id_fkey(email),
+          profiles!posts_author_id_fkey(email, display_name),
           unions(name),
           post_channels(
             channels(id, hashtag)
@@ -46,6 +46,7 @@ export const PostDetailScreen = ({ route, navigation }: any) => {
       return {
         ...data,
         author_email: data.profiles?.email,
+        author_display_name: data.profiles?.display_name,
         union_name: data.unions?.name,
         channels: (data.post_channels || [])
           .map((pc: any) => pc?.channels)
