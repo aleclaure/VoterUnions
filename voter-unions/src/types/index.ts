@@ -2,11 +2,20 @@ export type UserRole = 'owner' | 'admin' | 'moderator' | 'member' | 'guest';
 
 export type Stance = 'pro' | 'con' | 'neutral';
 
-export interface User {
+export interface Profile {
   id: string;
   email: string;
+  display_name: string;
+  username_normalized: string;
+  bio: string | null;
+  avatar_url: string | null;
+  last_seen: string;
   created_at: string;
+  updated_at: string;
 }
+
+// Legacy type alias for backward compatibility
+export type User = Profile;
 
 export interface Union {
   id: string;
