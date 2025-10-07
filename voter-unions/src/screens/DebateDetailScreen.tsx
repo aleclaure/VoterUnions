@@ -16,6 +16,7 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
   const [selectedStance, setSelectedStance] = useState<Stance>('neutral');
   const [sourceLink, setSourceLink] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [viewingThread, setViewingThread] = useState<string | null>(null);
   const { data: debateStats } = useDebateStats(debateId);
 
   const { data: debate } = useQuery({
@@ -122,6 +123,26 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
     return debateArguments?.filter(arg => arg.parent_id === parentId) || [];
   };
 
+  // Build thread chain from argument back to root
+  const buildThreadChain = (argumentId: string): Argument[] => {
+    if (!debateArguments) return [];
+    
+    const chain: Argument[] = [];
+    let currentArg = debateArguments.find(arg => arg.id === argumentId);
+    
+    // Trace back to root
+    while (currentArg) {
+      chain.unshift(currentArg); // Add to beginning of array
+      if (currentArg.parent_id) {
+        currentArg = debateArguments.find(arg => arg.id === currentArg!.parent_id);
+      } else {
+        currentArg = undefined;
+      }
+    }
+    
+    return chain;
+  };
+
   // Recursive component to render argument and all its nested replies
   const RenderArgumentWithReplies = ({ argument }: { argument: Argument }) => {
     const replies = getReplies(argument.id);
@@ -143,7 +164,7 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
     return <RenderArgumentWithReplies argument={item} />;
   };
 
-  const ArgumentCard = ({ argument, debateId, onReply }: { argument: Argument; debateId: string; onReply: (id: string) => void }) => {
+  const ArgumentCard = ({ argument, debateId, onReply, showThread }: { argument: Argument; debateId: string; onReply: (id: string) => void; showThread?: boolean }) => {
     const voteMutation = useVoteOnArgument();
     const { data: userVote } = useUserVote(argument.id);
 
@@ -152,6 +173,7 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
     };
 
     const voteScore = (argument.upvotes || 0) - (argument.downvotes || 0);
+    const isReply = argument.parent_id !== null;
 
     return (
       <View style={styles.argumentCard}>
@@ -200,12 +222,73 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity 
-            style={styles.replyButton}
-            onPress={() => onReply(argument.id)}
+          <View style={styles.actionButtons}>
+            {isReply && showThread !== false && (
+              <TouchableOpacity 
+                style={styles.threadButton}
+                onPress={() => setViewingThread(argument.id)}
+              >
+                <Text style={styles.threadButtonText}>🧵 Thread</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity 
+              style={styles.replyButton}
+              onPress={() => onReply(argument.id)}
+            >
+              <Text style={styles.replyButtonText}>↩ Reply</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  // Thread View Component
+  const ThreadView = ({ argumentId }: { argumentId: string }) => {
+    const threadChain = buildThreadChain(argumentId);
+    
+    return (
+      <View style={styles.threadViewOverlay}>
+        <View style={styles.threadViewContainer}>
+          <View style={styles.threadViewHeader}>
+            <Text style={styles.threadViewTitle}>Conversation Thread</Text>
+            <TouchableOpacity onPress={() => setViewingThread(null)}>
+              <Text style={styles.threadViewClose}>✕ Close</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView 
+            horizontal 
+            style={styles.threadScrollView}
+            showsHorizontalScrollIndicator={true}
+            contentContainerStyle={styles.threadScrollContent}
           >
-            <Text style={styles.replyButtonText}>↩ Reply</Text>
-          </TouchableOpacity>
+            {threadChain.map((arg, index) => (
+              <View key={arg.id} style={styles.threadItemWrapper}>
+                <View style={styles.threadCard}>
+                  <View style={[styles.stanceBadge, { backgroundColor: getStanceBgColor(arg.stance) }]}>
+                    <Text style={[styles.stanceText, { color: getStanceColor(arg.stance) }]}>
+                      {arg.stance.toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.threadCardContent}>{arg.content}</Text>
+                  {arg.source_links && arg.source_links.length > 0 && (
+                    <Text style={styles.threadCardSources}>🔗 {arg.source_links.length} source(s)</Text>
+                  )}
+                  <View style={styles.threadCardFooter}>
+                    <Text style={styles.threadCardVotes}>
+                      {(arg.upvotes || 0) - (arg.downvotes || 0)} points
+                    </Text>
+                  </View>
+                </View>
+                {index < threadChain.length - 1 && (
+                  <View style={styles.threadArrow}>
+                    <Text style={styles.threadArrowText}>→</Text>
+                  </View>
+                )}
+              </View>
+            ))}
+          </ScrollView>
         </View>
       </View>
     );
@@ -371,6 +454,8 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
           />
         </View>
       </ScrollView>
+      
+      {viewingThread && <ThreadView argumentId={viewingThread} />}
     </SafeAreaView>
   );
 };
@@ -663,5 +748,98 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#dc2626',
     fontWeight: '500',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  threadButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  threadButtonText: {
+    fontSize: 14,
+    color: '#2563eb',
+    fontWeight: '500',
+  },
+  threadViewOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  threadViewContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    maxHeight: '80%',
+  },
+  threadViewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  threadViewTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  threadViewClose: {
+    fontSize: 16,
+    color: '#dc2626',
+    fontWeight: '500',
+  },
+  threadScrollView: {
+    flex: 1,
+  },
+  threadScrollContent: {
+    padding: 20,
+    gap: 0,
+  },
+  threadItemWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  threadCard: {
+    width: 280,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  threadCardContent: {
+    fontSize: 14,
+    color: '#1e293b',
+    lineHeight: 20,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  threadCardSources: {
+    fontSize: 12,
+    color: '#64748b',
+    marginBottom: 8,
+  },
+  threadCardFooter: {
+    marginTop: 4,
+  },
+  threadCardVotes: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  threadArrow: {
+    marginHorizontal: 8,
+  },
+  threadArrowText: {
+    fontSize: 24,
+    color: '#94a3b8',
   },
 });
