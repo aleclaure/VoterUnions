@@ -3,7 +3,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { AuthScreen } from '../screens/AuthScreen';
-import { UnionsScreen } from '../screens/UnionsScreen';
 import { DebatesScreen } from '../screens/DebatesScreen';
 import { VoteScreen } from '../screens/VoteScreen';
 import { ProgressScreen } from '../screens/ProgressScreen';
@@ -12,6 +11,7 @@ import { CreateUnionScreen } from '../screens/CreateUnionScreen';
 import { DebateDetailScreen } from '../screens/DebateDetailScreen';
 import { CreateDebateScreen } from '../screens/CreateDebateScreen';
 import { CandidateDetailScreen } from '../screens/CandidateDetailScreen';
+import { UnionsTabNavigator } from './UnionsTabNavigator';
 import { useAuth } from '../hooks/useAuth';
 import { Text } from 'react-native';
 
@@ -29,7 +29,7 @@ const MainTabs = () => {
     >
       <Tab.Screen
         name="UnionsTab"
-        component={UnionsScreen}
+        component={UnionsTabNavigator}
         options={{
           tabBarLabel: 'Unions',
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🏛️</Text>,
