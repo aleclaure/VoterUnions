@@ -25,7 +25,14 @@ The application is built using Expo SDK 52 with React Native and TypeScript in s
 **Key Features:**
 - **Authentication**: Email OTP login/signup, secure token storage with `expo-secure-store`, auto token refresh, and session management via React Context API with memoized functions for stable references.
 - **Union Management**: Users can browse public unions, view details, create new unions, join existing ones, and manage members with role-based access control (owner, admin, moderator, member, guest).
-- **Debate System**: Functionality to browse debates by union, filter by issue area, create debates, and add arguments with stance selection (pro/con/neutral). Arguments display reaction counts with real-time updates.
+- **Enhanced Debate System**: 
+  - Browse debates by union and filter by issue area
+  - Create debates and add arguments with stance selection (PRO/CON/NEUTRAL)
+  - **Voting System**: Upvote/downvote arguments with real-time vote tallies
+  - **Real-time Scoreboard**: Visual display of debate momentum showing which side is winning
+  - **Source Attachments**: Add URLs and documents to support arguments
+  - **Threaded Replies**: Reply to arguments with 1-level threading
+  - **Notifications**: Alerts when debate momentum shifts significantly
 - **Voting & Pledging**: Users can browse candidates and policies, pledge support or opposition, with pledges scoped to specific unions and supporting multi-union participation.
 - **Progress Tracking**: Features for viewing campaign milestones, tracking completion percentages, and monitoring deadlines, all scoped to individual unions.
 
@@ -41,6 +48,15 @@ The application is built using Expo SDK 52 with React Native and TypeScript in s
 - Strict TypeScript mode and a managed Expo workflow ensure a consistent and robust development environment.
 
 ## Recent Changes
+- **October 7, 2025**: Enhanced debate system with interactive features:
+  - **Database Updates**: Added `parent_id`, `source_links`, `upvotes`, `downvotes` columns to `arguments` table
+  - **New Tables**: Created `argument_votes` table to track individual votes with proper RLS policies
+  - **Voting System**: Implemented upvote/downvote functionality with real-time vote tallies
+  - **Real-time Scoreboard**: Added visual scoreboard showing PRO/CON/NEUTRAL debate momentum
+  - **Supabase Realtime**: Integrated live updates for votes and arguments
+  - **Database Migration**: Created `debate-enhancements-migration.sql` - must be run in Supabase SQL Editor to activate new features
+  - **Files Modified**: `DebateDetailScreen.tsx`, `supabase-schema.sql`, `types/index.ts`
+  - **New Hooks**: `useArgumentVotes.ts`, `useDebateStats.ts`
 - **October 6, 2025**: Migrated authentication state management from Zustand to React Context API to resolve Snackager bundling errors. Zustand was causing @types/react peer dependency conflicts in Expo's cloud bundler. The new AuthContext implementation uses useCallback and useMemo to ensure stable function references, maintaining the same behavior as the previous Zustand store while eliminating the bundling issues.
 
 ## External Dependencies

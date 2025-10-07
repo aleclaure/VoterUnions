@@ -44,13 +44,17 @@ CREATE TABLE IF NOT EXISTS debates (
   deleted_at TIMESTAMPTZ
 );
 
--- Arguments table
+-- Arguments table (enhanced with reply, source, and voting features)
 CREATE TABLE IF NOT EXISTS arguments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   debate_id UUID REFERENCES debates(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  parent_id UUID REFERENCES arguments(id) ON DELETE CASCADE,
   stance TEXT CHECK (stance IN ('pro', 'con', 'neutral')),
   content TEXT NOT NULL,
+  source_links TEXT[] DEFAULT '{}',
+  upvotes INTEGER DEFAULT 0,
+  downvotes INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   reaction_count INTEGER DEFAULT 0,
   deleted_at TIMESTAMPTZ
@@ -62,6 +66,16 @@ CREATE TABLE IF NOT EXISTS reactions (
   argument_id UUID REFERENCES arguments(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   type TEXT CHECK (type IN ('agree', 'disagree', 'neutral')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(argument_id, user_id)
+);
+
+-- Argument votes table (upvote/downvote tracking)
+CREATE TABLE IF NOT EXISTS argument_votes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  argument_id UUID REFERENCES arguments(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  vote_type TEXT CHECK (vote_type IN ('upvote', 'downvote')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(argument_id, user_id)
 );
@@ -176,7 +190,11 @@ CREATE INDEX IF NOT EXISTS idx_union_members_union_id ON union_members(union_id)
 CREATE INDEX IF NOT EXISTS idx_union_members_user_id ON union_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_debates_union_id ON debates(union_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_arguments_debate_id ON arguments(debate_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_arguments_parent_id ON arguments(parent_id);
+CREATE INDEX IF NOT EXISTS idx_arguments_votes ON arguments((upvotes - downvotes) DESC);
 CREATE INDEX IF NOT EXISTS idx_reactions_argument_id ON reactions(argument_id);
+CREATE INDEX IF NOT EXISTS idx_argument_votes_argument_id ON argument_votes(argument_id);
+CREATE INDEX IF NOT EXISTS idx_argument_votes_user_id ON argument_votes(user_id);
 CREATE INDEX IF NOT EXISTS idx_pledges_union_id ON pledges(union_id);
 CREATE INDEX IF NOT EXISTS idx_milestones_union_id ON milestones(union_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_channels_union_id ON channels(union_id, created_at DESC);
@@ -200,6 +218,7 @@ ALTER TABLE union_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE debates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE arguments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE argument_votes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE candidates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE policies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pledges ENABLE ROW LEVEL SECURITY;
@@ -235,6 +254,12 @@ CREATE POLICY "Authenticated users can create arguments" ON arguments FOR INSERT
 CREATE POLICY "Users can view all reactions" ON reactions FOR SELECT USING (true);
 CREATE POLICY "Authenticated users can create reactions" ON reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can delete own reactions" ON reactions FOR DELETE USING (auth.uid() = user_id);
+
+-- Argument votes policies
+CREATE POLICY "Users can view all argument votes" ON argument_votes FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can vote on arguments" ON argument_votes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own votes" ON argument_votes FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own votes" ON argument_votes FOR DELETE USING (auth.uid() = user_id);
 
 -- Candidates policies
 CREATE POLICY "Everyone can view candidates" ON candidates FOR SELECT USING (true);
@@ -456,3 +481,32 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trigger_update_post_comment_count
 AFTER INSERT OR UPDATE OR DELETE ON comments
 FOR EACH ROW EXECUTE FUNCTION update_post_comment_count();
+
+-- Function to update argument vote counts (upvote/downvote)
+CREATE OR REPLACE FUNCTION update_argument_vote_count()
+RETURNS TRIGGER AS $$
+DECLARE
+  target_argument_id UUID;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    target_argument_id := OLD.argument_id;
+  ELSE
+    target_argument_id := NEW.argument_id;
+  END IF;
+  
+  UPDATE arguments SET 
+    upvotes = (SELECT COUNT(*) FROM argument_votes WHERE argument_id = target_argument_id AND vote_type = 'upvote'),
+    downvotes = (SELECT COUNT(*) FROM argument_votes WHERE argument_id = target_argument_id AND vote_type = 'downvote')
+  WHERE id = target_argument_id;
+  
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  ELSE
+    RETURN NEW;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_argument_vote_count
+AFTER INSERT OR UPDATE OR DELETE ON argument_votes
+FOR EACH ROW EXECUTE FUNCTION update_argument_vote_count();

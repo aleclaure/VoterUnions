@@ -5,6 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../contexts/AuthContext';
 import { Argument, Stance } from '../types';
+import { useVoteOnArgument, useUserVote } from '../hooks/useArgumentVotes';
+import { useDebateStats } from '../hooks/useDebateStats';
 
 export const DebateDetailScreen = ({ route, navigation }: any) => {
   const { debateId } = route.params;
@@ -12,6 +14,7 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
   const queryClient = useQueryClient();
   const [argumentContent, setArgumentContent] = useState('');
   const [selectedStance, setSelectedStance] = useState<Stance>('neutral');
+  const { data: debateStats } = useDebateStats(debateId);
 
   const { data: debate } = useQuery({
     queryKey: ['debate', debateId],
@@ -95,17 +98,62 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
     }
   };
 
-  const renderArgument = ({ item }: { item: Argument }) => (
-    <View style={styles.argumentCard}>
-      <View style={[styles.stanceBadge, { backgroundColor: getStanceBgColor(item.stance) }]}>
-        <Text style={[styles.stanceText, { color: getStanceColor(item.stance) }]}>
-          {item.stance.toUpperCase()}
-        </Text>
+  const renderArgument = ({ item }: { item: Argument }) => {
+    return <ArgumentCard argument={item} debateId={debateId} />;
+  };
+
+  const ArgumentCard = ({ argument, debateId }: { argument: Argument; debateId: string }) => {
+    const voteMutation = useVoteOnArgument();
+    const { data: userVote } = useUserVote(argument.id);
+
+    const handleVote = (voteType: 'upvote' | 'downvote') => {
+      voteMutation.mutate({ argumentId: argument.id, voteType, debateId });
+    };
+
+    const voteScore = (argument.upvotes || 0) - (argument.downvotes || 0);
+
+    return (
+      <View style={styles.argumentCard}>
+        <View style={styles.argumentHeader}>
+          <View style={[styles.stanceBadge, { backgroundColor: getStanceBgColor(argument.stance) }]}>
+            <Text style={[styles.stanceText, { color: getStanceColor(argument.stance) }]}>
+              {argument.stance.toUpperCase()}
+            </Text>
+          </View>
+        </View>
+        
+        <Text style={styles.argumentContent}>{argument.content}</Text>
+
+        <View style={styles.argumentFooter}>
+          <View style={styles.voteButtons}>
+            <TouchableOpacity
+              style={[styles.voteButton, userVote?.vote_type === 'upvote' && styles.voteButtonActive]}
+              onPress={() => handleVote('upvote')}
+            >
+              <Text style={[styles.voteButtonText, userVote?.vote_type === 'upvote' && styles.voteButtonTextActive]}>
+                ▲ {argument.upvotes || 0}
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={[styles.voteScore, voteScore > 0 && styles.voteScorePositive, voteScore < 0 && styles.voteScoreNegative]}>
+              {voteScore > 0 ? '+' : ''}{voteScore}
+            </Text>
+
+            <TouchableOpacity
+              style={[styles.voteButton, userVote?.vote_type === 'downvote' && styles.voteButtonActive]}
+              onPress={() => handleVote('downvote')}
+            >
+              <Text style={[styles.voteButtonText, userVote?.vote_type === 'downvote' && styles.voteButtonTextActive]}>
+                ▼ {argument.downvotes || 0}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.argumentMeta}>{argument.reaction_count} reactions</Text>
+        </View>
       </View>
-      <Text style={styles.argumentContent}>{item.content}</Text>
-      <Text style={styles.argumentMeta}>{item.reaction_count} reactions</Text>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -126,6 +174,68 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
             <Text style={styles.unionName}>{debate.unions?.name}</Text>
           </View>
         )}
+
+        {debateStats && debateStats.total > 0 && (() => {
+          const totalVotes = debateStats.pro.votes + debateStats.con.votes + debateStats.neutral.votes || 1;
+          const proWidth = `${Math.max(0, Math.round((debateStats.pro.votes / totalVotes) * 100))}%`;
+          const conWidth = `${Math.max(0, Math.round((debateStats.con.votes / totalVotes) * 100))}%`;
+          const neutralWidth = `${Math.max(0, Math.round((debateStats.neutral.votes / totalVotes) * 100))}%`;
+          
+          return (
+            <View style={styles.scoreboardContainer}>
+              <Text style={styles.scoreboardTitle}>Debate Scoreboard</Text>
+              <View style={styles.scoreboardBars}>
+                <View style={styles.scoreboardRow}>
+                  <Text style={styles.scoreboardLabel}>🟩 PRO</Text>
+                  <View style={styles.scoreboardBarContainer}>
+                    <View 
+                      style={[
+                        styles.scoreboardBar, 
+                        styles.scoreboardBarPro,
+                        { width: proWidth }
+                      ]} 
+                    />
+                  </View>
+                  <Text style={styles.scoreboardPercentage}>
+                    {debateStats.pro.count} ({debateStats.pro.votes > 0 ? '+' : ''}{debateStats.pro.votes})
+                  </Text>
+                </View>
+                
+                <View style={styles.scoreboardRow}>
+                  <Text style={styles.scoreboardLabel}>🟥 CON</Text>
+                  <View style={styles.scoreboardBarContainer}>
+                    <View 
+                      style={[
+                        styles.scoreboardBar, 
+                        styles.scoreboardBarCon,
+                        { width: conWidth }
+                      ]} 
+                    />
+                  </View>
+                  <Text style={styles.scoreboardPercentage}>
+                    {debateStats.con.count} ({debateStats.con.votes > 0 ? '+' : ''}{debateStats.con.votes})
+                  </Text>
+                </View>
+
+                <View style={styles.scoreboardRow}>
+                  <Text style={styles.scoreboardLabel}>🟦 NEUTRAL</Text>
+                  <View style={styles.scoreboardBarContainer}>
+                    <View 
+                      style={[
+                        styles.scoreboardBar, 
+                        styles.scoreboardBarNeutral,
+                        { width: neutralWidth }
+                      ]} 
+                    />
+                  </View>
+                  <Text style={styles.scoreboardPercentage}>
+                    {debateStats.neutral.count} ({debateStats.neutral.votes > 0 ? '+' : ''}{debateStats.neutral.votes})
+                  </Text>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
 
         <View style={styles.addArgument}>
           <Text style={styles.sectionTitle}>Add Your Argument</Text>
@@ -306,12 +416,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
+  argumentHeader: {
+    marginBottom: 8,
+  },
   stanceBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
-    marginBottom: 8,
   },
   stanceText: {
     fontSize: 12,
@@ -323,6 +435,47 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 12,
   },
+  argumentFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  voteButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  voteButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#fff',
+  },
+  voteButtonActive: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  voteButtonText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  voteButtonTextActive: {
+    color: '#fff',
+  },
+  voteScore: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  voteScorePositive: {
+    color: '#16a34a',
+  },
+  voteScoreNegative: {
+    color: '#dc2626',
+  },
   argumentMeta: {
     fontSize: 12,
     color: '#94a3b8',
@@ -331,5 +484,56 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#94a3b8',
     marginTop: 20,
+  },
+  scoreboardContainer: {
+    backgroundColor: '#fff',
+    padding: 20,
+    marginTop: 8,
+  },
+  scoreboardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 16,
+  },
+  scoreboardBars: {
+    gap: 12,
+  },
+  scoreboardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  scoreboardLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    width: 90,
+  },
+  scoreboardBarContainer: {
+    flex: 1,
+    height: 24,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  scoreboardBar: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  scoreboardBarPro: {
+    backgroundColor: '#16a34a',
+  },
+  scoreboardBarCon: {
+    backgroundColor: '#dc2626',
+  },
+  scoreboardBarNeutral: {
+    backgroundColor: '#64748b',
+  },
+  scoreboardPercentage: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
+    width: 80,
+    textAlign: 'right',
   },
 });

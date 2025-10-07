@@ -42,10 +42,23 @@ export interface Argument {
   id: string;
   debate_id: string;
   user_id: string;
+  parent_id: string | null;
   stance: Stance;
   content: string;
+  source_links: string[];
+  upvotes: number;
+  downvotes: number;
   created_at: string;
   reaction_count: number;
+  replies?: Argument[];
+}
+
+export interface ArgumentVote {
+  id: string;
+  argument_id: string;
+  user_id: string;
+  vote_type: 'upvote' | 'downvote';
+  created_at: string;
 }
 
 export interface Reaction {

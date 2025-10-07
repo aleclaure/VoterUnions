@@ -1,0 +1,206 @@
+Perfect — here’s a detailed natural-language prompt you can give to your AI coding agent to plan and design the new debate interaction system, based on the interface shown in your screenshot and your new ideas.
+It describes everything to fix, extend, and add — with no code, just clear design and functional requirements.
+
+⸻
+
+🧩 Voter Unions App — Debate Page Enhancements (Fix + Reply, Sources, and Vote Features)
+
+Context
+
+This page is part of the Debate section for a specific issue and union.
+Example debate:
+
+Question: “Do you think immigrants steal jobs?”
+Union: Coalition for Immigration Advocacy
+Channel/Topic: Immigrant Rights
+
+The page currently shows:
+	•	The debate title and description.
+	•	The union and issue context.
+	•	Buttons to add an argument as PRO, CON, or NEUTRAL.
+	•	An input box for users to write their argument.
+	•	A “Submit Argument” button.
+	•	A list of existing arguments with tags (e.g., CON) and reaction counts.
+
+⸻
+
+1️⃣ Primary Issue to Fix
+
+Problem
+
+When a user submits an argument, it appears only under the initial list of arguments but cannot be replied to, cannot show shared sources, and cannot be voted on meaningfully by others.
+
+Goal
+	•	Make debates interactive and dynamic.
+	•	Allow direct replies, sharing credible sources, and real-time voting to show which side (PRO, CON, or NEUTRAL) is currently “winning.”
+	•	When one side gains significant support, notify the original argument author to respond — by doubling down, adding more evidence, or withdrawing their stance.
+
+⸻
+
+2️⃣ Debate Page Structure — Updated Layout
+
+A. Debate Header (unchanged)
+	•	Title, topic, and category labels (e.g., Immigrant Rights).
+	•	Information about the issue (short description).
+	•	Union name (e.g., Coalition for Immigration Advocacy).
+
+B. Add Your Argument (existing section)
+	•	Buttons for PRO, CON, NEUTRAL (retain current design).
+	•	Text field for the argument.
+	•	“Submit Argument” button.
+	•	Below this, introduce optional inputs:
+	•	Attach a Source: user pastes a URL or document link.
+	•	Upload Evidence (optional): attach image, screenshot, or document (stored in Supabase Storage).
+	•	Preview button to see the formatted argument with citations before submitting.
+
+⸻
+
+3️⃣ New Feature: Replies to Arguments
+
+Purpose
+
+Allow users to respond directly to another person’s argument to create threaded discussions.
+
+Behavior
+	•	Each argument card includes a Reply button.
+	•	When tapped, a nested input box appears below that specific argument.
+	•	Users can type a reply, optionally attach a source link, and submit.
+	•	Replies appear indented below the parent argument in chronological order.
+	•	Each reply displays:
+	•	Username or alias.
+	•	Timestamp.
+	•	Any attached sources (link previews or thumbnails).
+	•	Vote count (see next section).
+
+Data model note (for the coding agent)
+	•	Replies should be stored in the same arguments or comments table, referencing a parent argument ID (parent_id), enabling hierarchical threading.
+	•	Maximum nesting depth = 1 (just one level of replies to avoid deep threads).
+
+⸻
+
+4️⃣ New Feature: Sharing Sources
+
+Purpose
+
+Encourage users to back their claims with facts, links, and documents.
+
+Behavior
+	•	When submitting an argument or reply:
+	•	The user can add one or more sources via pasted URL links or file attachments.
+	•	Sources display as:
+	•	Link previews (title, domain, short description).
+	•	Attachment tags (e.g., PDFs or screenshots).
+	•	Users can click to open the source in a browser view or preview modal.
+
+Optional Enhancement
+	•	Add a “Source Type” label: Article, Study, News, Video, etc.
+	•	Allow sorting or filtering arguments by presence of sources (e.g., “Show sourced arguments only”).
+
+⸻
+
+5️⃣ New Feature: Voting System (PRO vs CON Dynamics)
+
+Purpose
+
+Enable users to support the argument or side they agree with — creating live feedback for which side is “winning.”
+
+Voting Mechanics
+	•	Each argument (and its replies) has upvote/downvote buttons or side-based votes (supports PRO, CON, NEUTRAL).
+	•	Votes contribute to:
+	•	The argument’s score.
+	•	The side’s total momentum (aggregate per side in that debate).
+
+Real-time Display
+	•	Show a “Debate Scoreboard” or Progress Bar near the top:
+	•	Example:
+	•	🟩 PRO — 62%
+	•	🟥 CON — 33%
+	•	🟦 NEUTRAL — 5%
+	•	Update in real-time when votes occur (using Supabase Realtime).
+
+⸻
+
+6️⃣ New Feature: Engagement Notifications
+
+Purpose
+
+Keep users invested in the debate outcome and motivate evidence-based refinement.
+
+Triggers
+	•	If a user’s argument or side is losing momentum:
+	•	Send a notification:
+“Your argument on ‘Immigrants and Jobs’ is being challenged. Strengthen it with new sources or edits.”
+	•	If their side is winning:
+	•	Send a positive reinforcement:
+“Your argument is gaining support! Keep up the engagement.”
+	•	Users can also opt-in for reminders when their argument receives new replies or opposing evidence.
+
+Implementation outline
+	•	Notifications can be:
+	•	In-app push (Expo Notifications API).
+	•	Email or in-app alert feed.
+	•	Configurable thresholds:
+	•	Example: Notify if side changes >15% difference in votes.
+	•	Notify if a reply receives >5 upvotes in opposition.
+
+⸻
+
+7️⃣ UX Behavior Summary
+
+Section	Description
+Reply	Tap “Reply” on any argument to add a comment and optional source.
+Vote	Upvote/downvote or side-vote (PRO/CON/NEUTRAL). Real-time scoreboard updates.
+Sources	Add links or upload files to support arguments. Show link previews under each argument.
+Notifications	Automated triggers if your side’s support shifts significantly.
+Hierarchy	1-level nesting for replies. Clear indentation and timestamps.
+Filters	Sort by newest, most votes, or most sourced arguments.
+
+
+⸻
+
+8️⃣ Data & Interaction Plan (High-Level)
+
+Tables / Entities (conceptual)
+	•	debates → stores the question, issue, and union link.
+	•	arguments → stores user submissions (fields: id, debate_id, side, body, source_links[], parent_id, upvotes, downvotes).
+	•	votes → maps user votes to argument IDs.
+	•	notifications → stores triggered messages for users.
+	•	sources (optional) → for file uploads (linked to argument ID).
+
+Relationships
+	•	One debate → many arguments.
+	•	One argument → many replies (via parent_id).
+	•	One argument → many votes.
+	•	One user → many arguments, votes, notifications.
+
+⸻
+
+9️⃣ Future Enhancements (Optional but Compatible)
+	•	“Fact-check” badge system: verified users or moderators can tag sources as credible or disputed.
+	•	“Double Down Mode”: one-click button to reopen your losing argument in edit mode, encouraging refinement.
+	•	Debate analytics dashboard: visual graphs showing shifts in vote trends over time.
+	•	Gamification: badges for “Most Sourced,” “Most Upvoted,” “Fact Finder,” etc.
+
+⸻
+
+10️⃣ Acceptance Criteria (Black-Box Testing)
+	1.	✅ Replies appear under the correct argument and load instantly.
+	2.	✅ Arguments and replies show source links with previews or attachments.
+	3.	✅ Users can upvote/downvote arguments, with totals reflected in real-time.
+	4.	✅ The overall side score (PRO/CON/NEUTRAL) updates across the debate.
+	5.	✅ Notifications trigger correctly when side ratios shift or replies arrive.
+	6.	✅ App performance remains stable on both iOS and Android through Expo Go.
+
+⸻
+
+Final Instruction to the AI Coding Agent
+
+Implement these debate enhancements step by step:
+	•	First, fix the visibility issue where new arguments don’t appear.
+	•	Then, add the reply, source sharing, and voting system, followed by notifications for debate dynamics.
+	•	Maintain Expo compatibility and Supabase integration for all storage, votes, and real-time updates.
+	•	No hardcoded logic; ensure dynamic, multi-debate scalability.
+
+⸻
+
+Would you like me to follow this by drafting the UI/UX layout description (how these reply threads, sources, and vote counters visually appear on mobile)? It would look like an extended visual spec for Expo front-end builders.
