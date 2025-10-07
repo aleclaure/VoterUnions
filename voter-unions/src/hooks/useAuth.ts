@@ -23,6 +23,39 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, [setSession, setUser, setIsLoading]);
 
+  const signUp = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: undefined,
+      },
+    });
+    return { data, error };
+  };
+
+  const signInWithPassword = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    return { data, error };
+  };
+
+  const resetPassword = async (email: string) => {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: undefined,
+    });
+    return { data, error };
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    return { data, error };
+  };
+
   const signInWithOTP = async (email: string) => {
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -54,6 +87,10 @@ export const useAuth = () => {
     user,
     session,
     isLoading,
+    signUp,
+    signInWithPassword,
+    resetPassword,
+    updatePassword,
     signInWithOTP,
     verifyOTP,
     signOut,
