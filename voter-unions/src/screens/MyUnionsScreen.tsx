@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { usePosts, usePostReaction, usePostReactionsRealtime } from '../hooks/usePosts';
-import { useChannels } from '../hooks/useChannels';
+import { useChannels, useCreateChannel } from '../hooks/useChannels';
 import { PostCard } from '../components/PostCard';
 import { CreatePostModal } from '../components/CreatePostModal';
 import { CreateChannelModal } from '../components/CreateChannelModal';
@@ -36,6 +36,7 @@ export const MyUnionsScreen = ({ navigation }: any) => {
   const { data: channels } = useChannels(selectedUnionId || '');
   const { data: posts, isLoading: postsLoading } = usePosts(selectedUnionId || undefined);
   const postReactionMutation = usePostReaction();
+  const createChannelMutation = useCreateChannel();
   
   usePostReactionsRealtime();
 
@@ -77,14 +78,19 @@ export const MyUnionsScreen = ({ navigation }: any) => {
   const handleCreateChannel = async (name: string, hashtag: string, description: string, isPublic: boolean) => {
     if (!user || !selectedUnionId) return;
     
-    await supabase.from('channels').insert({
-      union_id: selectedUnionId,
-      name,
-      hashtag,
-      description,
-      is_public: isPublic,
-      created_by: user.id,
-    });
+    try {
+      await createChannelMutation.mutateAsync({
+        unionId: selectedUnionId,
+        name,
+        hashtag,
+        description,
+        isPublic,
+        userId: user.id,
+      });
+    } catch (error) {
+      console.error('Error creating channel:', error);
+      throw error;
+    }
   };
 
   if (!user) {
