@@ -220,7 +220,7 @@ CREATE POLICY "Authenticated users can create unions" ON unions FOR INSERT WITH 
 CREATE POLICY "Union owners and admins can update" ON unions FOR UPDATE USING (auth.uid() IN (SELECT user_id FROM union_members WHERE union_id = unions.id AND role IN ('owner', 'admin')));
 
 -- Union members policies
-CREATE POLICY "Members can view union memberships" ON union_members FOR SELECT USING (auth.uid() = user_id OR union_id IN (SELECT id FROM unions WHERE is_public = true));
+CREATE POLICY "Members can view union memberships" ON union_members FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can join public unions" ON union_members FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Debates policies
