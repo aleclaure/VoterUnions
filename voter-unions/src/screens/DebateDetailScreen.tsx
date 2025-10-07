@@ -15,6 +15,7 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
   const [argumentContent, setArgumentContent] = useState('');
   const [selectedStance, setSelectedStance] = useState<Stance>('neutral');
   const [sourceLink, setSourceLink] = useState('');
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const { data: debateStats } = useDebateStats(debateId);
 
   const { data: debate } = useQuery({
@@ -54,6 +55,7 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
           stance: selectedStance,
           content: argumentContent,
           source_links: sourceLinks,
+          parent_id: replyingTo,
         })
         .select()
         .single();
@@ -61,12 +63,14 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
       return data;
     },
     onSuccess: () => {
+      const wasReply = replyingTo !== null;
       queryClient.invalidateQueries({ queryKey: ['arguments', debateId] });
       queryClient.invalidateQueries({ queryKey: ['debateStats', debateId] });
       setArgumentContent('');
       setSelectedStance('neutral');
       setSourceLink('');
-      Alert.alert('Success', 'Argument added!');
+      setReplyingTo(null);
+      Alert.alert('Success', wasReply ? 'Reply added!' : 'Argument added!');
     },
     onError: (error: Error) => {
       Alert.alert('Error', error.message);
@@ -112,11 +116,29 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
     }
   };
 
-  const renderArgument = ({ item }: { item: Argument }) => {
-    return <ArgumentCard argument={item} debateId={debateId} />;
+  // Get top-level arguments (no parent) and replies
+  const topLevelArguments = debateArguments?.filter(arg => !arg.parent_id) || [];
+  const getReplies = (parentId: string) => {
+    return debateArguments?.filter(arg => arg.parent_id === parentId) || [];
   };
 
-  const ArgumentCard = ({ argument, debateId }: { argument: Argument; debateId: string }) => {
+  const renderArgument = ({ item }: { item: Argument }) => {
+    const replies = getReplies(item.id);
+    return (
+      <View>
+        <ArgumentCard argument={item} debateId={debateId} onReply={setReplyingTo} />
+        {replies.length > 0 && (
+          <View style={styles.repliesContainer}>
+            {replies.map(reply => (
+              <ArgumentCard key={reply.id} argument={reply} debateId={debateId} onReply={setReplyingTo} />
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const ArgumentCard = ({ argument, debateId, onReply }: { argument: Argument; debateId: string; onReply: (id: string) => void }) => {
     const voteMutation = useVoteOnArgument();
     const { data: userVote } = useUserVote(argument.id);
 
@@ -173,7 +195,12 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.argumentMeta}>{argument.reaction_count} reactions</Text>
+          <TouchableOpacity 
+            style={styles.replyButton}
+            onPress={() => onReply(argument.id)}
+          >
+            <Text style={styles.replyButtonText}>↩ Reply</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -262,7 +289,18 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
         })()}
 
         <View style={styles.addArgument}>
-          <Text style={styles.sectionTitle}>Add Your Argument</Text>
+          <Text style={styles.sectionTitle}>{replyingTo ? 'Add Your Reply' : 'Add Your Argument'}</Text>
+          
+          {replyingTo && (
+            <View style={styles.replyingToContainer}>
+              <Text style={styles.replyingToText}>
+                Replying to argument
+              </Text>
+              <TouchableOpacity onPress={() => setReplyingTo(null)}>
+                <Text style={styles.cancelReplyText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           
           <View style={styles.stanceSelector}>
             {(['pro', 'con', 'neutral'] as Stance[]).map((stance) => (
@@ -310,15 +348,15 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
             disabled={createArgumentMutation.isPending}
           >
             <Text style={styles.submitButtonText}>
-              {createArgumentMutation.isPending ? 'Submitting...' : 'Submit Argument'}
+              {createArgumentMutation.isPending ? 'Submitting...' : replyingTo ? 'Submit Reply' : 'Submit Argument'}
             </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.argumentsSection}>
-          <Text style={styles.sectionTitle}>Arguments ({debateArguments?.length || 0})</Text>
+          <Text style={styles.sectionTitle}>Arguments ({topLevelArguments.length})</Text>
           <FlatList
-            data={debateArguments}
+            data={topLevelArguments}
             renderItem={renderArgument}
             keyExtractor={(item) => item.id}
             scrollEnabled={false}
@@ -586,5 +624,39 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     width: 80,
     textAlign: 'right',
+  },
+  repliesContainer: {
+    marginLeft: 20,
+    marginTop: 12,
+    paddingLeft: 16,
+    borderLeftWidth: 2,
+    borderLeftColor: '#e2e8f0',
+  },
+  replyButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  replyButtonText: {
+    fontSize: 14,
+    color: '#2563eb',
+    fontWeight: '500',
+  },
+  replyingToContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  replyingToText: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  cancelReplyText: {
+    fontSize: 14,
+    color: '#dc2626',
+    fontWeight: '500',
   },
 });
