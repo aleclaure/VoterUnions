@@ -7,6 +7,8 @@ import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { DebatesScreen } from '../screens/DebatesScreen';
 import { VoteScreen } from '../screens/VoteScreen';
 import { ProgressScreen } from '../screens/ProgressScreen';
+import { ProfileScreen } from '../screens/ProfileScreen';
+import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { UnionDetailScreen } from '../screens/UnionDetailScreen';
 import { CreateUnionScreen } from '../screens/CreateUnionScreen';
 import { DebateDetailScreen } from '../screens/DebateDetailScreen';
@@ -62,6 +64,14 @@ const MainTabs = () => {
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>📊</Text>,
         }}
       />
+      <Tab.Screen
+        name="ProfileTab"
+        component={ProfileScreen}
+        options={{
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>👤</Text>,
+        }}
+      />
     </Tab.Navigator>
   );
 };
@@ -76,6 +86,7 @@ const MainStack = () => {
       <Stack.Screen name="CreateDebate" component={CreateDebateScreen} />
       <Stack.Screen name="CandidateDetail" component={CandidateDetailScreen} />
       <Stack.Screen name="PostDetail" component={PostDetailScreen} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
     </Stack.Navigator>
   );
 };
