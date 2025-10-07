@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { AuthScreen } from '../screens/AuthScreen';
+import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { DebatesScreen } from '../screens/DebatesScreen';
 import { VoteScreen } from '../screens/VoteScreen';
 import { ProgressScreen } from '../screens/ProgressScreen';
@@ -14,6 +15,7 @@ import { CandidateDetailScreen } from '../screens/CandidateDetailScreen';
 import { PostDetailScreen } from '../screens/PostDetailScreen';
 import { UnionsTabNavigator } from './UnionsTabNavigator';
 import { useAuth } from '../hooks/useAuth';
+import { useProfile } from '../hooks/useProfile';
 import { Text } from 'react-native';
 
 const Stack = createNativeStackNavigator();
@@ -79,9 +81,10 @@ const MainStack = () => {
 };
 
 export const AppNavigator = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
+  const { needsOnboarding, isLoading: profileLoading } = useProfile();
 
-  if (isLoading) {
+  if (authLoading || (user && profileLoading)) {
     return null;
   }
 
@@ -90,6 +93,8 @@ export const AppNavigator = () => {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
           <Stack.Screen name="Auth" component={AuthScreen} />
+        ) : needsOnboarding ? (
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         ) : (
           <Stack.Screen name="Main" component={MainStack} />
         )}
