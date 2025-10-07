@@ -23,15 +23,18 @@ Voter Unions is a cross-platform mobile application built with Expo and Supabase
 The application is built using Expo SDK 52 with React Native and TypeScript in strict mode. Navigation is handled by React Navigation, utilizing both bottom tabs and a native stack navigator. State management combines React Query (TanStack) for server state and React Context API for authentication state. The backend leverages Supabase for authentication, PostgreSQL database, Realtime functionalities, and Storage. Security is a paramount concern, with `expo-secure-store` used for token storage and comprehensive Row-Level Security (RLS) policies implemented in Supabase. The system is designed with an offline-first approach using React Query's capabilities.
 
 **Key Features:**
-- **Authentication**: Email OTP login/signup, secure token storage with `expo-secure-store`, auto token refresh, and session management via React Context API with memoized functions for stable references.
-- **Union Management**: Users can browse public unions, view details, create new unions, join existing ones, and manage members with role-based access control (owner, admin, moderator, member, guest).
+- **Authentication**: Email/Password signup and login with email verification, secure token storage with `expo-secure-store`, auto token refresh, password reset functionality, and session management via React Context API with memoized functions for stable references.
+- **User Profiles**: Unique usernames with display names, user bios, profile statistics (debates created, arguments posted, unions joined), profile editing, and password management.
+- **Union Management**: Users can browse public unions, view details, create new unions, join existing ones, and manage members with role-based access control (owner, admin, moderator, member, guest). All actions display user identities.
 - **Enhanced Debate System**: 
   - Browse debates by union and filter by issue area
   - Create debates and add arguments with stance selection (PRO/CON/NEUTRAL)
+  - **User Identity**: All debates, arguments, and replies show @username of creator
   - **Voting System**: Upvote/downvote arguments with real-time vote tallies
   - **Real-time Scoreboard**: Visual display of debate momentum showing which side is winning
   - **Source Attachments**: Add URLs and documents to support arguments
-  - **Threaded Replies**: Reply to arguments with 1-level threading
+  - **Threaded Replies**: Fully recursive reply threading with horizontal thread view
+  - **Horizontal Thread View**: Swipeable conversation chains showing full context
   - **Notifications**: Alerts when debate momentum shifts significantly
 - **Voting & Pledging**: Users can browse candidates and policies, pledge support or opposition, with pledges scoped to specific unions and supporting multi-union participation.
 - **Progress Tracking**: Features for viewing campaign milestones, tracking completion percentages, and monitoring deadlines, all scoped to individual unions.
