@@ -89,7 +89,7 @@ export const MyUnionsScreen = ({ navigation }: any) => {
 
   if (!user) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={[]}>
         <Text style={styles.emptyText}>Please log in to view your unions</Text>
       </SafeAreaView>
     );
@@ -97,7 +97,7 @@ export const MyUnionsScreen = ({ navigation }: any) => {
 
   if (unionsLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={[]}>
         <Text style={styles.loadingText}>Loading...</Text>
       </SafeAreaView>
     );
@@ -105,7 +105,7 @@ export const MyUnionsScreen = ({ navigation }: any) => {
 
   if (!myUnions || myUnions.length === 0) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={[]}>
         <Text style={styles.emptyText}>You haven't joined any unions yet</Text>
         <TouchableOpacity
           style={styles.browseButton}
@@ -118,7 +118,7 @@ export const MyUnionsScreen = ({ navigation }: any) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={[]}>
       <View style={styles.unionBanner}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unionScroll}>
           {myUnions.map(union => (

@@ -100,7 +100,7 @@ export const DiscoverScreen = ({ navigation }: any) => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={[]}>
       <View style={styles.categoryBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {ISSUE_CATEGORIES.map(category => (

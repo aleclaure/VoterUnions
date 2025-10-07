@@ -46,7 +46,7 @@ export const AllPostsScreen = ({ navigation }: any) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={[]}>
       <View style={styles.filterBar}>
         <TouchableOpacity
           style={[styles.filterButton, sortBy === 'recent' && styles.filterButtonActive]}
