@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { usePosts, usePostReaction, usePostReactionsRealtime } from '../hooks/usePosts';
+import { usePosts, usePostReaction, usePostReactionsRealtime, useCreatePost } from '../hooks/usePosts';
 import { useChannels, useCreateChannel } from '../hooks/useChannels';
 import { PostCard } from '../components/PostCard';
 import { CreatePostModal } from '../components/CreatePostModal';
@@ -37,8 +37,26 @@ export const MyUnionsScreen = ({ navigation }: any) => {
   const { data: posts, isLoading: postsLoading } = usePosts(selectedUnionId || undefined);
   const postReactionMutation = usePostReaction();
   const createChannelMutation = useCreateChannel();
+  const createPostMutation = useCreatePost();
   
   usePostReactionsRealtime();
+
+  const { data: allChannels } = useQuery({
+    queryKey: ['all-channels', myUnions?.map(u => u.id).join(',')],
+    queryFn: async () => {
+      if (!myUnions || myUnions.length === 0) return [];
+      const unionIds = myUnions.map(u => u.id);
+      const { data, error } = await supabase
+        .from('channels')
+        .select('*')
+        .in('union_id', unionIds)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!myUnions && myUnions.length > 0,
+  });
 
   React.useEffect(() => {
     if (myUnions && myUnions.length > 0 && !selectedUnionId) {
@@ -60,19 +78,41 @@ export const MyUnionsScreen = ({ navigation }: any) => {
   const handleCreatePost = async (content: string, channelIds: string[], isPublic: boolean) => {
     if (!user || !selectedUnionId) return;
     
-    await supabase.from('posts').insert({
-      union_id: selectedUnionId,
-      author_id: user.id,
-      content,
-      is_public: isPublic,
-    }).select().single().then(({ data: post, error }) => {
-      if (error) throw error;
-      if (channelIds.length > 0) {
-        return supabase.from('post_channels').insert(
-          channelIds.map(cid => ({ post_id: post.id, channel_id: cid }))
-        );
+    try {
+      await createPostMutation.mutateAsync({
+        unionId: selectedUnionId,
+        content,
+        channelIds,
+        isPublic,
+        userId: user.id,
+      });
+    } catch (error) {
+      console.error('Error creating post:', error);
+      throw error;
+    }
+  };
+
+  const handleMultiUnionPost = async (
+    content: string, 
+    unionChannelMap: { unionId: string; channelIds: string[] }[], 
+    isPublic: boolean
+  ) => {
+    if (!user) return;
+    
+    try {
+      for (const { unionId, channelIds } of unionChannelMap) {
+        await createPostMutation.mutateAsync({
+          unionId,
+          content,
+          channelIds,
+          isPublic,
+          userId: user.id,
+        });
       }
-    });
+    } catch (error) {
+      console.error('Error creating multi-union post:', error);
+      throw error;
+    }
   };
 
   const handleCreateChannel = async (name: string, hashtag: string, description: string, isPublic: boolean) => {
@@ -247,8 +287,10 @@ export const MyUnionsScreen = ({ navigation }: any) => {
             visible={showCreatePost}
             onClose={() => setShowCreatePost(false)}
             onSubmit={handleCreatePost}
-            channels={channels || []}
+            channels={allChannels || []}
             unionName={selectedUnion.name}
+            myUnions={myUnions}
+            onMultiUnionSubmit={handleMultiUnionPost}
           />
           <CreateChannelModal
             visible={showCreateChannel}
