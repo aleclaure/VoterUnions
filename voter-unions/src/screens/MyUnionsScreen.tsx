@@ -287,10 +287,11 @@ export const MyUnionsScreen = ({ navigation }: any) => {
             visible={showCreatePost}
             onClose={() => setShowCreatePost(false)}
             onSubmit={handleCreatePost}
-            channels={allChannels || []}
+            channels={channels || []}
             unionName={selectedUnion.name}
             myUnions={myUnions}
             onMultiUnionSubmit={handleMultiUnionPost}
+            allChannels={allChannels || []}
           />
           <CreateChannelModal
             visible={showCreateChannel}

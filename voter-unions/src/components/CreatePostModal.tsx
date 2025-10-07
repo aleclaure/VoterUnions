@@ -19,6 +19,7 @@ interface CreatePostModalProps {
   unionName: string;
   myUnions?: Union[];
   onMultiUnionSubmit?: (content: string, unionChannelMap: { unionId: string; channelIds: string[] }[], isPublic: boolean) => Promise<void>;
+  allChannels?: Channel[];
 }
 
 export const CreatePostModal: React.FC<CreatePostModalProps> = ({
@@ -29,6 +30,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   unionName,
   myUnions,
   onMultiUnionSubmit,
+  allChannels,
 }) => {
   const [content, setContent] = useState('');
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
@@ -37,6 +39,11 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showUnionDropdown, setShowUnionDropdown] = useState(false);
   const [showChannelDropdown, setShowChannelDropdown] = useState(false);
+
+  const channelsToShow = selectedUnionIds.length > 0 && allChannels ? allChannels : channels;
+  const filteredChannels = selectedUnionIds.length > 0 
+    ? channelsToShow.filter(ch => selectedUnionIds.includes(ch.union_id || ''))
+    : channelsToShow;
 
   const handleUnionToggle = (unionId: string) => {
     setSelectedUnionIds((prev) =>
@@ -65,7 +72,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         const unionChannelMap = selectedUnionIds.map(unionId => ({
           unionId,
           channelIds: selectedChannels.filter(cid => 
-            channels.find(ch => ch.id === cid && ch.union_id === unionId)
+            filteredChannels.find(ch => ch.id === cid && ch.union_id === unionId)
           ),
         }));
         await onMultiUnionSubmit(content.trim(), unionChannelMap, isPublic);
@@ -195,7 +202,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
               </View>
             )}
 
-            {channels.length > 0 && (
+            {filteredChannels.length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Post to Channels (optional)</Text>
                 <TouchableOpacity 
@@ -211,7 +218,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                 </TouchableOpacity>
                 {showChannelDropdown && (
                   <View style={styles.dropdownList}>
-                    {channels.map((channel) => (
+                    {filteredChannels.map((channel) => (
                       <TouchableOpacity
                         key={channel.id}
                         style={styles.dropdownItem}
