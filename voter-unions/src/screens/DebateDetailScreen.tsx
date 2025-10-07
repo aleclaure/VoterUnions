@@ -122,20 +122,25 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
     return debateArguments?.filter(arg => arg.parent_id === parentId) || [];
   };
 
-  const renderArgument = ({ item }: { item: Argument }) => {
-    const replies = getReplies(item.id);
+  // Recursive component to render argument and all its nested replies
+  const RenderArgumentWithReplies = ({ argument }: { argument: Argument }) => {
+    const replies = getReplies(argument.id);
     return (
       <View>
-        <ArgumentCard argument={item} debateId={debateId} onReply={setReplyingTo} />
+        <ArgumentCard argument={argument} debateId={debateId} onReply={setReplyingTo} />
         {replies.length > 0 && (
           <View style={styles.repliesContainer}>
             {replies.map(reply => (
-              <ArgumentCard key={reply.id} argument={reply} debateId={debateId} onReply={setReplyingTo} />
+              <RenderArgumentWithReplies key={reply.id} argument={reply} />
             ))}
           </View>
         )}
       </View>
     );
+  };
+
+  const renderArgument = ({ item }: { item: Argument }) => {
+    return <RenderArgumentWithReplies argument={item} />;
   };
 
   const ArgumentCard = ({ argument, debateId, onReply }: { argument: Argument; debateId: string; onReply: (id: string) => void }) => {
