@@ -11,6 +11,7 @@ import { CreateUnionScreen } from '../screens/CreateUnionScreen';
 import { DebateDetailScreen } from '../screens/DebateDetailScreen';
 import { CreateDebateScreen } from '../screens/CreateDebateScreen';
 import { CandidateDetailScreen } from '../screens/CandidateDetailScreen';
+import { PostDetailScreen } from '../screens/PostDetailScreen';
 import { UnionsTabNavigator } from './UnionsTabNavigator';
 import { useAuth } from '../hooks/useAuth';
 import { Text } from 'react-native';
@@ -72,6 +73,7 @@ const MainStack = () => {
       <Stack.Screen name="DebateDetail" component={DebateDetailScreen} />
       <Stack.Screen name="CreateDebate" component={CreateDebateScreen} />
       <Stack.Screen name="CandidateDetail" component={CandidateDetailScreen} />
+      <Stack.Screen name="PostDetail" component={PostDetailScreen} />
     </Stack.Navigator>
   );
 };

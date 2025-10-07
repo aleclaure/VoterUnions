@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { usePosts, usePostReaction } from '../hooks/usePosts';
+import { usePosts, usePostReaction, usePostReactionsRealtime } from '../hooks/usePosts';
 import { useChannels } from '../hooks/useChannels';
 import { PostCard } from '../components/PostCard';
 import { CreatePostModal } from '../components/CreatePostModal';
@@ -36,6 +36,8 @@ export const MyUnionsScreen = ({ navigation }: any) => {
   const { data: channels } = useChannels(selectedUnionId || '');
   const { data: posts, isLoading: postsLoading } = usePosts(selectedUnionId || undefined);
   const postReactionMutation = usePostReaction();
+  
+  usePostReactionsRealtime();
 
   React.useEffect(() => {
     if (myUnions && myUnions.length > 0 && !selectedUnionId) {
@@ -209,7 +211,7 @@ export const MyUnionsScreen = ({ navigation }: any) => {
           renderItem={({ item }) => (
             <PostCard
               post={item}
-              onPress={() => {}}
+              onPress={() => navigation.navigate('PostDetail', { postId: item.id })}
               onUpvote={() => postReactionMutation.mutate({
                 postId: item.id,
                 userId: user.id,
@@ -220,7 +222,7 @@ export const MyUnionsScreen = ({ navigation }: any) => {
                 userId: user.id,
                 reactionType: 'downvote',
               })}
-              onComment={() => {}}
+              onComment={() => navigation.navigate('PostDetail', { postId: item.id })}
             />
           )}
           keyExtractor={(item) => item.id}

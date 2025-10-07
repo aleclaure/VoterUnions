@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { usePublicPosts, usePostReaction } from '../hooks/usePosts';
+import { usePublicPosts, usePostReaction, usePostReactionsRealtime } from '../hooks/usePosts';
 import { PostCard } from '../components/PostCard';
 import { useAuth } from '../hooks/useAuth';
 
@@ -10,6 +10,8 @@ export const AllPostsScreen = ({ navigation }: any) => {
   const { data: posts, isLoading } = usePublicPosts();
   const postReactionMutation = usePostReaction();
   const [sortBy, setSortBy] = useState<'recent' | 'upvotes' | 'comments'>('recent');
+  
+  usePostReactionsRealtime();
 
   const sortedPosts = React.useMemo(() => {
     if (!posts) return [];
@@ -80,10 +82,10 @@ export const AllPostsScreen = ({ navigation }: any) => {
           renderItem={({ item }) => (
             <PostCard
               post={item}
-              onPress={() => {}}
+              onPress={() => navigation.navigate('PostDetail', { postId: item.id })}
               onUpvote={() => handleUpvote(item.id)}
               onDownvote={() => handleDownvote(item.id)}
-              onComment={() => {}}
+              onComment={() => navigation.navigate('PostDetail', { postId: item.id })}
             />
           )}
           keyExtractor={(item) => item.id}

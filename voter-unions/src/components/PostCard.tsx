@@ -13,6 +13,7 @@ interface PostCardProps {
   onDownvote?: () => void;
   onComment?: () => void;
   userReaction?: 'upvote' | 'downvote' | null;
+  showFullContent?: boolean;
 }
 
 export const PostCard: React.FC<PostCardProps> = ({
@@ -22,6 +23,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   onDownvote,
   onComment,
   userReaction,
+  showFullContent = false,
 }) => {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -61,7 +63,9 @@ export const PostCard: React.FC<PostCardProps> = ({
         </View>
       )}
 
-      <Text style={styles.content}>{post.content}</Text>
+      <Text style={styles.content} numberOfLines={showFullContent ? undefined : 5}>
+        {post.content}
+      </Text>
 
       <View style={styles.footer}>
         <TouchableOpacity
