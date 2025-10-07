@@ -4,49 +4,132 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 
 export const AuthScreen = () => {
+  const [isSignUp, setIsSignUp] = useState(true);
   const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signInWithOTP, verifyOTP } = useAuth();
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const { signUp, signInWithPassword, resetPassword } = useAuth();
 
-  const handleSendOTP = async () => {
-    if (!email) {
-      Alert.alert('Error', 'Please enter your email');
+  const handleSignUp = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter email and password');
+      return;
+    }
+
+    if (password.length < 8) {
+      Alert.alert('Error', 'Password must be at least 8 characters');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
       return;
     }
 
     setLoading(true);
-    const { error } = await signInWithOTP(email);
+    const { data, error } = await signUp(email, password);
+    setLoading(false);
+
+    if (error) {
+      Alert.alert('Error', error.message);
+    } else if (data.user) {
+      // User will be redirected to onboarding to set username
+      Alert.alert('Success', 'Account created! Please check your email to verify.');
+    }
+  };
+
+  const handleSignIn = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter email and password');
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await signInWithPassword(email, password);
+    setLoading(false);
+
+    if (error) {
+      Alert.alert('Error', error.message);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert('Error', 'Please enter your email address');
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await resetPassword(email);
     setLoading(false);
 
     if (error) {
       Alert.alert('Error', error.message);
     } else {
-      setOtpSent(true);
-      Alert.alert('Success', 'Check your email for the OTP code');
+      Alert.alert('Success', 'Password reset link sent to your email');
+      setShowForgotPassword(false);
     }
   };
 
-  const handleVerifyOTP = async () => {
-    if (!otp) {
-      Alert.alert('Error', 'Please enter the OTP code');
-      return;
-    }
+  if (showForgotPassword) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <Text style={styles.title}>Reset Password</Text>
+        <Text style={styles.subtitle}>Enter your email to receive a reset link</Text>
 
-    setLoading(true);
-    const { error } = await verifyOTP(email, otp);
-    setLoading(false);
+        <View style={styles.form}>
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
 
-    if (error) {
-      Alert.alert('Error', error.message);
-    }
-  };
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleForgotPassword}
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>
+              {loading ? 'Sending...' : 'Send Reset Link'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => setShowForgotPassword(false)}>
+            <Text style={styles.linkText}>Back to Sign In</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <Text style={styles.title}>Voter Unions</Text>
       <Text style={styles.subtitle}>Organize. Debate. Act.</Text>
+
+      <View style={styles.toggleContainer}>
+        <TouchableOpacity
+          style={[styles.toggleButton, isSignUp && styles.toggleButtonActive]}
+          onPress={() => setIsSignUp(true)}
+        >
+          <Text style={[styles.toggleText, isSignUp && styles.toggleTextActive]}>
+            Sign Up
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toggleButton, !isSignUp && styles.toggleButtonActive]}
+          onPress={() => setIsSignUp(false)}
+        >
+          <Text style={[styles.toggleText, !isSignUp && styles.toggleTextActive]}>
+            Sign In
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.form}>
         <TextInput
@@ -56,37 +139,41 @@ export const AuthScreen = () => {
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
-          editable={!otpSent}
         />
 
-        {otpSent && (
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoCapitalize="none"
+        />
+
+        {isSignUp && (
           <TextInput
             style={styles.input}
-            placeholder="Enter OTP Code"
-            value={otp}
-            onChangeText={setOtp}
-            keyboardType="number-pad"
+            placeholder="Confirm Password"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            autoCapitalize="none"
           />
         )}
 
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={otpSent ? handleVerifyOTP : handleSendOTP}
+          onPress={isSignUp ? handleSignUp : handleSignIn}
           disabled={loading}
         >
           <Text style={styles.buttonText}>
-            {loading ? 'Loading...' : otpSent ? 'Verify OTP' : 'Send OTP'}
+            {loading ? 'Loading...' : isSignUp ? 'Create Account' : 'Sign In'}
           </Text>
         </TouchableOpacity>
 
-        {otpSent && (
-          <TouchableOpacity
-            onPress={() => {
-              setOtpSent(false);
-              setOtp('');
-            }}
-          >
-            <Text style={styles.linkText}>Use different email</Text>
+        {!isSignUp && (
+          <TouchableOpacity onPress={() => setShowForgotPassword(true)}>
+            <Text style={styles.linkText}>Forgot password?</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -111,8 +198,32 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: 32,
     color: '#64748b',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 24,
+  },
+  toggleButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  toggleButtonActive: {
+    backgroundColor: '#fff',
+  },
+  toggleText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#64748b',
+  },
+  toggleTextActive: {
+    color: '#2563eb',
   },
   form: {
     gap: 16,
