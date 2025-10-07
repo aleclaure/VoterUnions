@@ -14,6 +14,7 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
   const queryClient = useQueryClient();
   const [argumentContent, setArgumentContent] = useState('');
   const [selectedStance, setSelectedStance] = useState<Stance>('neutral');
+  const [sourceLink, setSourceLink] = useState('');
   const { data: debateStats } = useDebateStats(debateId);
 
   const { data: debate } = useQuery({
@@ -44,6 +45,7 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
 
   const createArgumentMutation = useMutation({
     mutationFn: async () => {
+      const sourceLinks = sourceLink.trim() ? [sourceLink.trim()] : [];
       const { data, error } = await supabase
         .from('arguments')
         .insert({
@@ -51,6 +53,7 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
           user_id: user?.id,
           stance: selectedStance,
           content: argumentContent,
+          source_links: sourceLinks,
         })
         .select()
         .single();
@@ -59,8 +62,10 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['arguments', debateId] });
+      queryClient.invalidateQueries({ queryKey: ['debateStats', debateId] });
       setArgumentContent('');
       setSelectedStance('neutral');
+      setSourceLink('');
       Alert.alert('Success', 'Argument added!');
     },
     onError: (error: Error) => {
@@ -73,6 +78,15 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
       Alert.alert('Error', 'Please enter your argument');
       return;
     }
+
+    if (sourceLink.trim()) {
+      const urlPattern = /^https?:\/\/.+/i;
+      if (!urlPattern.test(sourceLink.trim())) {
+        Alert.alert('Invalid URL', 'Please enter a valid URL starting with http:// or https://');
+        return;
+      }
+    }
+
     createArgumentMutation.mutate();
   };
 
@@ -123,6 +137,16 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
         </View>
         
         <Text style={styles.argumentContent}>{argument.content}</Text>
+
+        {argument.source_links && argument.source_links.length > 0 && (
+          <View style={styles.sourcesContainer}>
+            {argument.source_links.map((link, index) => (
+              <TouchableOpacity key={index} onPress={() => Alert.alert('Source', link)}>
+                <Text style={styles.sourceLink}>🔗 {link}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         <View style={styles.argumentFooter}>
           <View style={styles.voteButtons}>
@@ -271,6 +295,15 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
             numberOfLines={4}
           />
 
+          <TextInput
+            style={styles.sourceInput}
+            value={sourceLink}
+            onChangeText={setSourceLink}
+            placeholder="Add source link (optional)"
+            autoCapitalize="none"
+            keyboardType="url"
+          />
+
           <TouchableOpacity
             style={[styles.submitButton, createArgumentMutation.isPending && styles.submitButtonDisabled]}
             onPress={handleSubmitArgument}
@@ -388,7 +421,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 100,
     textAlignVertical: 'top',
+    marginBottom: 12,
+  },
+  sourceInput: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
     marginBottom: 16,
+    color: '#64748b',
   },
   submitButton: {
     backgroundColor: '#2563eb',
@@ -433,7 +475,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1e293b',
     lineHeight: 24,
+    marginBottom: 8,
+  },
+  sourcesContainer: {
     marginBottom: 12,
+    gap: 6,
+  },
+  sourceLink: {
+    fontSize: 13,
+    color: '#2563eb',
+    textDecorationLine: 'underline',
   },
   argumentFooter: {
     flexDirection: 'row',
