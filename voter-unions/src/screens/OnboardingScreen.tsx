@@ -62,6 +62,7 @@ export const OnboardingScreen = () => {
           id: user.id,
           email: user.email!,
           display_name: displayName,
+          username_normalized: displayName.toLowerCase(),
           bio: bio.trim() || null,
           last_seen: new Date().toISOString(),
         }, {

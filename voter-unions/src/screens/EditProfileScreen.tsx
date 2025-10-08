@@ -63,6 +63,7 @@ export const EditProfileScreen = () => {
 
       await updateProfile({
         display_name: displayName,
+        username_normalized: displayName.toLowerCase(),
         bio: bio.trim() || null,
       });
 
