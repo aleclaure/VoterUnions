@@ -6,17 +6,53 @@ export const useAuth = () => {
   const { user, session, isLoading, setUser, setSession, setIsLoading, clearAuth } = useAuthStore();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      
+      // Auto-fix: Populate username_normalized if missing
+      if (session?.user?.id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username_normalized, display_name')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (profile?.display_name && !profile?.username_normalized) {
+          console.log('Auto-fixing username_normalized for user:', profile.display_name);
+          await supabase
+            .from('profiles')
+            .update({ username_normalized: profile.display_name.toLowerCase() })
+            .eq('id', session.user.id);
+        }
+      }
+      
       setIsLoading(false);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+      
+      // Auto-fix: Populate username_normalized if missing
+      if (session?.user?.id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username_normalized, display_name')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (profile?.display_name && !profile?.username_normalized) {
+          console.log('Auto-fixing username_normalized for user:', profile.display_name);
+          await supabase
+            .from('profiles')
+            .update({ username_normalized: profile.display_name.toLowerCase() })
+            .eq('id', session.user.id);
+        }
+      }
+      
       setIsLoading(false);
     });
 
