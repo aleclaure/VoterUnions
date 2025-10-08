@@ -1,56 +1,43 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../stores/authStore';
-import { Union } from '../types';
 
-interface UnionMemberData {
-  unions: Union;
-}
-
-export const CreateDebateScreen = ({ navigation }: {navigation: any}) => {
+export const CreateDebateScreen = ({ route, navigation }: any) => {
+  const { unionId } = route.params;
   const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [issueArea, setIssueArea] = useState('');
-  const [selectedUnionId, setSelectedUnionId] = useState<string>('');
 
-  const { data: unionData } = useQuery<UnionMemberData[]>({
-    queryKey: ['user-unions', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('union_members')
-        .select('unions(*)')
-        .eq('user_id', user?.id);
-      if (error) throw error;
-      return data as unknown as UnionMemberData[];
-    },
-    enabled: !!user,
-  });
-
-  const unions = unionData?.map((item) => item.unions);
-
-  const createMutation = useMutation({
+  const createDebateMutation = useMutation({
     mutationFn: async () => {
+      if (!user) throw new Error('You must be logged in to create a debate.');
+      if (!title.trim() || !description.trim() || !issueArea.trim()) {
+        throw new Error('Please fill out all fields.');
+      }
+
       const { data, error } = await supabase
         .from('debates')
         .insert({
-          union_id: selectedUnionId,
-          title,
-          description,
-          issue_area: issueArea,
-          created_by: user?.id,
+          union_id: unionId,
+          created_by: user.id,
+          title: title.trim(),
+          description: description.trim(),
+          issue_area: issueArea.trim(),
         })
         .select()
         .single();
+
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['debates'] });
-      Alert.alert('Success', 'Debate created successfully!');
+      queryClient.invalidateQueries({ queryKey: ['debates', unionId] });
+      Alert.alert('Success', 'Your debate has been created!');
       navigation.goBack();
     },
     onError: (error: Error) => {
@@ -58,105 +45,45 @@ export const CreateDebateScreen = ({ navigation }: {navigation: any}) => {
     },
   });
 
-  const handleSubmit = () => {
-    if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a debate title');
-      return;
-    }
-    if (!description.trim()) {
-      Alert.alert('Error', 'Please enter a description');
-      return;
-    }
-    if (!issueArea.trim()) {
-      Alert.alert('Error', 'Please enter an issue area');
-      return;
-    }
-    if (!selectedUnionId) {
-      Alert.alert('Error', 'Please select a union');
-      return;
-    }
-    createMutation.mutate();
-  };
-
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backText}>← Cancel</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Debate</Text>
-        <View style={{ width: 60 }} />
       </View>
-
       <View style={styles.form}>
-        <View style={styles.field}>
-          <Text style={styles.label}>Union</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unionSelector}>
-            {unions?.map((union) => (
-              <TouchableOpacity
-                key={union.id}
-                style={[
-                  styles.unionOption,
-                  selectedUnionId === union.id && styles.unionOptionSelected,
-                ]}
-                onPress={() => setSelectedUnionId(union.id)}
-              >
-                <Text
-                  style={[
-                    styles.unionOptionText,
-                    selectedUnionId === union.id && styles.unionOptionTextSelected,
-                  ]}
-                >
-                  {union.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Issue Area</Text>
-          <TextInput
-            style={styles.input}
-            value={issueArea}
-            onChangeText={setIssueArea}
-            placeholder="e.g., Climate, Housing, Labor Rights"
-          />
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Debate Title</Text>
-          <TextInput
-            style={styles.input}
-            value={title}
-            onChangeText={setTitle}
-            placeholder="What should we debate?"
-          />
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Description</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Provide context and framing for this debate..."
-            multiline
-            numberOfLines={4}
-          />
-        </View>
-
+        <Text style={styles.title}>Start a New Debate</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Debate Title"
+          value={title}
+          onChangeText={setTitle}
+        />
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="What's the issue?"
+          value={description}
+          onChangeText={setDescription}
+          multiline
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Issue Area (e.g., Healthcare, Environment)"
+          value={issueArea}
+          onChangeText={setIssueArea}
+        />
         <TouchableOpacity
-          style={[styles.submitButton, createMutation.isPending && styles.submitButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={createMutation.isPending}
+          style={styles.submitButton}
+          onPress={() => createDebateMutation.mutate()}
+          disabled={createDebateMutation.isPending}
         >
           <Text style={styles.submitButtonText}>
-            {createMutation.isPending ? 'Creating...' : 'Create Debate'}
+            {createDebateMutation.isPending ? 'Creating...' : 'Create Debate'}
           </Text>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+    </View>
   );
 };
 
@@ -166,69 +93,38 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
+  backButton: {
+    paddingVertical: 8,
+  },
   backText: {
     fontSize: 16,
     color: '#2563eb',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
   form: {
     padding: 20,
   },
-  field: {
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
     color: '#1e293b',
-    marginBottom: 8,
-  },
-  unionSelector: {
-    flexDirection: 'row',
-  },
-  unionOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginRight: 8,
-    backgroundColor: '#fff',
-  },
-  unionOptionSelected: {
-    backgroundColor: '#2563eb',
-    borderColor: '#2563eb',
-  },
-  unionOptionText: {
-    color: '#64748b',
-    fontSize: 14,
-  },
-  unionOptionTextSelected: {
-    color: '#fff',
-    fontWeight: '600',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
     backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    padding: 16,
+    fontSize: 16,
+    marginBottom: 16,
   },
   textArea: {
-    minHeight: 100,
+    height: 120,
     textAlignVertical: 'top',
   },
   submitButton: {
@@ -236,9 +132,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
   },
   submitButtonText: {
     color: '#fff',

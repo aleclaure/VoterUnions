@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../stores/authStore';
-import { Union } from '../types';
+import { Union, Debate } from '../types';
 
 export const UnionDetailScreen = ({ route, navigation }: any) => {
   const { unionId } = route.params;
@@ -36,6 +36,19 @@ export const UnionDetailScreen = ({ route, navigation }: any) => {
       return data;
     },
     enabled: !!user,
+  });
+
+  const { data: debates, isLoading: isLoadingDebates } = useQuery<Debate[]>({
+    queryKey: ['debates', unionId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('debates')
+        .select('*')
+        .eq('union_id', unionId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
   });
 
   const joinMutation = useMutation({
@@ -110,6 +123,34 @@ export const UnionDetailScreen = ({ route, navigation }: any) => {
         {membership && (
           <View style={styles.memberBadge}>
             <Text style={styles.memberBadgeText}>Member • {membership.role}</Text>
+          </View>
+        )}
+
+        {membership && (
+          <View style={styles.discussionsSection}>
+            <Text style={styles.sectionTitle}>Discussions</Text>
+            <TouchableOpacity
+              style={styles.createDebateButton}
+              onPress={() => navigation.navigate('CreateDebate', { unionId })}
+            >
+              <Text style={styles.createDebateButtonText}>Start a New Debate</Text>
+            </TouchableOpacity>
+            {isLoadingDebates ? (
+              <Text>Loading discussions...</Text>
+            ) : (
+              debates?.map((debate) => (
+                <TouchableOpacity
+                  key={debate.id}
+                  style={styles.debateCard}
+                  onPress={() => navigation.navigate('DebateDetail', { debateId: debate.id })}
+                >
+                  <Text style={styles.debateTitle}>{debate.title}</Text>
+                  <Text style={styles.debateMeta}>
+                    {debate.argument_count} arguments
+                  </Text>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         )}
       </View>
@@ -189,5 +230,44 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 40,
     color: '#dc2626',
+  },
+  discussionsSection: {
+    marginTop: 24,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 16,
+  },
+  createDebateButton: {
+    backgroundColor: '#3b82f6',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  createDebateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  debateCard: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  debateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  debateMeta: {
+    fontSize: 14,
+    color: '#94a3b8',
+    marginTop: 8,
   },
 });
