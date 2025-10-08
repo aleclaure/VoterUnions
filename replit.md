@@ -20,10 +20,10 @@ Voter Unions is a cross-platform mobile application built with Expo and Supabase
   4. Removal plan if deprecated
 
 ## System Architecture
-The application is built using Expo SDK 52 with React Native and TypeScript in strict mode. Navigation is handled by React Navigation, utilizing both bottom tabs and a native stack navigator. State management combines React Query (TanStack) for server state and React Context API for authentication state. The backend leverages Supabase for authentication, PostgreSQL database, Realtime functionalities, and Storage. Security is a paramount concern, with `@react-native-async-storage/async-storage` used for token storage (migrated from expo-secure-store to avoid 2048-byte limit) and comprehensive Row-Level Security (RLS) policies implemented in Supabase. The system is designed with an offline-first approach using React Query's capabilities.
+The application is built using Expo SDK 52 with React Native and TypeScript in strict mode. Navigation is handled by React Navigation, utilizing both bottom tabs and a native stack navigator. State management combines React Query (TanStack) for server state and React Context API for authentication state. The backend leverages Supabase for authentication, PostgreSQL database, Realtime functionalities, and Storage. Security is a paramount concern, with `expo-secure-store` used for token storage and comprehensive Row-Level Security (RLS) policies implemented in Supabase. The system is designed with an offline-first approach using React Query's capabilities.
 
 **Key Features:**
-- **Authentication**: Email/Password signup and login with email verification, secure token storage with `@react-native-async-storage/async-storage` (migrated from expo-secure-store), auto token refresh, password reset functionality, session management via React Context API with memoized functions for stable references, and automatic username_normalized population on login.
+- **Authentication**: Email/Password signup and login with email verification, secure token storage with `expo-secure-store`, auto token refresh, password reset functionality, and session management via React Context API with memoized functions for stable references.
 - **User Profiles**: Unique usernames with display names, user bios, profile statistics (debates created, arguments posted, unions joined), profile editing, and password management.
 - **Union Management**: Users can browse public unions, view details, create new unions, join existing ones, and manage members with role-based access control (owner, admin, moderator, member, guest). All actions display user identities.
 - **Enhanced Debate System**: 
@@ -51,11 +51,6 @@ The application is built using Expo SDK 52 with React Native and TypeScript in s
 - Strict TypeScript mode and a managed Expo workflow ensure a consistent and robust development environment.
 
 ## Recent Changes
-- **October 8, 2025**: Critical auth storage migration and username fix:
-  - **AsyncStorage Migration**: Replaced `expo-secure-store` with `@react-native-async-storage/async-storage` for Supabase auth token storage to resolve SecureStore's 2048-byte limit error (Supabase sessions exceed this limit). This follows Expo + Supabase 2024 official recommendations.
-  - **Auto-Fix for username_normalized**: Added automatic population of `username_normalized` field in `useAuth` hook. On login/app load, the app checks if `username_normalized` is missing and auto-populates it with `LOWER(display_name)`. This fixes the post visibility issue where posts weren't appearing due to NULL username_normalized causing profile joins to fail.
-  - **Files Modified**: `supabase.ts` (AsyncStorage adapter), `useAuth.ts` (auto-fix logic)
-  - **Impact**: Users no longer need to manually run SQL fixes; the app automatically repairs missing data on login
 - **October 7, 2025**: Enhanced debate system with interactive features:
   - **Database Updates**: Added `parent_id`, `source_links`, `upvotes`, `downvotes` columns to `arguments` table
   - **New Tables**: Created `argument_votes` table to track individual votes with proper RLS policies
