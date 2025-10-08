@@ -68,12 +68,32 @@ export const MyUnionsScreen = ({ navigation }: any) => {
 
   const filteredPosts = React.useMemo(() => {
     if (!posts) return [];
-    if (!selectedChannelId) return posts;
     
-    return posts.filter(post => 
+    if (!selectedChannelId) {
+      console.log('🔍 Showing ALL posts for union (no channel filter):', {
+        unionId: selectedUnionId,
+        totalPosts: posts.length,
+        postsWithChannels: posts.filter(p => p.channels && p.channels.length > 0).length,
+        postsWithoutChannels: posts.filter(p => !p.channels || p.channels.length === 0).length
+      });
+      return posts;
+    }
+    
+    const filtered = posts.filter(post => 
       post.channels?.some(ch => ch.id === selectedChannelId)
     );
-  }, [posts, selectedChannelId]);
+    
+    const selectedChannel = channels?.find(ch => ch.id === selectedChannelId);
+    console.log('🔍 Filtering posts by channel:', {
+      channelId: selectedChannelId,
+      channelHashtag: selectedChannel?.hashtag,
+      totalPosts: posts.length,
+      filteredPosts: filtered.length,
+      filteredPostIds: filtered.map(p => p.id.substring(0, 8))
+    });
+    
+    return filtered;
+  }, [posts, selectedChannelId, channels]);
 
   const handleCreatePost = async (content: string, channelIds: string[], isPublic: boolean) => {
     if (!user || !selectedUnionId) return;

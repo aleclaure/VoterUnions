@@ -59,11 +59,19 @@ export const usePosts = (unionId?: string) => {
       const { data, error } = await query;
 
       if (error) {
-        console.error('Error fetching posts:', error);
+        console.error('❌ Error fetching posts:', error);
         throw error;
       }
 
-      console.log('Posts fetched:', data?.length || 0, 'posts');
+      console.log(`📥 Posts fetched for ${unionId ? `union ${unionId}` : 'all unions'}:`, {
+        count: data?.length || 0,
+        posts: data?.map(p => ({
+          id: p.id.substring(0, 8),
+          union: p.unions?.name,
+          channels: (p.post_channels || []).map((pc: any) => pc?.channels?.hashtag).filter(Boolean),
+          hasAuthor: !!p.profiles?.display_name
+        }))
+      });
 
       return (data || []).map((post: any) => ({
         ...post,
@@ -95,7 +103,20 @@ export const usePublicPosts = () => {
         .eq('is_public', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching public posts:', error);
+        throw error;
+      }
+
+      console.log('📥 Public posts fetched:', {
+        count: data?.length || 0,
+        posts: data?.map(p => ({
+          id: p.id.substring(0, 8),
+          union: p.unions?.name,
+          channels: (p.post_channels || []).map((pc: any) => pc?.channels?.hashtag).filter(Boolean),
+          hasAuthor: !!p.profiles?.display_name
+        }))
+      });
 
       return (data || []).map((post: any) => ({
         ...post,
@@ -127,7 +148,13 @@ export const useCreatePost = () => {
       isPublic: boolean;
       userId: string;
     }) => {
-      console.log('Creating post:', { unionId, content: content.substring(0, 50), channelIds, isPublic });
+      console.log('📝 Creating post:', { 
+        unionId, 
+        content: content.substring(0, 50) + '...', 
+        channelIds, 
+        isPublic,
+        userId 
+      });
       
       const { data: post, error: postError } = await supabase
         .from('posts')
@@ -141,13 +168,23 @@ export const useCreatePost = () => {
         .single();
 
       if (postError) {
-        console.error('Error creating post:', postError);
+        console.error('❌ Error creating post:', postError);
         throw postError;
       }
 
-      console.log('Post created successfully:', post.id);
+      console.log('✅ Post created successfully!', {
+        postId: post.id,
+        unionId: post.union_id,
+        isPublic: post.is_public,
+        willAppearIn: [
+          post.is_public ? 'All Posts page (public)' : null,
+          `Union: ${unionId}`,
+          channelIds.length > 0 ? `Channels: ${channelIds.length}` : 'No specific channels (will show in union All view)'
+        ].filter(Boolean)
+      });
 
       if (channelIds.length > 0) {
+        console.log('🔗 Linking post to channels...', channelIds);
         const { error: channelsError } = await supabase
           .from('post_channels')
           .insert(
@@ -158,10 +195,12 @@ export const useCreatePost = () => {
           );
 
         if (channelsError) {
-          console.error('Error linking post to channels:', channelsError);
+          console.error('❌ Error linking post to channels:', channelsError);
           throw channelsError;
         }
-        console.log('Post linked to', channelIds.length, 'channels');
+        console.log('✅ Post linked to', channelIds.length, 'channel(s)');
+      } else {
+        console.log('ℹ️ No channels selected - post will appear in union "All" view only');
       }
 
       return post;
