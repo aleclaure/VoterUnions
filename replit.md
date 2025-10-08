@@ -61,10 +61,13 @@ The application is built using Expo SDK 52 with React Native and TypeScript in s
 - Strict TypeScript mode and a managed Expo workflow ensure a consistent and robust development environment.
 
 ## Recent Changes
-- **October 8, 2025**: Post routing system enhancements and bug fixes:
+- **October 8, 2025**: Post visibility fix and database query improvements:
+  - **Fixed Post Visibility**: Posts now display correctly by implementing manual profile joins (Supabase foreign key constraint was missing between posts and profiles tables)
+  - **Query Optimization**: Replaced foreign key-dependent joins with manual two-step queries (fetch posts, then fetch profiles separately and join in-memory)
+  - **Root Cause**: Database missing `posts_author_id_fkey` constraint, causing automatic joins to fail silently
+  - **Solution**: Modified `usePosts`, `usePublicPosts`, and `usePostComments` to fetch profiles separately using `.in()` operator and join manually using Map
   - **Fixed SecureStore Error**: Migrated from expo-secure-store to AsyncStorage for Supabase auth storage (SecureStore has 2048-byte limit, Supabase tokens exceed this - official 2024 Expo+Supabase recommendation)
   - **Enhanced Logging**: Added comprehensive logging to track post creation, fetching, and filtering across unions and channels
-  - **Post Routing Documentation**: Documented how posts appear in All Posts page, union views, and channel views based on selection
   - **Files Modified**: `supabase.ts`, `usePosts.ts`, `MyUnionsScreen.tsx`
 - **October 7, 2025**: Enhanced debate system with interactive features:
   - **Database Updates**: Added `parent_id`, `source_links`, `upvotes`, `downvotes` columns to `arguments` table

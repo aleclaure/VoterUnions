@@ -44,7 +44,6 @@ export const usePosts = (unionId?: string) => {
         .from('posts')
         .select(`
           *,
-          profiles!posts_author_id_fkey(email, display_name),
           unions(name),
           post_channels(
             channels(id, hashtag)
@@ -56,32 +55,44 @@ export const usePosts = (unionId?: string) => {
         query = query.eq('union_id', unionId);
       }
 
-      const { data, error } = await query;
+      const { data: posts, error } = await query;
 
       if (error) {
         console.error('❌ Error fetching posts:', error);
         throw error;
       }
 
+      // Fetch profiles separately and join manually
+      const authorIds = [...new Set(posts?.map(p => p.author_id).filter(Boolean))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, email, display_name, username_normalized')
+        .in('id', authorIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
       console.log(`📥 Posts fetched for ${unionId ? `union ${unionId}` : 'all unions'}:`, {
-        count: data?.length || 0,
-        posts: data?.map(p => ({
+        count: posts?.length || 0,
+        posts: posts?.map(p => ({
           id: p.id.substring(0, 8),
           union: p.unions?.name,
           channels: (p.post_channels || []).map((pc: any) => pc?.channels?.hashtag).filter(Boolean),
-          hasAuthor: !!p.profiles?.display_name
+          hasAuthor: !!profileMap.get(p.author_id)?.display_name
         }))
       });
 
-      return (data || []).map((post: any) => ({
-        ...post,
-        author_email: post.profiles?.email,
-        author_display_name: post.profiles?.display_name,
-        union_name: post.unions?.name,
-        channels: (post.post_channels || [])
-          .map((pc: any) => pc?.channels)
-          .filter((c: any) => c != null) || [],
-      })) as PostWithDetails[];
+      return (posts || []).map((post: any) => {
+        const author = profileMap.get(post.author_id);
+        return {
+          ...post,
+          author_email: author?.email,
+          author_display_name: author?.display_name,
+          union_name: post.unions?.name,
+          channels: (post.post_channels || [])
+            .map((pc: any) => pc?.channels)
+            .filter((c: any) => c != null) || [],
+        };
+      }) as PostWithDetails[];
     },
   });
 };
@@ -90,11 +101,10 @@ export const usePublicPosts = () => {
   return useQuery({
     queryKey: ['posts', 'public'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: posts, error } = await supabase
         .from('posts')
         .select(`
           *,
-          profiles!posts_author_id_fkey(email, display_name),
           unions(name),
           post_channels(
             channels(id, hashtag)
@@ -108,25 +118,37 @@ export const usePublicPosts = () => {
         throw error;
       }
 
+      // Fetch profiles separately and join manually
+      const authorIds = [...new Set(posts?.map(p => p.author_id).filter(Boolean))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, email, display_name, username_normalized')
+        .in('id', authorIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
       console.log('📥 Public posts fetched:', {
-        count: data?.length || 0,
-        posts: data?.map(p => ({
+        count: posts?.length || 0,
+        posts: posts?.map(p => ({
           id: p.id.substring(0, 8),
           union: p.unions?.name,
           channels: (p.post_channels || []).map((pc: any) => pc?.channels?.hashtag).filter(Boolean),
-          hasAuthor: !!p.profiles?.display_name
+          hasAuthor: !!profileMap.get(p.author_id)?.display_name
         }))
       });
 
-      return (data || []).map((post: any) => ({
-        ...post,
-        author_email: post.profiles?.email,
-        author_display_name: post.profiles?.display_name,
-        union_name: post.unions?.name,
-        channels: (post.post_channels || [])
-          .map((pc: any) => pc?.channels)
-          .filter((c: any) => c != null) || [],
-      })) as PostWithDetails[];
+      return (posts || []).map((post: any) => {
+        const author = profileMap.get(post.author_id);
+        return {
+          ...post,
+          author_email: author?.email,
+          author_display_name: author?.display_name,
+          union_name: post.unions?.name,
+          channels: (post.post_channels || [])
+            .map((pc: any) => pc?.channels)
+            .filter((c: any) => c != null) || [],
+        };
+      }) as PostWithDetails[];
     },
   });
 };
@@ -306,22 +328,31 @@ export const usePostComments = (postId: string) => {
   return useQuery({
     queryKey: ['comments', postId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: comments, error } = await supabase
         .from('comments')
-        .select(`
-          *,
-          profiles!comments_author_id_fkey(email, display_name)
-        `)
+        .select('*')
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
 
-      return (data || []).map((comment: any) => ({
-        ...comment,
-        author_email: comment.profiles?.email,
-        author_display_name: comment.profiles?.display_name,
-      }));
+      // Fetch profiles separately and join manually
+      const authorIds = [...new Set(comments?.map(c => c.author_id).filter(Boolean))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, email, display_name, username_normalized')
+        .in('id', authorIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      return (comments || []).map((comment: any) => {
+        const author = profileMap.get(comment.author_id);
+        return {
+          ...comment,
+          author_email: author?.email,
+          author_display_name: author?.display_name,
+        };
+      });
     },
   });
 };
