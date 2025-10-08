@@ -58,7 +58,12 @@ export const usePosts = (unionId?: string) => {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching posts:', error);
+        throw error;
+      }
+
+      console.log('Posts fetched:', data?.length || 0, 'posts');
 
       return (data || []).map((post: any) => ({
         ...post,
@@ -122,6 +127,8 @@ export const useCreatePost = () => {
       isPublic: boolean;
       userId: string;
     }) => {
+      console.log('Creating post:', { unionId, content: content.substring(0, 50), channelIds, isPublic });
+      
       const { data: post, error: postError } = await supabase
         .from('posts')
         .insert({
@@ -133,7 +140,12 @@ export const useCreatePost = () => {
         .select()
         .single();
 
-      if (postError) throw postError;
+      if (postError) {
+        console.error('Error creating post:', postError);
+        throw postError;
+      }
+
+      console.log('Post created successfully:', post.id);
 
       if (channelIds.length > 0) {
         const { error: channelsError } = await supabase
@@ -145,12 +157,17 @@ export const useCreatePost = () => {
             }))
           );
 
-        if (channelsError) throw channelsError;
+        if (channelsError) {
+          console.error('Error linking post to channels:', channelsError);
+          throw channelsError;
+        }
+        console.log('Post linked to', channelIds.length, 'channels');
       }
 
       return post;
     },
     onSuccess: (data, variables) => {
+      console.log('Invalidating queries after post creation');
       queryClient.invalidateQueries({ queryKey: ['posts'] });
       queryClient.invalidateQueries({ queryKey: ['posts', variables.unionId] });
       if (variables.isPublic) {
