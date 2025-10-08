@@ -36,6 +36,16 @@ The application is built using Expo SDK 52 with React Native and TypeScript in s
   - **Threaded Replies**: Fully recursive reply threading with horizontal thread view
   - **Horizontal Thread View**: Swipeable conversation chains showing full context
   - **Notifications**: Alerts when debate momentum shifts significantly
+- **Social Feed & Channels**: 
+  - Create posts with union and channel selection
+  - **Post Routing System**: Posts intelligently appear based on selection:
+    - **Public posts** → Appear in "All Posts" page (global feed) + selected union(s)
+    - **Union posts** → Appear only in selected union(s)
+    - **Channel posts** → Appear in specific channel(s) within union
+    - **No channel selected** → Post appears in union's "All" view
+  - Users can post to multiple unions simultaneously (creates separate posts per union)
+  - Channel filtering: View all posts in a union or filter by specific channels
+  - Enhanced logging tracks post creation, fetching, and filtering for debugging
 - **Voting & Pledging**: Users can browse candidates and policies, pledge support or opposition, with pledges scoped to specific unions and supporting multi-union participation.
 - **Progress Tracking**: Features for viewing campaign milestones, tracking completion percentages, and monitoring deadlines, all scoped to individual unions.
 
@@ -51,6 +61,11 @@ The application is built using Expo SDK 52 with React Native and TypeScript in s
 - Strict TypeScript mode and a managed Expo workflow ensure a consistent and robust development environment.
 
 ## Recent Changes
+- **October 8, 2025**: Post routing system enhancements and bug fixes:
+  - **Fixed SecureStore Error**: Migrated from expo-secure-store to AsyncStorage for Supabase auth storage (SecureStore has 2048-byte limit, Supabase tokens exceed this - official 2024 Expo+Supabase recommendation)
+  - **Enhanced Logging**: Added comprehensive logging to track post creation, fetching, and filtering across unions and channels
+  - **Post Routing Documentation**: Documented how posts appear in All Posts page, union views, and channel views based on selection
+  - **Files Modified**: `supabase.ts`, `usePosts.ts`, `MyUnionsScreen.tsx`
 - **October 7, 2025**: Enhanced debate system with interactive features:
   - **Database Updates**: Added `parent_id`, `source_links`, `upvotes`, `downvotes` columns to `arguments` table
   - **New Tables**: Created `argument_votes` table to track individual votes with proper RLS policies
