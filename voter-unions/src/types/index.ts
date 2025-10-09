@@ -163,3 +163,102 @@ export interface PostReaction {
   reaction_type: PostReactionType;
   created_at: string;
 }
+
+// Power Tracker Types
+export type DonorType = 'individual' | 'pac' | 'corporation' | 'other';
+export type BillStatus = 'introduced' | 'passed_house' | 'passed_senate' | 'enacted' | 'failed';
+export type GraphicCategory = 'wealth_inequality' | 'tax_avoidance' | 'corporate_power' | 'campaign_finance' | 'other';
+export type PledgeTargetType = 'politician' | 'bill' | 'reform';
+export type PledgeAction = 'vote_against' | 'support_reform' | 'oppose_reform';
+export type BillPoliticianRelationship = 'sponsor' | 'cosponsor' | 'voted_for' | 'voted_against';
+
+export interface PowerPolitician {
+  id: string;
+  name: string;
+  office: string;
+  party?: string;
+  state?: string;
+  bio?: string;
+  photo_url?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
+export interface PowerDonor {
+  id: string;
+  politician_id: string;
+  donor_name: string;
+  donor_type: DonorType;
+  amount?: number;
+  industry?: string;
+  date?: string;
+  notes?: string;
+  source_link?: string;
+  created_by: string;
+  created_at: string;
+  deleted_at?: string;
+}
+
+export interface PowerBill {
+  id: string;
+  bill_number: string;
+  title: string;
+  summary: string;
+  status: BillStatus;
+  analysis?: string;
+  source_link?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
+export interface PowerBeneficiary {
+  id: string;
+  bill_id: string;
+  corporation_name: string;
+  industry?: string;
+  how_they_profit: string;
+  estimated_benefit?: string;
+  source_link?: string;
+  created_by: string;
+  created_at: string;
+  deleted_at?: string;
+}
+
+export interface PowerGraphic {
+  id: string;
+  title: string;
+  description?: string;
+  image_url: string;
+  category: GraphicCategory;
+  source_link?: string;
+  created_by: string;
+  created_at: string;
+  deleted_at?: string;
+}
+
+export interface PowerPledge {
+  id: string;
+  union_id: string;
+  user_id: string;
+  target_type: PledgeTargetType;
+  politician_id?: string;
+  bill_id?: string;
+  action: PledgeAction;
+  reason?: string;
+  created_at: string;
+  deleted_at?: string;
+}
+
+export interface PowerBillPolitician {
+  id: string;
+  bill_id: string;
+  politician_id: string;
+  relationship_type: BillPoliticianRelationship;
+  created_by: string;
+  created_at: string;
+  deleted_at?: string;
+}

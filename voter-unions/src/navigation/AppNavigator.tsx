@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { AuthScreen } from '../screens/AuthScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
-import { DebatesScreen } from '../screens/DebatesScreen';
+import { PowerTrackerScreen } from '../screens/PowerTrackerScreen';
 import { VoteScreen } from '../screens/VoteScreen';
 import { ProgressScreen } from '../screens/ProgressScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
@@ -41,11 +41,11 @@ const MainTabs = () => {
         }}
       />
       <Tab.Screen
-        name="DebatesTab"
-        component={DebatesScreen}
+        name="PowerTrackerTab"
+        component={PowerTrackerScreen}
         options={{
-          tabBarLabel: 'Debates',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>💬</Text>,
+          tabBarLabel: 'Power',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🔍</Text>,
         }}
       />
       <Tab.Screen

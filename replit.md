@@ -46,11 +46,19 @@ The application is built using Expo SDK 52 with React Native and TypeScript in s
   - Users can post to multiple unions simultaneously (creates separate posts per union)
   - Channel filtering: View all posts in a union or filter by specific channels
   - Enhanced logging tracks post creation, fetching, and filtering for debugging
+- **Power Tracker** (replaces Debates tab):
+  - **Tab 1: Politicians** - User-curated politician profiles with donor tracking, corporate ties, and conflict of interest analysis
+  - **Tab 2: Bills** - Legislative analysis showing "who profits" from bills, beneficiary corporations, and lobbying connections
+  - **Tab 3: Data & Graphics** - Gallery of wealth inequality infographics, corporate power visualizations, and economic data
+  - **Tab 4: Take Action** - Create pledges to vote against politicians or support/oppose reforms, linked to specific unions
+  - **Philosophy**: "Know your enemy: organized money" - expose where real power lies by following money and influence
+  - **User-Generated Content**: All data is manually curated by users for targeted, clean analysis (no API dependencies)
+  - **Material Top Tabs**: Horizontal swipeable tabs positioned below iPhone status bar/notch for optimal UX
 - **Voting & Pledging**: Users can browse candidates and policies, pledge support or opposition, with pledges scoped to specific unions and supporting multi-union participation.
 - **Progress Tracking**: Features for viewing campaign milestones, tracking completion percentages, and monitoring deadlines, all scoped to individual unions.
 
 **Database Design:**
-- All tables (`profiles`, `unions`, `union_members`, `debates`, `arguments`, `reactions`, `candidates`, `policies`, `pledges`, `milestones`) use UUID v4 as primary keys.
+- All tables (`profiles`, `unions`, `union_members`, `debates`, `arguments`, `reactions`, `candidates`, `policies`, `pledges`, `milestones`, `power_politicians`, `power_donors`, `power_bills`, `power_beneficiaries`, `power_graphics`, `power_pledges`, `power_bill_politicians`) use UUID v4 as primary keys.
 - Soft deletes are implemented using a `deleted_at` column.
 - Row-Level Security (RLS) policies are enabled on all tables to enforce data security.
 - Automatic counts for members, arguments, and reactions are managed via database triggers.
@@ -61,6 +69,15 @@ The application is built using Expo SDK 52 with React Native and TypeScript in s
 - Strict TypeScript mode and a managed Expo workflow ensure a consistent and robust development environment.
 
 ## Recent Changes
+- **October 9, 2025**: Power Tracker feature replaces Debates tab:
+  - **New Feature**: Replaced Debates tab with Power Tracker - a transparency tool to track political power, money, and influence
+  - **Database Schema**: Added 7 new tables (`power_politicians`, `power_donors`, `power_bills`, `power_beneficiaries`, `power_graphics`, `power_pledges`, `power_bill_politicians`) with full RLS policies
+  - **UI Implementation**: 4 Material Top Tabs (Politicians, Bills, Data, Action) with swipeable navigation below safe area
+  - **CRUD Hooks**: Complete set of hooks for all Power Tracker tables (`usePowerPoliticians`, `usePowerBills`, `usePowerGraphics`, `usePowerPledges`)
+  - **User-Curated Content**: All data manually created by users - politicians with donors, bills with beneficiary analysis, wealth inequality graphics, and action pledges
+  - **Navigation Update**: Changed bottom tab from "Debates" (💬) to "Power" (🔍)
+  - **Files Created**: `PowerTrackerScreen.tsx`, `PoliticiansTab.tsx`, `BillsTab.tsx`, `DataTab.tsx`, `ActionTab.tsx`, `power-tracker-schema.sql`, plus 4 new hook files
+  - **Migration Required**: User must run `power-tracker-schema.sql` in Supabase SQL Editor to activate new tables
 - **October 8, 2025**: Post visibility fix and database query improvements:
   - **Fixed Post Visibility**: Posts now display correctly by implementing manual profile joins (Supabase foreign key constraint was missing between posts and profiles tables)
   - **Query Optimization**: Replaced foreign key-dependent joins with manual two-step queries (fetch posts, then fetch profiles separately and join in-memory)
