@@ -6,7 +6,7 @@ import { AuthScreen } from '../screens/AuthScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { PowerTrackerScreen } from '../screens/PowerTrackerScreen';
 import { PeoplesAgendaScreen } from '../screens/PeoplesAgendaScreen';
-import { ProgressScreen } from '../screens/ProgressScreen';
+import { NegotiationsScreen } from '../screens/NegotiationsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { UnionDetailScreen } from '../screens/UnionDetailScreen';
@@ -57,11 +57,11 @@ const MainTabs = () => {
         }}
       />
       <Tab.Screen
-        name="ProgressTab"
-        component={ProgressScreen}
+        name="NegotiationsTab"
+        component={NegotiationsScreen}
         options={{
-          tabBarLabel: 'Progress',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>📊</Text>,
+          tabBarLabel: 'Terms',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>⚖️</Text>,
         }}
       />
       <Tab.Screen

@@ -1,0 +1,74 @@
+People’s Terms (Main Tab)
+
+Tagline: “We set the terms — not the billionaires.”
+Core Idea: A living, evolving people’s contract — where everyone can propose, refine, vote, and activate shared demands.
+
+⸻
+
+📝 1. Proposals
+
+Purpose: The drafting floor.
+Functionality:
+	•	Users submit new demands in clear language (title + description + category + optional data or sources).
+	•	Submissions display user handle, date, and supporting sources (articles, reports, etc.).
+	•	Community comments and suggestions appear below each draft.
+	•	Users can “endorse,” “revise,” or “merge” proposals that overlap.
+	•	Moderators (or union admins) can group related ones into issue clusters (e.g., “Housing,” “Healthcare”).
+
+Goal: Turn raw public sentiment into organized, debate-ready ideas.
+Example: “Cap insulin prices at $25” → tagged under “Healthcare Costs.”
+
+⸻
+
+🗳️ 2. Voting Hall
+
+Purpose: The decision engine.
+Functionality:
+	•	Displays all approved proposals awaiting community vote.
+	•	Each proposal shows:
+	•	Current support percentage
+	•	Total votes and demographics (optional region, union, etc.)
+	•	Countdown timer until voting closes
+	•	Voting system options:
+	•	👍 Support / 👎 Oppose
+	•	or weighted voting (1–5 importance rating)
+	•	Thresholds automatically mark when an idea passes (e.g., 65%+ support → “Ratified”).
+
+Goal: Make every user feel they directly shape the collective agenda.
+Tagline: “Every vote defines our demands.”
+
+⸻
+
+📈 3. Ratified Terms
+
+Purpose: The living document — The People’s Platform.
+Functionality:
+	•	Displays all passed demands with tags (Housing, Labor, Environment, etc.).
+	•	Shows metrics:
+	•	Support percentage
+	•	Number of unions endorsing
+	•	Linked negotiations that use it as leverage
+	•	Users can comment, suggest language improvements, or propose follow-up goals (e.g., enforcement steps).
+	•	Option to “watch” a term for updates in negotiations.
+
+Goal: Turn people’s consensus into an official, evolving document of demands.
+Tagline: “Our values, in writing.”
+
+⸻
+
+🔥 4. Activated Demands
+
+Purpose: Where ideals become leverage.
+Functionality:
+	•	Shows which ratified demands are now active negotiations in progress (linked to the Negotiations tab).
+	•	Example:
+	•	“Raise the minimum wage to $15” → Active against Senator X → 52,000 pledges.
+	•	“Ban corporate dark money” → Active against Company Y → 14,000 pledges.
+	•	Track real-time outcomes:
+	•	✅ “Bill introduced”
+	•	🚫 “Voted down”
+	•	🔄 “Under review”
+	•	Notifications when progress occurs: “Your activated demand is being debated in Congress.”
+
+Goal: Close the loop — showing users that their votes lead to pressure and results.
+Tagline: “From principle to power.”

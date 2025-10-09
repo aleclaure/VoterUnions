@@ -331,3 +331,82 @@ export interface ReformWin {
   updated_at: string;
   deleted_at?: string;
 }
+
+// People's Terms / Negotiations Types
+export type DemandStatus = 'draft' | 'voting' | 'ratified' | 'activated' | 'rejected';
+export type DemandVoteType = 'support' | 'oppose';
+export type CommentType = 'comment' | 'endorsement' | 'revision' | 'merge_suggestion';
+export type NegotiationOutcome = 'in_progress' | 'bill_introduced' | 'voted_down' | 'under_review' | 'passed' | 'rejected';
+export type NegotiationTargetType = 'politician' | 'company' | 'institution';
+
+export interface Demand {
+  id: string;
+  title: string;
+  description: string;
+  category?: string;
+  status: DemandStatus;
+  support_percentage: number;
+  total_votes: number;
+  votes_for: number;
+  votes_against: number;
+  vote_deadline?: string;
+  ratified_at?: string;
+  created_by: string;
+  union_id?: string;
+  source_links?: string[];
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
+export interface DemandVote {
+  id: string;
+  demand_id: string;
+  user_id: string;
+  vote_type: DemandVoteType;
+  importance_rating?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DemandComment {
+  id: string;
+  demand_id: string;
+  user_id: string;
+  comment_text: string;
+  comment_type: CommentType;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
+export interface DemandNegotiation {
+  id: string;
+  demand_id: string;
+  target_type?: NegotiationTargetType;
+  target_name: string;
+  target_description?: string;
+  pledge_count: number;
+  outcome_status: NegotiationOutcome;
+  union_id?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
+export interface NegotiationUpdate {
+  id: string;
+  negotiation_id: string;
+  update_type?: string;
+  update_text: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface DemandEndorsement {
+  id: string;
+  demand_id: string;
+  union_id: string;
+  created_at: string;
+}
