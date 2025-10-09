@@ -36,6 +36,7 @@ The application is built using Expo SDK 52 with React Native and TypeScript. Nav
 - **Power Tracker**: A transparency tool to track political power, money, and influence. Features include user-curated profiles of politicians with donor tracking, legislative analysis of bills, wealth inequality data graphics, and pledges to influence political action. All data is user-generated.
 - **People's Agenda**: A platform to unite working-class communities around shared demands. Features include policy voting, collaborative drafting of "The People's Platform," a reform wins tracker, and tools for generating outreach content. All content is user-generated.
 - **People's Terms / Negotiations**: A system to formalize community consensus into official demands and track negotiations. Features include drafting proposals with feedback, a voting hall with a ratification threshold, a living document of ratified terms, and tracking of activated demands and negotiation outcomes. All content is user-generated.
+- **Consumer Union**: A platform to organize consumer power for economic justice and demand ethical behavior from corporations. Features include boycott proposal creation with evidence and alternatives, democratic voting to activate campaigns (60% threshold), active boycott tracking with pledges and timeline updates, and an impact archive documenting victories with economic metrics. Tagline: "Our money has power — we spend for justice." All content is user-generated.
 
 **Database Design:**
 - PostgreSQL database with UUID v4 primary keys.

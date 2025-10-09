@@ -1,0 +1,63 @@
+🛒 Consumer Union Tab
+
+Mission: Organize consumer power to demand ethical behavior from corporations and economic justice for the public.
+Tagline: “Our money has power — we spend for justice.”
+
+⸻
+
+1️⃣ Consumer Proposals
+
+Purpose: Create and discuss campaigns against exploitative corporate behavior.
+Functionality:
+	•	Users submit boycott or ethical-consumption proposals (e.g., “Boycott fast fashion brands using child labor,” or “Support local co-ops”).
+	•	Proposals include:
+	•	Target company / industry
+	•	Demand summary
+	•	Evidence or linked reports
+	•	Proposed alternatives
+	•	Comment threads for debate and refinement.
+Goal: Identify clear, actionable consumer targets.
+Tagline: “Every purchase is a political act.”
+
+⸻
+
+2️⃣ Vote & Launch
+
+Purpose: Democratically decide which campaigns to activate.
+Functionality:
+	•	Each proposal enters a voting phase once vetted.
+	•	Users vote: “Activate Boycott,” “Delay,” or “Reject.”
+	•	Once a campaign reaches threshold (e.g., 60%+ support), it’s officially launched into the next subtab.
+Goal: Ensure collective legitimacy behind every boycott.
+Tagline: “Consensus before confrontation.”
+
+⸻
+
+3️⃣ Active Boycotts
+
+Purpose: Track and coordinate live consumer campaigns.
+Functionality:
+	•	Displays all currently active boycotts with:
+	•	Target corporation
+	•	List of demands
+	•	Progress meter (“Demand met 45%”)
+	•	Timeline of company responses or media coverage
+	•	Suggested consumer actions (unsubscribe, cancel, switch)
+	•	Option to “pledge participation” and share on social media.
+Goal: Coordinate mass consumer withdrawal to force reform.
+Tagline: “When we stop buying, they start listening.”
+
+⸻
+
+4️⃣ Impact & Wins
+
+Purpose: Celebrate victories and track accountability.
+Functionality:
+	•	Archive completed boycotts with outcomes (“Company X raised wages,” “Brand Y divested from fossil fuels”).
+	•	Data visualization:
+	•	Total participants
+	•	Economic impact estimates
+	•	Public statements from companies
+	•	Allows users to propose post-boycott monitoring plans.
+Goal: Measure the real-world power of collective spending decisions.
+Tagline: “Proof that organized consumers change everything.”

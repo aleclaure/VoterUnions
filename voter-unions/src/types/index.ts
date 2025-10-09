@@ -410,3 +410,104 @@ export interface DemandEndorsement {
   union_id: string;
   created_at: string;
 }
+
+// ==================== Consumer Union Types ====================
+
+export type BoycottVoteType = 'activate' | 'delay' | 'reject';
+export type BoycottStatus = 'draft' | 'in_voting' | 'approved' | 'rejected';
+export type CampaignStatus = 'active' | 'completed' | 'cancelled';
+export type CampaignUpdateType = 'company_response' | 'media_coverage' | 'demand_met' | 'progress_update';
+export type CampaignOutcomeType = 'victory' | 'partial_victory' | 'cancelled' | 'ongoing_monitoring';
+export type PledgeType = 'participate' | 'share' | 'monitor';
+
+export interface BoycottProposal {
+  id: string;
+  title: string;
+  target_company: string;
+  target_industry?: string;
+  demand_summary: string;
+  evidence?: string;
+  proposed_alternatives?: string;
+  status: BoycottStatus;
+  vote_count: number;
+  votes_activate: number;
+  votes_delay: number;
+  votes_reject: number;
+  activation_percentage: number;
+  union_id?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
+export interface BoycottVote {
+  id: string;
+  proposal_id: string;
+  user_id: string;
+  vote_type: BoycottVoteType;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BoycottComment {
+  id: string;
+  proposal_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
+export interface BoycottCampaign {
+  id: string;
+  proposal_id?: string;
+  title: string;
+  target_company: string;
+  target_industry?: string;
+  demands: string;
+  consumer_actions?: string;
+  status: CampaignStatus;
+  progress_percentage: number;
+  pledge_count: number;
+  economic_impact_estimate?: number;
+  union_id?: string;
+  launched_by: string;
+  launched_at: string;
+  completed_at?: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
+export interface CampaignPledge {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  pledge_type: PledgeType;
+  created_at: string;
+}
+
+export interface CampaignUpdate {
+  id: string;
+  campaign_id: string;
+  update_type?: CampaignUpdateType;
+  content: string;
+  source_url?: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface CampaignOutcome {
+  id: string;
+  campaign_id: string;
+  outcome_type?: CampaignOutcomeType;
+  outcome_description: string;
+  total_participants?: number;
+  economic_impact?: number;
+  company_statements?: string;
+  monitoring_plan?: string;
+  created_by: string;
+  created_at: string;
+}
