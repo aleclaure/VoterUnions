@@ -8,6 +8,7 @@ import { PowerTrackerScreen } from '../screens/PowerTrackerScreen';
 import { PeoplesAgendaScreen } from '../screens/PeoplesAgendaScreen';
 import { NegotiationsScreen } from '../screens/NegotiationsScreen';
 import ConsumerScreen from '../screens/ConsumerScreen';
+import WorkersScreen from '../screens/WorkersScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { UnionDetailScreen } from '../screens/UnionDetailScreen';
@@ -71,6 +72,14 @@ const MainTabs = () => {
         options={{
           tabBarLabel: 'Consumer',
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🛒</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="WorkersTab"
+        component={WorkersScreen}
+        options={{
+          tabBarLabel: 'Workers',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>⚒️</Text>,
         }}
       />
       <Tab.Screen
