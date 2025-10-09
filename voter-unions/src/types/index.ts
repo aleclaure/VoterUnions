@@ -90,7 +90,12 @@ export interface Policy {
   id: string;
   title: string;
   description: string;
+  vote_count?: number;
+  created_by?: string;
+  union_id?: string;
+  issue_area?: string;
   created_at: string;
+  deleted_at?: string;
 }
 
 export interface Pledge {
@@ -260,5 +265,69 @@ export interface PowerBillPolitician {
   relationship_type: BillPoliticianRelationship;
   created_by: string;
   created_at: string;
+  deleted_at?: string;
+}
+
+// People's Agenda Types
+// Philosophy: "Different backgrounds, one struggle"
+export type PolicyVoteType = 'upvote' | 'downvote';
+export type AmendmentVoteType = 'for' | 'against';
+export type AmendmentStatus = 'proposed' | 'accepted' | 'rejected';
+export type ReformScope = 'local' | 'state' | 'national';
+export type ReformStatus = 'proposed' | 'in_progress' | 'passed' | 'implemented';
+
+export interface PolicyVote {
+  id: string;
+  policy_id: string;
+  user_id: string;
+  vote_type: PolicyVoteType;
+  created_at: string;
+}
+
+export interface PlatformSection {
+  id: string;
+  title: string;
+  content: string;
+  section_order: number;
+  issue_area: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
+export interface PlatformAmendment {
+  id: string;
+  section_id: string;
+  user_id: string;
+  proposed_text: string;
+  rationale?: string;
+  votes_for: number;
+  votes_against: number;
+  status: AmendmentStatus;
+  created_at: string;
+  deleted_at?: string;
+}
+
+export interface AmendmentVote {
+  id: string;
+  amendment_id: string;
+  user_id: string;
+  vote_type: AmendmentVoteType;
+  created_at: string;
+}
+
+export interface ReformWin {
+  id: string;
+  policy_name: string;
+  description: string;
+  location: string;
+  scope: ReformScope;
+  status: ReformStatus;
+  momentum_score: number;
+  source_url?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
   deleted_at?: string;
 }

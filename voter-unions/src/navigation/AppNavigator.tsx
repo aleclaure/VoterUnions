@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { AuthScreen } from '../screens/AuthScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { PowerTrackerScreen } from '../screens/PowerTrackerScreen';
-import { VoteScreen } from '../screens/VoteScreen';
+import { PeoplesAgendaScreen } from '../screens/PeoplesAgendaScreen';
 import { ProgressScreen } from '../screens/ProgressScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
@@ -49,11 +49,11 @@ const MainTabs = () => {
         }}
       />
       <Tab.Screen
-        name="VoteTab"
-        component={VoteScreen}
+        name="AgendaTab"
+        component={PeoplesAgendaScreen}
         options={{
-          tabBarLabel: 'Vote',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🗳️</Text>,
+          tabBarLabel: 'Agenda',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🤝</Text>,
         }}
       />
       <Tab.Screen

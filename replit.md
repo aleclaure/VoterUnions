@@ -46,7 +46,7 @@ The application is built using Expo SDK 52 with React Native and TypeScript in s
   - Users can post to multiple unions simultaneously (creates separate posts per union)
   - Channel filtering: View all posts in a union or filter by specific channels
   - Enhanced logging tracks post creation, fetching, and filtering for debugging
-- **Power Tracker** (replaces Debates tab):
+- **Power Tracker**:
   - **Tab 1: Politicians** - User-curated politician profiles with donor tracking, corporate ties, and conflict of interest analysis
   - **Tab 2: Bills** - Legislative analysis showing "who profits" from bills, beneficiary corporations, and lobbying connections
   - **Tab 3: Data & Graphics** - Gallery of wealth inequality infographics, corporate power visualizations, and economic data
@@ -54,11 +54,18 @@ The application is built using Expo SDK 52 with React Native and TypeScript in s
   - **Philosophy**: "Know your enemy: organized money" - expose where real power lies by following money and influence
   - **User-Generated Content**: All data is manually curated by users for targeted, clean analysis (no API dependencies)
   - **Material Top Tabs**: Horizontal swipeable tabs positioned below iPhone status bar/notch for optimal UX
-- **Voting & Pledging**: Users can browse candidates and policies, pledge support or opposition, with pledges scoped to specific unions and supporting multi-union participation.
+- **People's Agenda**:
+  - **Tab 1: Priorities** - Policy voting interface where users propose and vote on policy priorities (e.g., Medicare for All, housing reform)
+  - **Tab 2: Platform** - Collaborative drafting of "The People's Platform" with sections and proposed amendments
+  - **Tab 3: Wins** - Reform wins tracker showing policies gaining momentum at local, state, and national levels
+  - **Tab 4: Outreach** - Auto-generate shareable campaign content and representative messages based on top voted policies
+  - **Philosophy**: "Different backgrounds, one struggle" - unite working class around shared demands, replacing divisive talking points with practical solutions
+  - **User-Generated Content**: All policies, platform sections, and reform tracking manually curated by users (no API dependencies)
+  - **Material Top Tabs**: Horizontal swipeable tabs matching Power Tracker's design pattern
 - **Progress Tracking**: Features for viewing campaign milestones, tracking completion percentages, and monitoring deadlines, all scoped to individual unions.
 
 **Database Design:**
-- All tables (`profiles`, `unions`, `union_members`, `debates`, `arguments`, `reactions`, `candidates`, `policies`, `pledges`, `milestones`, `power_politicians`, `power_donors`, `power_bills`, `power_beneficiaries`, `power_graphics`, `power_pledges`, `power_bill_politicians`) use UUID v4 as primary keys.
+- All tables (`profiles`, `unions`, `union_members`, `debates`, `arguments`, `reactions`, `candidates`, `policies`, `pledges`, `milestones`, `power_politicians`, `power_donors`, `power_bills`, `power_beneficiaries`, `power_graphics`, `power_pledges`, `power_bill_politicians`, `policy_votes`, `platform_sections`, `platform_amendments`, `amendment_votes`, `reform_wins`) use UUID v4 as primary keys.
 - Soft deletes are implemented using a `deleted_at` column.
 - Row-Level Security (RLS) policies are enabled on all tables to enforce data security.
 - Automatic counts for members, arguments, and reactions are managed via database triggers.
@@ -69,7 +76,16 @@ The application is built using Expo SDK 52 with React Native and TypeScript in s
 - Strict TypeScript mode and a managed Expo workflow ensure a consistent and robust development environment.
 
 ## Recent Changes
-- **October 9, 2025**: Power Tracker feature replaces Debates tab:
+- **October 9, 2025**: People's Agenda feature replaces Vote tab:
+  - **New Feature**: Replaced Vote tab with People's Agenda - a tool to unite working class around shared demands
+  - **Database Schema**: Added 5 new tables (`policy_votes`, `platform_sections`, `platform_amendments`, `amendment_votes`, `reform_wins`) with full RLS policies
+  - **UI Implementation**: 4 Material Top Tabs (Priorities, Platform, Wins, Outreach) with swipeable navigation
+  - **Tab Features**: Policy voting with upvote/downvote, collaborative platform drafting with amendments, reform wins tracker, auto-generated outreach campaigns
+  - **Philosophy Shift**: From "Know your enemy: organized money" (Power Tracker) to "Different backgrounds, one struggle" (People's Agenda)
+  - **Navigation Update**: Changed bottom tab from "Vote" (🗳️) to "Agenda" (🤝)
+  - **Files Created**: `PeoplesAgendaScreen.tsx`, `PrioritiesTab.tsx`, `PlatformTab.tsx`, `WinsTab.tsx`, `OutreachTab.tsx`, `peoples-agenda-schema.sql`
+  - **Migration Required**: User must run `peoples-agenda-schema.sql` in Supabase SQL Editor to activate new tables
+- **October 9, 2025**: Power Tracker feature added:
   - **New Feature**: Replaced Debates tab with Power Tracker - a transparency tool to track political power, money, and influence
   - **Database Schema**: Added 7 new tables (`power_politicians`, `power_donors`, `power_bills`, `power_beneficiaries`, `power_graphics`, `power_pledges`, `power_bill_politicians`) with full RLS policies
   - **UI Implementation**: 4 Material Top Tabs (Politicians, Bills, Data, Action) with swipeable navigation below safe area
