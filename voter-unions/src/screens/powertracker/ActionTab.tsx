@@ -18,7 +18,7 @@ import {
 import { usePowerPoliticians } from '../../hooks/usePowerPoliticians';
 import { usePowerBills } from '../../hooks/usePowerBills';
 import { useAuth } from '../../hooks/useAuth';
-import { useUnionMemberships } from '../../hooks/useUnions';
+import { useUnionMemberships, UnionMembership } from '../../hooks/useUnions';
 import { PowerPledge, PledgeAction } from '../../types';
 
 export const ActionTab = () => {
@@ -185,7 +185,7 @@ export const ActionTab = () => {
               <Text style={styles.label}>Select Union</Text>
               <View style={styles.optionButtons}>
                 {memberships && memberships.length > 0 ? (
-                  memberships.map((membership) => (
+                  memberships.map((membership: UnionMembership) => (
                     <TouchableOpacity
                       key={membership.union_id}
                       style={[

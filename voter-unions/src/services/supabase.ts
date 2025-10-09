@@ -27,14 +27,97 @@ const clearOldSecureStoreSession = async () => {
   }
 };
 
+// Wrapper around AsyncStorage that handles IndexedDB version conflicts
+const SafeAsyncStorage = {
+  getItem: async (key: string) => {
+    try {
+      return await AsyncStorage.getItem(key);
+    } catch (error: any) {
+      if (typeof window !== 'undefined' && window.indexedDB && 
+          (error?.message?.includes('version') || error?.message?.includes('database'))) {
+        console.warn('⚠️ IndexedDB error on getItem, deleting database...');
+        await deleteAsyncStorageDB();
+        // Retry after deletion
+        try {
+          return await AsyncStorage.getItem(key);
+        } catch (retryError) {
+          console.error('❌ Retry failed:', retryError);
+          return null;
+        }
+      }
+      throw error;
+    }
+  },
+  
+  setItem: async (key: string, value: string) => {
+    try {
+      await AsyncStorage.setItem(key, value);
+    } catch (error: any) {
+      if (typeof window !== 'undefined' && window.indexedDB && 
+          (error?.message?.includes('version') || error?.message?.includes('database'))) {
+        console.warn('⚠️ IndexedDB error on setItem, deleting database...');
+        await deleteAsyncStorageDB();
+        // Retry after deletion
+        await AsyncStorage.setItem(key, value);
+      } else {
+        throw error;
+      }
+    }
+  },
+  
+  removeItem: async (key: string) => {
+    try {
+      await AsyncStorage.removeItem(key);
+    } catch (error: any) {
+      if (typeof window !== 'undefined' && window.indexedDB && 
+          (error?.message?.includes('version') || error?.message?.includes('database'))) {
+        console.warn('⚠️ IndexedDB error on removeItem, deleting database...');
+        await deleteAsyncStorageDB();
+        // Retry after deletion
+        await AsyncStorage.removeItem(key);
+      } else {
+        throw error;
+      }
+    }
+  },
+};
+
+// Helper to delete IndexedDB database
+const deleteAsyncStorageDB = async (): Promise<void> => {
+  if (typeof window !== 'undefined' && window.indexedDB) {
+    return new Promise((resolve) => {
+      try {
+        const deleteRequest = window.indexedDB.deleteDatabase('AsyncStorage');
+        
+        deleteRequest.onsuccess = () => {
+          console.log('✅ IndexedDB deleted successfully');
+          resolve();
+        };
+        
+        deleteRequest.onerror = () => {
+          console.error('❌ Failed to delete IndexedDB');
+          resolve();
+        };
+        
+        deleteRequest.onblocked = () => {
+          console.warn('⚠️ IndexedDB deletion blocked');
+          resolve();
+        };
+      } catch (err) {
+        console.error('❌ Error deleting IndexedDB:', err);
+        resolve();
+      }
+    });
+  }
+};
+
 // Run cleanup on import
 clearOldSecureStoreSession();
 
-// Create and export Supabase client
-// Using AsyncStorage instead of SecureStore to avoid 2048-byte limit (recommended by Expo + Supabase 2024)
+// Create and export Supabase client with safe storage wrapper
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: AsyncStorage,
+    storage: SafeAsyncStorage as any,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
