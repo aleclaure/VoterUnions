@@ -1,0 +1,60 @@
+Workers Union Tab
+
+Mission: Empower workers to collectively organize, propose, and execute strikes or workplace reforms.
+Tagline: “We make the economy run — and we can stop it too.”
+
+⸻
+
+1️⃣ Worker Proposals
+
+Purpose: The drafting space for workplace demands.
+Functionality:
+	•	Workers submit proposals to:
+	•	Demand fair pay, safe conditions, or union recognition.
+	•	Plan strike votes or collective bargaining actions.
+	•	Each proposal includes employer, location/industry, demands, and worker testimonies (optional anonymity).
+	•	Other workers can join or endorse by industry tag (e.g., “Retail,” “Tech,” “Healthcare”).
+Goal: Turn isolated frustrations into collective plans.
+Tagline: “No one fights alone.”
+
+⸻
+
+2️⃣ Organize & Vote
+
+Purpose: Democratic decision-making for labor actions.
+Functionality:
+	•	Workers can vote on whether to:
+	•	Begin strike planning
+	•	File official petitions
+	•	Negotiate internally first
+	•	Requires verified workplace or union email for authenticity.
+	•	Once a threshold is met, proposal moves to the “Active Strikes” subtab.
+Goal: Ensure legitimacy and safety through worker consensus.
+Tagline: “One voice, one workforce.”
+
+⸻
+
+3️⃣ Active Strikes
+
+Purpose: Coordinate and monitor ongoing strikes or walkouts.
+Functionality:
+	•	Real-time feed showing:
+	•	Active strikes
+	•	Location, company, demands, and current negotiation status
+	•	Live updates, photos, solidarity messages
+	•	Integration with local unions, strike funds, and community support tools.
+Goal: Keep strikes visible, supported, and effective.
+Tagline: “When we stop working, they start listening.”
+
+⸻
+
+4️⃣ Outcomes & Solidarity
+
+Purpose: Track results and build long-term alliances.
+Functionality:
+	•	Document results (settlements, raises, new policies).
+	•	Public “Solidarity Archive” highlighting wins.
+	•	Option to form cross-industry alliances (“Educators + Healthcare workers unite”).
+	•	Post-strike surveys for strategy learning.
+Goal: Build an interlinked, resilient worker movement across sectors.
+Tagline: “Every win builds the next one.”
