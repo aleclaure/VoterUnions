@@ -124,8 +124,10 @@ export const PlatformTab = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform-amendments'] });
+    onSuccess: async () => {
+      // Invalidate and refetch with proper section-scoped query key
+      await queryClient.invalidateQueries({ queryKey: ['platform-amendments', selectedSection?.id] });
+      await queryClient.refetchQueries({ queryKey: ['platform-amendments', selectedSection?.id] });
       setShowProposeModal(false);
       setAmendmentText('');
       setAmendmentRationale('');
