@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import ProposalsTab from './consumer/ProposalsTab';
 import VoteLaunchTab from './consumer/VoteLaunchTab';
@@ -10,7 +11,7 @@ const Tab = createMaterialTopTabNavigator();
 
 export default function ConsumerScreen() {
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <Tab.Navigator
         screenOptions={{
           tabBarScrollEnabled: true,
@@ -42,7 +43,7 @@ export default function ConsumerScreen() {
           options={{ tabBarLabel: '🏆 Impact' }}
         />
       </Tab.Navigator>
-    </View>
+    </SafeAreaView>
   );
 }
 
