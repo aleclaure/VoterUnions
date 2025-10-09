@@ -511,3 +511,104 @@ export interface CampaignOutcome {
   created_by: string;
   created_at: string;
 }
+
+// ==================== Workers Union Types ====================
+
+export type WorkerVoteType = 'strike_planning' | 'file_petition' | 'negotiate_first';
+export type WorkerProposalStatus = 'open' | 'voting' | 'activated' | 'resolved' | 'archived';
+export type NegotiationStatus = 'not_started' | 'in_progress' | 'stalled' | 'resolved' | 'victory' | 'ended';
+export type StrikePledgeType = 'participate' | 'support' | 'donate' | 'spread_word';
+export type StrikeUpdateType = 'news' | 'photo' | 'solidarity' | 'negotiation' | 'victory' | 'setback';
+export type StrikeResultType = 'victory' | 'partial_victory' | 'ongoing' | 'ended' | 'defeated';
+
+export interface WorkerProposal {
+  id: string;
+  created_by: string;
+  employer_name: string;
+  industry: string;
+  location: string;
+  workplace_size?: string;
+  title: string;
+  demands: string;
+  background?: string;
+  worker_testimonies?: string[];
+  vote_count: number;
+  votes_strike_planning: number;
+  votes_file_petition: number;
+  votes_negotiate_first: number;
+  activation_percentage: number;
+  status: WorkerProposalStatus;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
+export interface WorkerVote {
+  id: string;
+  proposal_id: string;
+  voter_id: string;
+  vote_type: WorkerVoteType;
+  verified_workplace_email?: string;
+  union_affiliation?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ActiveStrike {
+  id: string;
+  proposal_id: string;
+  created_by: string;
+  strike_location: string;
+  company_name: string;
+  current_demands: string;
+  negotiation_status: NegotiationStatus;
+  start_date: string;
+  end_date?: string;
+  coordinator_contact?: string;
+  pledge_count: number;
+  update_count: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
+export interface StrikePledge {
+  id: string;
+  strike_id: string;
+  worker_id: string;
+  pledge_type: StrikePledgeType;
+  anonymous: boolean;
+  message?: string;
+  created_at: string;
+}
+
+export interface StrikeUpdate {
+  id: string;
+  strike_id: string;
+  posted_by: string;
+  update_type: StrikeUpdateType;
+  content: string;
+  media_urls?: string[];
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
+export interface StrikeOutcome {
+  id: string;
+  strike_id: string;
+  created_by: string;
+  result_type: StrikeResultType;
+  achievements: string;
+  settlement_details?: string;
+  workers_affected?: number;
+  pay_increase_percentage?: number;
+  new_policies?: string[];
+  cross_industry_alliances?: string[];
+  lessons_learned?: string;
+  strategy_notes?: string;
+  outcome_date: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
