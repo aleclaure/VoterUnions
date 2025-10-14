@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import ProposalsTab from './consumer/ProposalsTab';
@@ -12,6 +12,11 @@ const Tab = createMaterialTopTabNavigator();
 export default function ConsumerScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Consumer Union</Text>
+        <Text style={styles.subtitle}>Every purchase is a political act.</Text>
+      </View>
+
       <Tab.Navigator
         screenOptions={{
           tabBarScrollEnabled: true,
@@ -50,6 +55,23 @@ export default function ConsumerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8fafc',
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#64748b',
+    marginTop: 4,
   },
 });
