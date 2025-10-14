@@ -14,33 +14,34 @@ export default function WorkersScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <Tab.Navigator
         screenOptions={{
-          tabBarScrollEnabled: true,
+          tabBarScrollEnabled: false,
           tabBarActiveTintColor: '#2563eb',
           tabBarInactiveTintColor: '#6b7280',
           tabBarIndicatorStyle: { backgroundColor: '#2563eb', height: 3 },
-          tabBarLabelStyle: { fontSize: 12, fontWeight: '600', textTransform: 'none' },
+          tabBarLabelStyle: { fontSize: 11, fontWeight: '600', textTransform: 'none', textAlign: 'center' },
           tabBarStyle: { backgroundColor: '#fff', elevation: 0, shadowOpacity: 0, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+          tabBarItemStyle: { width: 'auto' },
         }}
       >
         <Tab.Screen 
           name="WorkerProposals" 
           component={WorkerProposalsTab}
-          options={{ tabBarLabel: '📋 Worker Proposals' }}
+          options={{ tabBarLabel: 'Worker\nProposals' }}
         />
         <Tab.Screen 
           name="OrganizeVote" 
           component={OrganizeVoteTab}
-          options={{ tabBarLabel: '✊ Organize & Vote' }}
+          options={{ tabBarLabel: 'Organize\n& Vote' }}
         />
         <Tab.Screen 
           name="ActiveStrikes" 
           component={ActiveStrikesTab}
-          options={{ tabBarLabel: '🪧 Active Strikes' }}
+          options={{ tabBarLabel: 'Active\nStrikes' }}
         />
         <Tab.Screen 
           name="OutcomesSolidarity" 
           component={OutcomesSolidarityTab}
-          options={{ tabBarLabel: '🏆 Outcomes & Solidarity' }}
+          options={{ tabBarLabel: 'Outcomes\n& Solidarity' }}
         />
       </Tab.Navigator>
     </SafeAreaView>

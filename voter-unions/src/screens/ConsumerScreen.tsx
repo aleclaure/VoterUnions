@@ -14,33 +14,34 @@ export default function ConsumerScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <Tab.Navigator
         screenOptions={{
-          tabBarScrollEnabled: true,
+          tabBarScrollEnabled: false,
           tabBarActiveTintColor: '#2563eb',
           tabBarInactiveTintColor: '#6b7280',
           tabBarIndicatorStyle: { backgroundColor: '#2563eb', height: 3 },
-          tabBarLabelStyle: { fontSize: 12, fontWeight: '600', textTransform: 'none' },
+          tabBarLabelStyle: { fontSize: 11, fontWeight: '600', textTransform: 'none', textAlign: 'center' },
           tabBarStyle: { backgroundColor: '#fff', elevation: 0, shadowOpacity: 0, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+          tabBarItemStyle: { width: 'auto' },
         }}
       >
         <Tab.Screen 
           name="Proposals" 
           component={ProposalsTab}
-          options={{ tabBarLabel: '🛍️ Proposals' }}
+          options={{ tabBarLabel: 'Proposals' }}
         />
         <Tab.Screen 
           name="VoteLaunch" 
           component={VoteLaunchTab}
-          options={{ tabBarLabel: '🗳️ Vote & Launch' }}
+          options={{ tabBarLabel: 'Vote &\nLaunch' }}
         />
         <Tab.Screen 
           name="ActiveBoycotts" 
           component={ActiveBoycottsTab}
-          options={{ tabBarLabel: '🚫 Active' }}
+          options={{ tabBarLabel: 'Active\nBoycotts' }}
         />
         <Tab.Screen 
           name="ImpactWins" 
           component={ImpactWinsTab}
-          options={{ tabBarLabel: '🏆 Impact' }}
+          options={{ tabBarLabel: 'Impact &\nWins' }}
         />
       </Tab.Navigator>
     </SafeAreaView>
