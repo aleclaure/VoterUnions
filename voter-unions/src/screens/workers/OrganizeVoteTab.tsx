@@ -117,6 +117,11 @@ export default function OrganizeVoteTab() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Organize & Vote</Text>
+          <Text style={styles.headerSubtitle}>One voice, one workforce.</Text>
+        </View>
+
         <View style={styles.proposalsList}>
           {proposals.map((proposal) => {
             const userVote = getUserVote(proposal.id);
@@ -200,6 +205,9 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 16, color: '#6b7280' },
+  header: { padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 4 },
+  headerSubtitle: { fontSize: 14, color: '#6b7280' },
   proposalsList: { padding: 16 },
   proposalCard: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#e5e7eb' },
   proposalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 8 },

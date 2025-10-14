@@ -125,6 +125,11 @@ export default function ActiveStrikesTab() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Active Strikes</Text>
+          <Text style={styles.headerSubtitle}>When we stop working, they start listening.</Text>
+        </View>
+
         <View style={styles.strikesList}>
           {strikes.map((strike) => {
             const pledged = hasPledged(strike.id);
@@ -222,6 +227,9 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 16, color: '#6b7280' },
+  header: { padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 4 },
+  headerSubtitle: { fontSize: 14, color: '#6b7280' },
   strikesList: { padding: 16 },
   strikeCard: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#e5e7eb' },
   strikeTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 8 },

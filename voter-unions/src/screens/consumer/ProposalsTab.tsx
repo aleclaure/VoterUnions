@@ -101,8 +101,10 @@ export default function ProposalsTab() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
-        {/* Action Button */}
-        <View style={styles.actionBar}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Consumer Proposals</Text>
+          <Text style={styles.headerSubtitle}>Every purchase is a political act.</Text>
           <TouchableOpacity
             style={styles.createButton}
             onPress={() => setShowForm(!showForm)}
@@ -287,11 +289,23 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  actionBar: {
+  header: {
     backgroundColor: '#fff',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 16,
+    fontStyle: 'italic',
   },
   createButton: {
     backgroundColor: '#2563eb',

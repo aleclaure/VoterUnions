@@ -131,6 +131,12 @@ export default function VoteLaunchTab() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Vote & Launch</Text>
+          <Text style={styles.headerSubtitle}>Consensus before confrontation.</Text>
+        </View>
+
         {/* Proposals List */}
         <View style={styles.proposalsSection}>
           {proposals.length === 0 ? (
@@ -297,6 +303,23 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  header: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontStyle: 'italic',
   },
   proposalsSection: {
     padding: 16,
