@@ -124,11 +124,8 @@ export default function OutcomesSolidarityTab() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Outcomes & Solidarity</Text>
-          <Text style={styles.headerSubtitle}>Every win builds the next one.</Text>
-          
-          {myStrikes.length > 0 && (
+        {myStrikes.length > 0 && (
+          <View style={styles.actionBar}>
             <TouchableOpacity
               style={styles.createButton}
               onPress={() => setShowForm(!showForm)}
@@ -137,8 +134,8 @@ export default function OutcomesSolidarityTab() {
                 {showForm ? '✕ Cancel' : '+ Record Outcome'}
               </Text>
             </TouchableOpacity>
-          )}
-        </View>
+          </View>
+        )}
 
         {showForm && (
           <View style={styles.form}>
@@ -326,9 +323,7 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 16, color: '#6b7280' },
-  header: { padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 4 },
-  headerSubtitle: { fontSize: 14, color: '#6b7280', marginBottom: 16 },
+  actionBar: { backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
   createButton: { backgroundColor: '#2563eb', padding: 12, borderRadius: 8, alignItems: 'center' },
   createButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   form: { margin: 16, padding: 16, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#e5e7eb' },

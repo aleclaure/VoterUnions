@@ -127,12 +127,6 @@ export default function ImpactWinsTab() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Impact & Wins</Text>
-          <Text style={styles.headerSubtitle}>Proof that organized consumers change everything.</Text>
-        </View>
-
         {/* Summary Stats */}
         <View style={styles.statsSection}>
           <Text style={styles.statsTitle}>Our Collective Power</Text>
@@ -382,23 +376,6 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-  },
-  header: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontStyle: 'italic',
   },
   statsSection: {
     backgroundColor: '#fff',
