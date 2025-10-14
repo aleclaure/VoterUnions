@@ -20,7 +20,6 @@ export default function WorkersScreen() {
           tabBarIndicatorStyle: { backgroundColor: '#2563eb', height: 3 },
           tabBarLabelStyle: { fontSize: 11, fontWeight: '600', textTransform: 'none', textAlign: 'center' },
           tabBarStyle: { backgroundColor: '#fff', elevation: 0, shadowOpacity: 0, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-          tabBarItemStyle: { width: 'auto' },
         }}
       >
         <Tab.Screen 
