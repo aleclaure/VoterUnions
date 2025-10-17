@@ -54,6 +54,16 @@ The application is built using Expo SDK 52 with React Native and TypeScript. Nav
 - Automatic counts for members, arguments, and reactions managed via database triggers.
 - Performance optimized with composite indexes.
 
+**Device-Based Vote Protection (All 7 Vote Tables):**
+- **Security Model**: Each device gets exactly one vote per entity, preventing fraud through device-level enforcement.
+- **Database Layer**: All vote tables have `device_id` column with NOT NULL constraint + unique index on (entity_id, device_id).
+- **Read Layer**: All vote queries filter by BOTH user_id AND device_id for per-device state.
+- **Mutation Layer**: All vote mutations query by user_id AND device_id before update/delete/insert operations.
+- **UX Layer**: Vote handlers silently ignore clicks while deviceId loads (no error alerts).
+- **Migration**: Legacy votes migrated with unique placeholder device IDs before enforcing NOT NULL constraints.
+- **Protected Tables**: argument_votes, post_reactions, policy_votes, demand_votes, boycott_votes, worker_votes, amendment_votes.
+- **Device Tracking**: Uses `expo-application` to generate stable device identifiers stored in `expo-secure-store`.
+
 ## External Dependencies
 - **Expo SDK 52 (React Native)**: Core mobile app development framework.
 - **React Navigation**: For in-app navigation.
