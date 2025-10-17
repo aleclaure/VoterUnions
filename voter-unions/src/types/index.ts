@@ -897,3 +897,44 @@ export interface LaborPowerBookmark {
   created_at: string;
   deleted_at?: string;
 }
+
+// ============================================================================
+// Content Reporting Interfaces
+// ============================================================================
+
+export type ReportContentType = 
+  | 'post'
+  | 'comment'
+  | 'debate'
+  | 'argument'
+  | 'policy'
+  | 'amendment'
+  | 'negotiation_demand'
+  | 'boycott_proposal'
+  | 'boycott_comment'
+  | 'worker_proposal'
+  | 'worker_comment'
+  | 'politician'
+  | 'bill'
+  | 'donor'
+  | 'corporate_exploitation'
+  | 'organizing_resistance'
+  | 'worker_rights_legislation'
+  | 'solidarity_victories';
+
+export type ReportStatus = 'pending' | 'reviewed' | 'dismissed' | 'actioned';
+
+export interface Report {
+  id: string;
+  reporter_id: string;
+  content_type: ReportContentType;
+  content_id: string;
+  union_id: string | null;
+  reason: string;
+  status: ReportStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  admin_notes: string | null;
+  created_at: string;
+  deleted_at: string | null;
+}
