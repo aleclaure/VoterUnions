@@ -28,7 +28,13 @@ The application is built using Expo SDK 52 with React Native and TypeScript. Nav
 - Strict TypeScript and managed Expo workflow ensure a consistent and robust development environment.
 
 **Technical Implementations:**
-- **Authentication**: Email/Password signup/login with email verification, secure token storage, auto token refresh, password reset, and session management via React Context API.
+- **Authentication**: Email/Password signup/login with email verification, hardware-backed secure token storage (expo-secure-store), auto token refresh, password reset, and session management via React Context API.
+  - **Security Enhancements (Phase 1)**:
+    - Environment-enforced credentials with runtime validation (no hardcoded fallbacks)
+    - Hardware-backed token encryption via expo-secure-store on native platforms
+    - Strong password policy: 12+ characters with uppercase, lowercase, numbers, and special characters
+    - Email validation on all authentication entry points
+    - Consistent password validation across signup, signin, reset, and profile updates
 - **User Profiles**: Unique usernames, display names, bios, statistics, editing, and password management.
 - **Union Management**: Browse, create, join unions, and manage members with role-based access control.
 - **Enhanced Debate System**: Supports browsing, creation of debates, arguments with stances (PRO/CON/NEUTRAL), user identity display, upvote/downvote system with real-time tallies, scoreboard for momentum, source attachments, and threaded replies with horizontal thread view.
