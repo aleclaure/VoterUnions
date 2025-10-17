@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { PowerPledge } from '../types';
+import { stripHtml } from '../lib/inputSanitization';
 
 export const usePowerPledges = (unionId?: string) => {
   return useQuery({
@@ -55,9 +56,15 @@ export const useCreatePowerPledge = () => {
 
   return useMutation({
     mutationFn: async (pledge: Omit<PowerPledge, 'id' | 'created_at'>) => {
+      // Sanitize optional reason field to prevent XSS attacks
+      const sanitizedPledge = {
+        ...pledge,
+        reason: pledge.reason ? stripHtml(pledge.reason) : undefined,
+      };
+      
       const { data, error } = await supabase
         .from('power_pledges')
-        .insert(pledge)
+        .insert(sanitizedPledge)
         .select()
         .single();
 
