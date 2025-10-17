@@ -1,0 +1,72 @@
+Summary of changes I made (detailed, for your coding agent)
+I inspected your public schema and then applied a compatibility-first patch and an idempotent policy-fix. Below are the exact, specific changes and rationale so your coding agent can reproduce or review them.
+
+Database inspection
+Listed tables in the public schema to confirm existing objects and RLS state.
+Verified tables referenced by the migration exist (e.g., auth.users, active_sessions, user_security_settings, security_alerts, trusted_devices).
+Replaced previous migration with a simplified, version-compatible migration
+Purpose: avoid Postgres syntax/version incompatibilities and remove risky constructs that were causing syntax errors (e.g., CREATE POLICY IF NOT EXISTS).
+Key adjustments:
+Removed "IF NOT EXISTS" usage from CREATE POLICY statements (Postgres does not support this).
+Removed potentially version-sensitive filtered CREATE INDEX WHERE clauses (kept plain CREATE INDEX IF NOT EXISTS without WHERE filters).
+Replaced fragile REVOKE/role statements with a safe DO ... BEGIN EXCEPTION wrapper (so failures do not abort the migration).
+Used explicit ALTER TABLE ... ENABLE ROW LEVEL SECURITY before creating policies.
+Kept security helper functions but made REVOKE EXECUTE wrapped in a DO block so errors are ignored safely.
+Ensured each SQL statement is terminated with semicolons and used standard Postgres constructs.
+Created or ensured existence of core objects (non-destructive)
+Extensions:
+
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+Tables (created with IF NOT EXISTS to avoid destroying existing data):
+
+active_sessions (UUID primary key, references auth.users(id), session fields, timestamps, deleted_at)
+user_security_settings (UUID PK, user_id unique FK, 2FA and notification flags, security_score)
+security_alerts (UUID PK, user_id FK, alert_type, severity, is_resolved, metadata)
+trusted_devices (UUID PK, user_id FK, device_id unique per user, is_revoked)
+Indexes:
+
+Created indexes using CREATE INDEX IF NOT EXISTS for common lookup columns (user_id, device_id, is_active, expires_at, email_verified, two_factor_enabled, alert_type, is_resolved, severity). I purposely avoided partial indexes (WHERE ...) for compatibility.
+Added RLS policies (original intent preserved) but in compatible form
+Enabled RLS explicitly:
+ALTER TABLE
+
+
+Added helper functions and triggers (unchanged purpose, wrapped safely)
+upsert_active_session(...) — SECURITY DEFINER function to create a new session and mark prior device sessions as revoked. Kept and ensured REVOKE EXECUTE is attempted within a DO block that catches exceptions so failures don't abort migration.
+revoke_session(p_session_id UUID) — SECURITY DEFINER function to mark a session revoked.
+calculate_security_score(p_user_id UUID) — computes a score and updates user_security_settings.
+trigger_update_security_score() + trigger update_security_score_trigger — triggers calculate_security_score after inserts/updates to user_security_settings.
+Rationale: helper functions retained but made robust against permission/role errors when revoking execute privileges.
+Added safe idempotent policy patch (to fix "policy already exists" error you reported)
+Created a DO 
+B
+E
+G
+I
+N
+.
+.
+.
+E
+N
+D
+BEGIN...END block that:
+Checks pg_policy + pg_class + pg_namespace to detect existing policies.
+Conditionally executes DROP POLICY ON .
+
+
+Safety and non-destructiveness
+All table creation used IF NOT EXISTS; indexes used IF NOT EXISTS.
+The policy patch only drops policies (no tables, no data), and then recreates them with the intended definitions.
+REVOKE operations are executed inside DO blocks to avoid aborting on missing roles or permission differences.
+Specific tokens/constructs that caused trouble and were changed
+Removed: CREATE POLICY IF NOT EXISTS ... (not supported in Postgres).
+Replaced: Filtered/partial indexes (CREATE INDEX ... WHERE ...) — replaced with plain indexes to avoid version-specific behavior.
+Wrapped: REVOKE EXECUTE and other privilege commands in DO blocks with EXCEPTION handling.
+Ensured: All policy names are consistent and collisions are handled by conditional DROP + CREATE.
+Next steps I recommend for your agent
+Run the idempotent policy patch SQL I provided to remove conflicting policies and re-create correct policies.
+If you prefer not to drop policies, modify the script to skip creation if policy exists; I can provide that variant.
+After the patch, re-run the full migration if you still need to create missing tables/functions (the provided migration is safe to run because it uses IF NOT EXISTS).
+Re-introduce filtered/partial indexes later if desired, after confirming the Postgres version supports them; they improve performance for queries such as "WHERE deleted_at IS NULL".
