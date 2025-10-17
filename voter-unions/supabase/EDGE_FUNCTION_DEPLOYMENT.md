@@ -40,41 +40,18 @@ supabase link --project-ref YOUR_PROJECT_REF
 ```bash
 # Deploy the cleanup function
 supabase functions deploy cleanup-deleted-users
+
+# Note: SUPABASE_SERVICE_ROLE_KEY is automatically available
+# in Edge Functions - no manual secret configuration needed!
 ```
+
+**Important**: The Edge Function automatically has access to `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL` environment variables. Supabase injects these automatically when you deploy.
 
 ### 5. Configure Cron Schedule
 
-#### Option A: Using pg_cron (Recommended)
+#### Option A: Using External Cron Service (Recommended - Easiest)
 
-In Supabase Dashboard → SQL Editor, run:
-
-```sql
--- Enable pg_cron extension
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-
--- Schedule daily cleanup at 2 AM UTC
-SELECT cron.schedule(
-  'cleanup-deleted-users-daily',
-  '0 2 * * *',
-  $$
-  SELECT
-    net.http_post(
-      url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/cleanup-deleted-users',
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key')
-      ),
-      body := '{}'::jsonb
-    ) as request_id;
-  $$
-);
-```
-
-**Replace `YOUR_PROJECT_REF`** with your actual project reference.
-
-#### Option B: Using External Cron Service
-
-If pg_cron is unavailable, use a service like **Cron-job.org** or **EasyCron**:
+Use a service like **Cron-job.org** or **EasyCron**:
 
 1. Create account at https://cron-job.org
 2. Add new cron job:
@@ -88,6 +65,58 @@ If pg_cron is unavailable, use a service like **Cron-job.org** or **EasyCron**:
      ```
 
 Find your `SERVICE_ROLE_KEY` in Supabase Dashboard → Settings → API
+
+**Why external cron is recommended**: It's simpler and doesn't require managing service-role keys in your database. The Edge Function already has automatic access to the service-role key when invoked.
+
+#### Option B: Using pg_cron (Advanced)
+
+If you prefer database-based scheduling, you can use pg_cron with Supabase's HTTP functions:
+
+**Step 1**: Store service role key as a Postgres setting (one-time setup):
+
+In Supabase Dashboard → SQL Editor:
+
+```sql
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS http;
+
+-- SECURITY WARNING: This stores the service role key in the database
+-- Only do this if you understand the security implications
+-- Alternative: Use external cron service (Option A) instead
+
+-- Set the service role key (replace with your actual key)
+ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY_HERE';
+
+-- Reload configuration
+SELECT pg_reload_conf();
+```
+
+**Step 2**: Schedule the cron job:
+
+```sql
+SELECT cron.schedule(
+  'cleanup-deleted-users-daily',
+  '0 2 * * *',  -- Every day at 2 AM UTC
+  $$
+  SELECT
+    http_post(
+      'https://YOUR_PROJECT_REF.supabase.co/functions/v1/cleanup-deleted-users',
+      '{}',
+      'application/json',
+      jsonb_build_object(
+        'Authorization', 'Bearer ' || current_setting('app.service_role_key')
+      )
+    );
+  $$
+);
+```
+
+**Replace**:
+- `YOUR_SERVICE_ROLE_KEY_HERE` with your service role key (Dashboard → Settings → API)
+- `YOUR_PROJECT_REF` with your project reference
+
+**Security Note**: This approach stores your service-role key in the database configuration. If this concerns you, use Option A (external cron service) instead
 
 ## Testing
 

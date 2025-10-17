@@ -15,7 +15,7 @@ Client applications cannot directly delete `auth.users` records because this req
 ## Prerequisites
 
 1. **SQL Migration**: Run `voter-unions/supabase/deletion-tracking.sql` to create the tracking table
-2. **Service Role Key**: Function automatically uses `SUPABASE_SERVICE_ROLE_KEY` environment variable
+2. **Service Role Key**: ✅ Automatically available! Supabase injects `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL` into all Edge Functions at runtime - no manual configuration needed
 
 ## Deployment
 
@@ -46,47 +46,21 @@ supabase functions deploy cleanup-deleted-users
 
 ### 5. Set Up Cron Schedule
 
-In your Supabase Dashboard:
+**See the complete deployment guide**: `voter-unions/supabase/EDGE_FUNCTION_DEPLOYMENT.md`
 
-1. Go to **Database** → **Cron Jobs** (or use pg_cron extension)
-2. Create a new cron job:
+The guide provides two options:
 
-```sql
--- Enable pg_cron extension (if not already enabled)
-CREATE EXTENSION IF NOT EXISTS pg_cron;
+**Option A: External Cron Service (Recommended)**
+- Use Cron-job.org or similar
+- Simple setup, no database configuration
+- 5-minute setup
 
--- Schedule daily cleanup at 2 AM UTC
-SELECT cron.schedule(
-  'cleanup-deleted-users-daily',
-  '0 2 * * *',  -- Every day at 2 AM UTC
-  $$
-  SELECT
-    net.http_post(
-      url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/cleanup-deleted-users',
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key')
-      ),
-      body := '{}'::jsonb
-    ) as request_id;
-  $$
-);
-```
+**Option B: pg_cron (Advanced)**
+- Database-based scheduling
+- Requires storing service-role key in database settings
+- More complex but fully self-hosted
 
-**Note**: Replace `YOUR_PROJECT_REF` with your actual Supabase project reference.
-
-### Alternative: Use Supabase Dashboard Webhooks
-
-If pg_cron is not available:
-
-1. Go to **Database** → **Webhooks**
-2. Create a webhook with:
-   - **Type**: Schedule
-   - **Schedule**: `0 2 * * *` (daily at 2 AM)
-   - **HTTP Request**:
-     - Method: `POST`
-     - URL: `https://YOUR_PROJECT_REF.supabase.co/functions/v1/cleanup-deleted-users`
-     - Headers: `Authorization: Bearer YOUR_SERVICE_ROLE_KEY`
+👉 **For detailed step-by-step instructions, see**: [`EDGE_FUNCTION_DEPLOYMENT.md`](../../EDGE_FUNCTION_DEPLOYMENT.md)
 
 ## How It Works
 
