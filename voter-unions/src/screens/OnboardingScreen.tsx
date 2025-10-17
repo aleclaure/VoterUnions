@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityInd
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { sanitizeProfile } from '../lib/inputSanitization';
 
 export const OnboardingScreen = () => {
   const [displayName, setDisplayName] = useState('');
@@ -55,15 +56,22 @@ export const OnboardingScreen = () => {
         return;
       }
 
-      // Create or update profile with display name and bio
+      // Sanitize profile data to prevent XSS attacks
+      const sanitizedProfile = sanitizeProfile({
+        display_name: displayName,
+        username: displayName,
+        bio: bio.trim() || undefined,
+      });
+
+      // Create or update profile with sanitized data
       const { error: upsertError } = await supabase
         .from('profiles')
         .upsert({
           id: user.id,
           email: user.email!,
-          display_name: displayName,
-          username_normalized: displayName.toLowerCase(),
-          bio: bio.trim() || null,
+          display_name: sanitizedProfile.display_name,
+          username_normalized: (sanitizedProfile.username || '').toLowerCase(),
+          bio: sanitizedProfile.bio,
           last_seen: new Date().toISOString(),
         }, {
           onConflict: 'id'
