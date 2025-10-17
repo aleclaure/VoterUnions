@@ -77,6 +77,7 @@ export function sanitizeUrl(url: string | null | undefined): string | null {
     }
     
     // Reject suspicious patterns
+    // eslint-disable-next-line no-script-url
     if (parsed.href.includes('javascript:') || parsed.href.includes('data:')) {
       return null;
     }

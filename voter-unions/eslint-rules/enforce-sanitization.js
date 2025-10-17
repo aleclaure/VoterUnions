@@ -3,16 +3,9 @@
  * 
  * This rule detects when user data is inserted into the database without
  * proper sanitization, helping prevent XSS and injection attacks.
- * 
- * Usage: Add to your ESLint config:
- * {
- *   "rules": {
- *     "custom-rules/enforce-sanitization": "error"
- *   }
- * }
  */
 
-module.exports = {
+export default {
   meta: {
     type: 'problem',
     docs: {
@@ -39,6 +32,34 @@ module.exports = {
       'sanitizeProposal',
       'sanitizeObject',
     ]);
+    
+    // Helper function to check if a node uses sanitization
+    const usesSanitization = (node) => {
+      if (node.type === 'CallExpression' && node.callee.type === 'Identifier') {
+        return sanitizationFunctions.has(node.callee.name);
+      }
+      
+      // Check nested calls
+      if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression') {
+        return usesSanitization(node.callee.object);
+      }
+      
+      // Check object spread/destructuring
+      if (node.type === 'ObjectExpression') {
+        return node.properties.some(prop => 
+          prop.value && usesSanitization(prop.value)
+        );
+      }
+      
+      return false;
+    };
+    
+    // Helper function to check if object has string properties
+    const hasStringProperties = (objectNode) => {
+      return objectNode.properties.some(prop => 
+        prop.value && prop.value.type === 'Literal' && typeof prop.value.value === 'string'
+      );
+    };
 
     return {
       // Track imports from inputSanitization.ts
@@ -71,7 +92,7 @@ module.exports = {
               const init = def.node.init;
               
               // Check if the initialization uses a sanitization function
-              if (init && !this.usesSanitization(init, sanitizationFunctions)) {
+              if (init && !usesSanitization(init)) {
                 context.report({
                   node,
                   messageId: 'unsanitizedInsert',
@@ -85,14 +106,14 @@ module.exports = {
             let hasSanitization = false;
             
             for (const prop of insertArg.properties) {
-              if (prop.value && this.usesSanitization(prop.value, sanitizationFunctions)) {
+              if (prop.value && usesSanitization(prop.value)) {
                 hasSanitization = true;
                 break;
               }
             }
             
             // Only warn if no sanitization is found AND there are string literals
-            if (!hasSanitization && this.hasStringProperties(insertArg)) {
+            if (!hasSanitization && hasStringProperties(insertArg)) {
               // Check if sanitization import exists
               if (!hasSanitizationImport) {
                 context.report({
@@ -103,34 +124,6 @@ module.exports = {
             }
           }
         }
-      },
-      
-      // Helper method to check if a node uses sanitization
-      usesSanitization(node, sanitizationFunctions) {
-        if (node.type === 'CallExpression' && node.callee.type === 'Identifier') {
-          return sanitizationFunctions.has(node.callee.name);
-        }
-        
-        // Check nested calls
-        if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression') {
-          return this.usesSanitization(node.callee.object, sanitizationFunctions);
-        }
-        
-        // Check object spread/destructuring
-        if (node.type === 'ObjectExpression') {
-          return node.properties.some(prop => 
-            prop.value && this.usesSanitization(prop.value, sanitizationFunctions)
-          );
-        }
-        
-        return false;
-      },
-      
-      // Helper method to check if object has string properties
-      hasStringProperties(objectNode) {
-        return objectNode.properties.some(prop => 
-          prop.value && prop.value.type === 'Literal' && typeof prop.value.value === 'string'
-        );
       },
     };
   },
