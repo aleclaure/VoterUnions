@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { useDeviceId } from '../hooks/useDeviceId';
 import { usePosts, usePostReaction, usePostReactionsRealtime, useCreatePost } from '../hooks/usePosts';
 import { useChannels, useCreateChannel } from '../hooks/useChannels';
 import { PostCard } from '../components/PostCard';
@@ -13,6 +14,7 @@ import { Union } from '../types';
 
 export const MyUnionsScreen = ({ navigation }: any) => {
   const { user } = useAuth();
+  const { deviceId } = useDeviceId();
   const [selectedUnionId, setSelectedUnionId] = useState<string | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
@@ -278,16 +280,24 @@ export const MyUnionsScreen = ({ navigation }: any) => {
             <PostCard
               post={item}
               onPress={() => navigation.navigate('PostDetail', { postId: item.id })}
-              onUpvote={() => postReactionMutation.mutate({
-                postId: item.id,
-                userId: user.id,
-                reactionType: 'upvote',
-              })}
-              onDownvote={() => postReactionMutation.mutate({
-                postId: item.id,
-                userId: user.id,
-                reactionType: 'downvote',
-              })}
+              onUpvote={() => {
+                if (!deviceId) return; // Silently ignore while deviceId loads
+                postReactionMutation.mutate({
+                  postId: item.id,
+                  userId: user.id,
+                  reactionType: 'upvote',
+                  deviceId,
+                });
+              }}
+              onDownvote={() => {
+                if (!deviceId) return; // Silently ignore while deviceId loads
+                postReactionMutation.mutate({
+                  postId: item.id,
+                  userId: user.id,
+                  reactionType: 'downvote',
+                  deviceId,
+                });
+              }}
               onComment={() => navigation.navigate('PostDetail', { postId: item.id })}
             />
           )}

@@ -249,20 +249,29 @@ export const usePostReaction = () => {
       postId,
       userId,
       reactionType,
+      deviceId,
     }: {
       postId: string;
       userId: string;
       reactionType: 'upvote' | 'downvote';
+      deviceId?: string | null;
     }) => {
+      if (!deviceId) {
+        throw new Error('Device verification in progress. Please wait and try again.');
+      }
+      
+      // Query by BOTH user_id AND device_id to ensure per-device vote tracking
       const { data: existing } = await supabase
         .from('post_reactions')
         .select('*')
         .eq('post_id', postId)
         .eq('user_id', userId)
+        .eq('device_id', deviceId) // Critical: match by device_id too
         .single();
 
       if (existing) {
         if (existing.reaction_type === reactionType) {
+          // Same reaction - remove it (toggle off)
           const { error } = await supabase
             .from('post_reactions')
             .delete()
@@ -271,6 +280,7 @@ export const usePostReaction = () => {
           if (error) throw error;
           return null;
         } else {
+          // Different reaction - update it (change vote)
           const { data, error } = await supabase
             .from('post_reactions')
             .update({ reaction_type: reactionType })
@@ -282,12 +292,14 @@ export const usePostReaction = () => {
           return data;
         }
       } else {
+        // No existing reaction from this device - insert new
         const { data, error } = await supabase
           .from('post_reactions')
           .insert({
             post_id: postId,
             user_id: userId,
             reaction_type: reactionType,
+            device_id: deviceId,
           })
           .select()
           .single();
@@ -304,23 +316,24 @@ export const usePostReaction = () => {
   });
 };
 
-export const useUserPostReaction = (postId: string, userId: string | undefined) => {
+export const useUserPostReaction = (postId: string, userId: string | undefined, deviceId: string | null | undefined) => {
   return useQuery({
-    queryKey: ['post-reactions', postId, userId],
+    queryKey: ['post-reactions', postId, userId, deviceId],
     queryFn: async () => {
-      if (!userId) return null;
+      if (!userId || !deviceId) return null;
 
       const { data, error } = await supabase
         .from('post_reactions')
         .select('*')
         .eq('post_id', postId)
         .eq('user_id', userId)
-        .single();
+        .eq('device_id', deviceId) // Critical: filter by device_id for per-device reactions
+        .maybeSingle(); // Use maybeSingle instead of single to handle no results gracefully
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) throw error;
       return data as PostReaction | null;
     },
-    enabled: !!userId && !!postId,
+    enabled: !!userId && !!postId && !!deviceId,
   });
 };
 

@@ -4,9 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePublicPosts, usePostReaction, usePostReactionsRealtime } from '../hooks/usePosts';
 import { PostCard } from '../components/PostCard';
 import { useAuth } from '../hooks/useAuth';
+import { useDeviceId } from '../hooks/useDeviceId';
 
 export const AllPostsScreen = ({ navigation }: any) => {
   const { user } = useAuth();
+  const { deviceId } = useDeviceId();
   const { data: posts, isLoading } = usePublicPosts();
   const postReactionMutation = usePostReaction();
   const [sortBy, setSortBy] = useState<'recent' | 'upvotes' | 'comments'>('recent');
@@ -28,20 +30,22 @@ export const AllPostsScreen = ({ navigation }: any) => {
   }, [posts, sortBy]);
 
   const handleUpvote = (postId: string) => {
-    if (!user) return;
+    if (!user || !deviceId) return; // Silently ignore while deviceId loads
     postReactionMutation.mutate({
       postId,
       userId: user.id,
       reactionType: 'upvote',
+      deviceId,
     });
   };
 
   const handleDownvote = (postId: string) => {
-    if (!user) return;
+    if (!user || !deviceId) return; // Silently ignore while deviceId loads
     postReactionMutation.mutate({
       postId,
       userId: user.id,
       reactionType: 'downvote',
+      deviceId,
     });
   };
 

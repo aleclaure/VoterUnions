@@ -30,6 +30,10 @@ ALTER TABLE boycott_votes
 ALTER TABLE worker_votes 
   ADD COLUMN IF NOT EXISTS device_id VARCHAR(255);
 
+-- 7. Amendment Votes (People's Agenda - Platform)
+ALTER TABLE amendment_votes 
+  ADD COLUMN IF NOT EXISTS device_id VARCHAR(255);
+
 -- ============================================================================
 -- Step 2: Update existing NULL device_ids to a system placeholder
 -- This handles legacy votes before device tracking was implemented
@@ -41,6 +45,7 @@ UPDATE policy_votes SET device_id = 'legacy-' || id::text WHERE device_id IS NUL
 UPDATE demand_votes SET device_id = 'legacy-' || id::text WHERE device_id IS NULL;
 UPDATE boycott_votes SET device_id = 'legacy-' || id::text WHERE device_id IS NULL;
 UPDATE worker_votes SET device_id = 'legacy-' || id::text WHERE device_id IS NULL;
+UPDATE amendment_votes SET device_id = 'legacy-' || id::text WHERE device_id IS NULL;
 
 -- ============================================================================
 -- Step 3: Make device_id NOT NULL (enforces server-side requirement)
@@ -64,6 +69,9 @@ ALTER TABLE boycott_votes
 ALTER TABLE worker_votes 
   ALTER COLUMN device_id SET NOT NULL;
 
+ALTER TABLE amendment_votes 
+  ALTER COLUMN device_id SET NOT NULL;
+
 -- ============================================================================
 -- Step 4: Add unique constraints (now applies to ALL votes, not just non-NULL)
 -- ============================================================================
@@ -75,6 +83,7 @@ DROP INDEX IF EXISTS idx_policy_votes_device_unique;
 DROP INDEX IF EXISTS idx_demand_votes_device_unique;
 DROP INDEX IF EXISTS idx_boycott_votes_device_unique;
 DROP INDEX IF EXISTS idx_worker_votes_device_unique;
+DROP INDEX IF EXISTS idx_amendment_votes_device_unique;
 
 -- Add full unique constraints (enforces one vote per device per entity)
 CREATE UNIQUE INDEX idx_argument_votes_device_unique 
@@ -94,6 +103,9 @@ CREATE UNIQUE INDEX idx_boycott_votes_device_unique
 
 CREATE UNIQUE INDEX idx_worker_votes_device_unique 
   ON worker_votes(proposal_id, device_id);
+
+CREATE UNIQUE INDEX idx_amendment_votes_device_unique 
+  ON amendment_votes(amendment_id, device_id);
 
 -- ============================================================================
 -- Performance Indexes

@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { useDeviceId } from '../hooks/useDeviceId';
 import { usePostComments, useCreateComment, usePostReaction, usePostReactionsRealtime } from '../hooks/usePosts';
 import { PostCard } from '../components/PostCard';
 import { CommentCard } from '../components/CommentCard';
@@ -22,6 +23,7 @@ import { PostWithDetails } from '../hooks/usePosts';
 export const PostDetailScreen = ({ route, navigation }: any) => {
   const { postId } = route.params;
   const { user } = useAuth();
+  const { deviceId } = useDeviceId();
   const queryClient = useQueryClient();
   const [commentText, setCommentText] = useState('');
 
@@ -104,20 +106,22 @@ export const PostDetailScreen = ({ route, navigation }: any) => {
   };
 
   const handleUpvote = () => {
-    if (!user || !post) return;
+    if (!user || !post || !deviceId) return; // Silently ignore while deviceId loads
     postReactionMutation.mutate({
       postId: post.id,
       userId: user.id,
       reactionType: 'upvote',
+      deviceId,
     });
   };
 
   const handleDownvote = () => {
-    if (!user || !post) return;
+    if (!user || !post || !deviceId) return; // Silently ignore while deviceId loads
     postReactionMutation.mutate({
       postId: post.id,
       userId: user.id,
       reactionType: 'downvote',
+      deviceId,
     });
   };
 

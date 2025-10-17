@@ -15,11 +15,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { useDeviceId } from '../../hooks/useDeviceId';
 import { PlatformSection, PlatformAmendment, AmendmentVote } from '../../types';
 
 export const PlatformTab = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { deviceId } = useDeviceId();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAmendmentsModal, setShowAmendmentsModal] = useState(false);
   const [showProposeModal, setShowProposeModal] = useState(false);
@@ -159,11 +161,16 @@ export const PlatformTab = () => {
           if (error) throw error;
         }
       } else {
+        if (!deviceId) {
+          throw new Error('Device verification in progress. Please wait and try again.');
+        }
+        
         const { error } = await supabase.from('amendment_votes').insert([
           {
             amendment_id: amendmentId,
             user_id: user?.id,
             vote_type: voteType,
+            device_id: deviceId,
           },
         ]);
         if (error) throw error;
