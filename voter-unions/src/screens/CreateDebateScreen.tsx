@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../contexts/AuthContext';
+import { useEmailVerificationGuard } from '../hooks/useEmailVerificationGuard';
 import { Union } from '../types';
 
 interface UnionMemberData {
@@ -13,6 +14,7 @@ interface UnionMemberData {
 export const CreateDebateScreen = ({ navigation }: {navigation: any}) => {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const { guardAction } = useEmailVerificationGuard();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [issueArea, setIssueArea] = useState('');
@@ -35,6 +37,10 @@ export const CreateDebateScreen = ({ navigation }: {navigation: any}) => {
 
   const createMutation = useMutation({
     mutationFn: async () => {
+      // Email verification guard
+      const allowed = await guardAction('CREATE_DEBATE');
+      if (!allowed) throw new Error('Email verification required');
+      
       const { data, error } = await supabase
         .from('debates')
         .insert({

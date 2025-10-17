@@ -16,12 +16,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useDeviceId } from '../../hooks/useDeviceId';
+import { useEmailVerificationGuard } from '../../hooks/useEmailVerificationGuard';
 import { PlatformSection, PlatformAmendment, AmendmentVote } from '../../types';
 
 export const PlatformTab = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { deviceId } = useDeviceId();
+  const { guardAction } = useEmailVerificationGuard();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAmendmentsModal, setShowAmendmentsModal] = useState(false);
   const [showProposeModal, setShowProposeModal] = useState(false);
@@ -80,6 +82,10 @@ export const PlatformTab = () => {
 
   const createSectionMutation = useMutation({
     mutationFn: async (section: { title: string; content: string; issue_area: string }) => {
+      // Email verification guard
+      const allowed = await guardAction('CREATE_POST');
+      if (!allowed) throw new Error('Email verification required');
+      
       const maxOrder = sections?.length || 0;
       const { data, error } = await supabase
         .from('platform_sections')
@@ -144,6 +150,10 @@ export const PlatformTab = () => {
       amendmentId: string;
       voteType: 'for' | 'against';
     }) => {
+      // Email verification guard
+      const allowed = await guardAction('VOTE');
+      if (!allowed) throw new Error('Email verification required');
+      
       const existingVote = userVotes?.find((v) => v.amendment_id === amendmentId);
 
       if (existingVote) {

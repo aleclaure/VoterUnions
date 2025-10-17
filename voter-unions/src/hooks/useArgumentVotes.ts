@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../contexts/AuthContext';
 import { ArgumentVote } from '../types';
+import { useEmailVerificationGuard } from './useEmailVerificationGuard';
 
 export const useUserVote = (argumentId: string, deviceId: string | null | undefined) => {
   const { user } = useAuthStore();
@@ -29,6 +30,7 @@ export const useUserVote = (argumentId: string, deviceId: string | null | undefi
 export const useVoteOnArgument = () => {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const { guardAction } = useEmailVerificationGuard();
 
   return useMutation({
     mutationFn: async ({ argumentId, voteType, debateId, deviceId }: { 
@@ -39,6 +41,10 @@ export const useVoteOnArgument = () => {
     }) => {
       if (!user) throw new Error('Must be logged in to vote');
       if (!deviceId) throw new Error('Device verification in progress. Please wait and try again.');
+      
+      // Email verification guard
+      const allowed = await guardAction('VOTE');
+      if (!allowed) throw new Error('Email verification required');
 
       // Query by BOTH user_id AND device_id to ensure per-device vote tracking
       const { data: existingVote } = await supabase

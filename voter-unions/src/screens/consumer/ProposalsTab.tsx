@@ -3,11 +3,13 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { useEmailVerificationGuard } from '../../hooks/useEmailVerificationGuard';
 import { BoycottProposal, BoycottComment } from '../../types';
 
 export default function ProposalsTab() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { guardAction } = useEmailVerificationGuard();
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -36,6 +38,10 @@ export default function ProposalsTab() {
   // Create proposal mutation
   const createProposal = useMutation({
     mutationFn: async (proposal: typeof formData) => {
+      // Email verification guard
+      const allowed = await guardAction('CREATE_BOYCOTT');
+      if (!allowed) throw new Error('Email verification required');
+      
       const { data, error } = await supabase
         .from('boycott_proposals')
         .insert([{

@@ -15,12 +15,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useDeviceId } from '../../hooks/useDeviceId';
+import { useEmailVerificationGuard } from '../../hooks/useEmailVerificationGuard';
 import { Policy, PolicyVote } from '../../types';
 
 export const PrioritiesTab = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { deviceId } = useDeviceId();
+  const { guardAction } = useEmailVerificationGuard();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPolicyTitle, setNewPolicyTitle] = useState('');
   const [newPolicyDescription, setNewPolicyDescription] = useState('');
@@ -91,6 +93,10 @@ export const PrioritiesTab = () => {
       policyId: string;
       voteType: 'upvote' | 'downvote';
     }) => {
+      // Email verification guard
+      const allowed = await guardAction('VOTE');
+      if (!allowed) throw new Error('Email verification required');
+      
       const existingVote = userVotes?.find((v) => v.policy_id === policyId);
 
       if (existingVote) {

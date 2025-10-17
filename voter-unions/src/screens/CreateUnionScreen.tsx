@@ -4,16 +4,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../contexts/AuthContext';
+import { useEmailVerificationGuard } from '../hooks/useEmailVerificationGuard';
 
 export const CreateUnionScreen = ({ navigation }: any) => {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const { guardAction } = useEmailVerificationGuard();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(true);
 
   const createMutation = useMutation({
     mutationFn: async () => {
+      // Email verification guard
+      const allowed = await guardAction('CREATE_UNION');
+      if (!allowed) throw new Error('Email verification required');
+      
       const { data: unionData, error: unionError } = await supabase
         .from('unions')
         .insert({

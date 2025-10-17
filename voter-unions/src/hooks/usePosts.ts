@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { Post, PostReaction, Comment } from '../types';
+import { useEmailVerificationGuard } from './useEmailVerificationGuard';
 
 export interface PostWithDetails extends Post {
   author_email?: string;
@@ -155,6 +156,7 @@ export const usePublicPosts = () => {
 
 export const useCreatePost = () => {
   const queryClient = useQueryClient();
+  const { guardAction } = useEmailVerificationGuard();
 
   return useMutation({
     mutationFn: async ({
@@ -170,6 +172,10 @@ export const useCreatePost = () => {
       isPublic: boolean;
       userId: string;
     }) => {
+      // Email verification guard
+      const allowed = await guardAction('CREATE_POST');
+      if (!allowed) throw new Error('Email verification required');
+      
       console.log('📝 Creating post:', { 
         unionId, 
         content: content.substring(0, 50) + '...', 

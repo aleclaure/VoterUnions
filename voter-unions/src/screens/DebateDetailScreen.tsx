@@ -9,12 +9,14 @@ import { useVoteOnArgument, useUserVote } from '../hooks/useArgumentVotes';
 import { useDebateStats } from '../hooks/useDebateStats';
 import { useProfiles } from '../hooks/useProfile';
 import { useDeviceId } from '../hooks/useDeviceId';
+import { useEmailVerificationGuard } from '../hooks/useEmailVerificationGuard';
 
 export const DebateDetailScreen = ({ route, navigation }: any) => {
   const { debateId } = route.params;
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const { deviceId } = useDeviceId();
+  const { guardAction } = useEmailVerificationGuard();
   const [argumentContent, setArgumentContent] = useState('');
   const [selectedStance, setSelectedStance] = useState<Stance>('neutral');
   const [sourceLink, setSourceLink] = useState('');
@@ -67,8 +69,12 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
 
   const createArgumentMutation = useMutation({
     mutationFn: async () => {
+      // Email verification guard
+      const allowed = await guardAction('CREATE_ARGUMENT');
+      if (!allowed) throw new Error('Email verification required');
+      
       const sourceLinks = sourceLink.trim() ? [sourceLink.trim()] : [];
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .from('arguments')
         .insert({
           debate_id: debateId,

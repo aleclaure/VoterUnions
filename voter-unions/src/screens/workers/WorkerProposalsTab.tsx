@@ -3,11 +3,13 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { useEmailVerificationGuard } from '../../hooks/useEmailVerificationGuard';
 import { WorkerProposal } from '../../types';
 
 export default function WorkerProposalsTab() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { guardAction } = useEmailVerificationGuard();
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -36,6 +38,10 @@ export default function WorkerProposalsTab() {
 
   const createProposal = useMutation({
     mutationFn: async (proposal: typeof formData) => {
+      // Email verification guard
+      const allowed = await guardAction('CREATE_STRIKE');
+      if (!allowed) throw new Error('Email verification required');
+      
       const testimoniesArray = proposal.worker_testimonies
         ? proposal.worker_testimonies.split('\n').filter(t => t.trim())
         : [];

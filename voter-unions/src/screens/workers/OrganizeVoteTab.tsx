@@ -4,12 +4,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useDeviceId } from '../../hooks/useDeviceId';
+import { useEmailVerificationGuard } from '../../hooks/useEmailVerificationGuard';
 import { WorkerProposal, WorkerVote } from '../../types';
 
 export default function OrganizeVoteTab() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { deviceId } = useDeviceId();
+  const { guardAction } = useEmailVerificationGuard();
 
   const { data: proposals = [], isLoading } = useQuery<WorkerProposal[]>({
     queryKey: ['worker-proposals-voting'],
@@ -43,6 +45,10 @@ export default function OrganizeVoteTab() {
 
   const castVote = useMutation({
     mutationFn: async ({ proposalId, voteType }: { proposalId: string; voteType: 'strike_planning' | 'file_petition' | 'negotiate_first' }) => {
+      // Email verification guard
+      const allowed = await guardAction('VOTE');
+      if (!allowed) throw new Error('Email verification required');
+      
       if (!deviceId) {
         throw new Error('Device verification in progress. Please wait and try again.');
       }
