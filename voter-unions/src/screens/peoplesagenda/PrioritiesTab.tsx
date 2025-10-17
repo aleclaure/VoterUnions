@@ -14,11 +14,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { useDeviceId } from '../../hooks/useDeviceId';
 import { Policy, PolicyVote } from '../../types';
 
 export const PrioritiesTab = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { deviceId } = useDeviceId();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPolicyTitle, setNewPolicyTitle] = useState('');
   const [newPolicyDescription, setNewPolicyDescription] = useState('');
@@ -106,11 +108,16 @@ export const PrioritiesTab = () => {
           if (error) throw error;
         }
       } else {
+        if (!deviceId) {
+          throw new Error('Device verification in progress. Please wait and try again.');
+        }
+        
         const { error } = await supabase.from('policy_votes').insert([
           {
             policy_id: policyId,
             user_id: user?.id,
             vote_type: voteType,
+            device_id: deviceId,
           },
         ]);
         if (error) throw error;

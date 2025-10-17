@@ -3,11 +3,13 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'rea
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { useDeviceId } from '../../hooks/useDeviceId';
 import { WorkerProposal, WorkerVote } from '../../types';
 
 export default function OrganizeVoteTab() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { deviceId } = useDeviceId();
 
   const { data: proposals = [], isLoading } = useQuery<WorkerProposal[]>({
     queryKey: ['worker-proposals-voting'],
@@ -41,12 +43,17 @@ export default function OrganizeVoteTab() {
 
   const castVote = useMutation({
     mutationFn: async ({ proposalId, voteType }: { proposalId: string; voteType: 'strike_planning' | 'file_petition' | 'negotiate_first' }) => {
+      if (!deviceId) {
+        throw new Error('Device verification in progress. Please wait and try again.');
+      }
+      
       const { data, error } = await supabase
         .from('worker_votes')
         .upsert({
           proposal_id: proposalId,
           voter_id: user?.id,
           vote_type: voteType,
+          device_id: deviceId,
         }, {
           onConflict: 'proposal_id,voter_id',
         })

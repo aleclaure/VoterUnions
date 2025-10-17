@@ -8,11 +8,13 @@ import { Argument, Stance } from '../types';
 import { useVoteOnArgument, useUserVote } from '../hooks/useArgumentVotes';
 import { useDebateStats } from '../hooks/useDebateStats';
 import { useProfiles } from '../hooks/useProfile';
+import { useDeviceId } from '../hooks/useDeviceId';
 
 export const DebateDetailScreen = ({ route, navigation }: any) => {
   const { debateId } = route.params;
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const { deviceId } = useDeviceId();
   const [argumentContent, setArgumentContent] = useState('');
   const [selectedStance, setSelectedStance] = useState<Stance>('neutral');
   const [sourceLink, setSourceLink] = useState('');
@@ -166,7 +168,7 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
     const replies = getReplies(argument.id);
     return (
       <View>
-        <ArgumentCard argument={argument} debateId={debateId} onReply={setReplyingTo} />
+        <ArgumentCard argument={argument} debateId={debateId} onReply={setReplyingTo} deviceId={deviceId} />
         {replies.length > 0 && (
           <View style={styles.repliesContainer}>
             {replies.map(reply => (
@@ -182,12 +184,16 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
     return <RenderArgumentWithReplies argument={item} />;
   };
 
-  const ArgumentCard = ({ argument, debateId, onReply, showThread }: { argument: Argument; debateId: string; onReply: (id: string) => void; showThread?: boolean }) => {
+  const ArgumentCard = ({ argument, debateId, onReply, showThread, deviceId }: { argument: Argument; debateId: string; onReply: (id: string) => void; showThread?: boolean; deviceId?: string | null }) => {
     const voteMutation = useVoteOnArgument();
     const { data: userVote } = useUserVote(argument.id);
 
     const handleVote = (voteType: 'upvote' | 'downvote') => {
-      voteMutation.mutate({ argumentId: argument.id, voteType, debateId });
+      if (!deviceId) {
+        Alert.alert('Error', 'Device verification in progress. Please wait and try again.');
+        return;
+      }
+      voteMutation.mutate({ argumentId: argument.id, voteType, debateId, deviceId });
     };
 
     const voteScore = (argument.upvotes || 0) - (argument.downvotes || 0);

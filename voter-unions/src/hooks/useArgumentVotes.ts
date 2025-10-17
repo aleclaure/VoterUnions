@@ -30,12 +30,14 @@ export const useVoteOnArgument = () => {
   const { user } = useAuthStore();
 
   return useMutation({
-    mutationFn: async ({ argumentId, voteType, debateId }: { 
+    mutationFn: async ({ argumentId, voteType, debateId, deviceId }: { 
       argumentId: string; 
       voteType: 'upvote' | 'downvote';
       debateId: string;
+      deviceId: string;
     }) => {
       if (!user) throw new Error('Must be logged in to vote');
+      if (!deviceId) throw new Error('Device verification in progress. Please wait and try again.');
 
       const { data: existingVote } = await supabase
         .from('argument_votes')
@@ -67,6 +69,7 @@ export const useVoteOnArgument = () => {
             argument_id: argumentId,
             user_id: user.id,
             vote_type: voteType,
+            device_id: deviceId,
           });
         if (error) throw error;
         return { action: 'added', voteType };

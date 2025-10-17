@@ -12,11 +12,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { useDeviceId } from '../../hooks/useDeviceId';
 import { Demand, DemandVote } from '../../types';
 
 export const VotingHallTab = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { deviceId } = useDeviceId();
 
   const { data: votingDemands, isLoading } = useQuery({
     queryKey: ['demands-voting'],
@@ -73,11 +75,16 @@ export const VotingHallTab = () => {
           if (error) throw error;
         }
       } else {
+        if (!deviceId) {
+          throw new Error('Device verification in progress. Please wait and try again.');
+        }
+        
         const { error } = await supabase.from('demand_votes').insert([
           {
             demand_id: demandId,
             user_id: user?.id,
             vote_type: voteType,
+            device_id: deviceId,
           },
         ]);
         if (error) throw error;
