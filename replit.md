@@ -45,6 +45,16 @@ The application is built using Expo SDK 52 with React Native and TypeScript. Nav
 - **Database Design**: PostgreSQL with UUID v4 primary keys, soft deletes (`deleted_at`), comprehensive RLS policies on all tables, automatic counts via database triggers, and performance optimization with composite indexes.
 - **Device-Based Vote Protection**: A security model across all seven vote tables that enforces exactly one vote per entity per device, utilizing a `device_id` column with a unique index, and `expo-secure-store` for stable device identifiers.
 - **XSS Protection System**: Bulletproof automated enforcement via AST-based data flow analysis using Babel parser. All user-generated content is sanitized before database insertion with 62 automated tests (31 sanitization tests, 16 integration tests, 8 enforcement tests, 7 AST data flow tests) that FAIL if sanitization is bypassed. ESLint security plugin provides additional static analysis. System tracks variables from sanitization calls through to Supabase .insert() operations, detecting direct assignments, inline sanitization, conditional expressions, and object spreads.
+- **GDPR Compliance Features**:
+  - **Content Reporting System**: Comprehensive reporting system supporting 18 content types (posts, comments, profiles, etc.) with RLS policies, ReportButton UI component, and ModerationQueueScreen for union admins to review and resolve reports.
+  - **Privacy Policy**: GDPR-compliant screen with lawful bases for processing (Article 6), data controller details, EU representative section, and Standard Contractual Clauses for international transfers (placeholders noted for production).
+  - **Data Export (Article 20)**: Complete data portability across all user data (20+ tables) with platform-adaptive delivery (expo-sharing on native, JSON modal with copy-to-clipboard fallback for web/simulators where FileSystem unavailable).
+  - **Hard Delete Account (Article 17)**: Best-effort erasure with cascade deletion across 50+ tables and audit log anonymization. Honest UI disclosure that auth.users PII will be removed "within 30 days by backend systems" (requires Edge Function with service-role key for full compliance).
+- **Admin Audit Logging & Transparency**:
+  - **Comprehensive Audit System**: Extended audit_logs table tracking authentication events, moderation actions (report status changes, content deletions), and admin actions with device/IP tracking.
+  - **Database Triggers**: Automatic logging of report status changes (dismissed, reviewed, actioned) and content deletion (posts, comments) for complete transparency.
+  - **Union Member Visibility**: RLS policies and get_union_moderation_logs() function allow all union members to view moderation actions via ModerationLogsScreen, ensuring admin accountability.
+- **Rate Limiting**: Client-side rate limiting across 11 action types (authentication, posts, comments, channels, power pledges) to prevent abuse and spam.
 
 ## External Dependencies
 - **Expo SDK 52 (React Native)**: Core mobile application development.
