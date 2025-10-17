@@ -49,7 +49,12 @@ The application is built using Expo SDK 52 with React Native and TypeScript. Nav
   - **Content Reporting System**: Comprehensive reporting system supporting 18 content types (posts, comments, profiles, etc.) with RLS policies, ReportButton UI component, and ModerationQueueScreen for union admins to review and resolve reports.
   - **Privacy Policy**: GDPR-compliant screen with lawful bases for processing (Article 6), data controller details, EU representative section, and Standard Contractual Clauses for international transfers (placeholders noted for production).
   - **Data Export (Article 20)**: Complete data portability across all user data (20+ tables) with platform-adaptive delivery (expo-sharing on native, JSON modal with copy-to-clipboard fallback for web/simulators where FileSystem unavailable).
-  - **Hard Delete Account (Article 17)**: Best-effort erasure with cascade deletion across 50+ tables and audit log anonymization. Honest UI disclosure that auth.users PII will be removed "within 30 days by backend systems" (requires Edge Function with service-role key for full compliance).
+  - **Hard Delete Account (Article 17)**: Complete GDPR-compliant erasure system with:
+    - **Immediate**: Cascade deletion across 50+ tables and audit log anonymization
+    - **Automated Backend**: Supabase Edge Function (cleanup-deleted-users) deletes auth.users records within 30 days using service-role permissions
+    - **Tracking**: user_deletion_requests table logs all deletion requests with status tracking
+    - **Transparency**: Users can query deletion status via get_deletion_request_status() function
+    - **Deployment**: Production-ready Edge Function with comprehensive deployment guide (see voter-unions/supabase/EDGE_FUNCTION_DEPLOYMENT.md)
 - **Admin Audit Logging & Transparency**:
   - **Comprehensive Audit System**: Extended audit_logs table tracking authentication events, moderation actions (report status changes, content deletions), and admin actions with device/IP tracking.
   - **Database Triggers**: Automatic logging of report status changes (dismissed, reviewed, actioned) and content deletion (posts, comments) for complete transparency.
