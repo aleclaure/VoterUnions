@@ -44,6 +44,7 @@ The application is built using Expo SDK 52 with React Native and TypeScript. Nav
   - **Labor Power**: Documents labor struggles, organizing tactics, and worker victories with user-generated content across various categories.
 - **Database Design**: PostgreSQL with UUID v4 primary keys, soft deletes (`deleted_at`), comprehensive RLS policies on all tables, automatic counts via database triggers, and performance optimization with composite indexes.
 - **Device-Based Vote Protection**: A security model across all seven vote tables that enforces exactly one vote per entity per device, utilizing a `device_id` column with a unique index, and `expo-secure-store` for stable device identifiers.
+- **XSS Protection System**: Bulletproof automated enforcement via AST-based data flow analysis using Babel parser. All user-generated content is sanitized before database insertion with 62 automated tests (31 sanitization tests, 16 integration tests, 8 enforcement tests, 7 AST data flow tests) that FAIL if sanitization is bypassed. ESLint security plugin provides additional static analysis. System tracks variables from sanitization calls through to Supabase .insert() operations, detecting direct assignments, inline sanitization, conditional expressions, and object spreads.
 
 ## External Dependencies
 - **Expo SDK 52 (React Native)**: Core mobile application development.
@@ -57,3 +58,8 @@ The application is built using Expo SDK 52 with React Native and TypeScript. Nav
 - **expo-secure-store**: Secure storage for sensitive data.
 - **TypeScript**: Type safety.
 - **expo-application**: Generates stable device identifiers.
+- **Testing & Security**:
+    - **Vitest**: Testing framework for automated security enforcement.
+    - **ESLint Security Plugin**: Static analysis for security vulnerabilities.
+    - **Babel Parser/Traverse**: AST-based data flow analysis for XSS protection.
+    - **62 Automated Security Tests**: Comprehensive test suite that prevents XSS vulnerabilities.
