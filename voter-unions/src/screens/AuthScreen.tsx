@@ -3,6 +3,9 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'reac
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
 import { passwordSchema, emailSchema, validateData } from '../lib/validations';
+import { rateLimiter } from '../services/rateLimit';
+import { auditHelpers } from '../services/auditLog';
+import { useDeviceId } from '../hooks/useDeviceId';
 
 export const AuthScreen = () => {
   const [isSignUp, setIsSignUp] = useState(true);
@@ -12,8 +15,18 @@ export const AuthScreen = () => {
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { signUp, signInWithPassword, resetPassword } = useAuth();
+  const { deviceId } = useDeviceId();
 
   const handleSignUp = async () => {
+    // Check rate limit
+    const rateLimit = await rateLimiter.checkRateLimit('signup', email);
+    if (rateLimit.isBlocked && rateLimit.timeRemaining) {
+      const timeStr = rateLimiter.formatTimeRemaining(rateLimit.timeRemaining);
+      Alert.alert('Too Many Attempts', `Please try again in ${timeStr}`);
+      await auditHelpers.rateLimitTriggered(email, 'signup', deviceId);
+      return;
+    }
+
     // Validate email
     const emailValidation = validateData(emailSchema, email);
     if (!emailValidation.success) {
@@ -40,13 +53,25 @@ export const AuthScreen = () => {
 
     if (error) {
       Alert.alert('Error', error.message);
+      await rateLimiter.recordAttempt('signup', email);
+      await auditHelpers.signupFailed(email, error.message, deviceId);
     } else if (data.user) {
-      // User will be redirected to onboarding to set username
+      await rateLimiter.clearLimit('signup', email);
+      await auditHelpers.signupSuccess(data.user.id, email, deviceId);
       Alert.alert('Success', 'Account created! Please check your email to verify.');
     }
   };
 
   const handleSignIn = async () => {
+    // Check rate limit
+    const rateLimit = await rateLimiter.checkRateLimit('login', email);
+    if (rateLimit.isBlocked && rateLimit.timeRemaining) {
+      const timeStr = rateLimiter.formatTimeRemaining(rateLimit.timeRemaining);
+      Alert.alert('Account Locked', `Too many failed attempts. Please try again in ${timeStr}`);
+      await auditHelpers.rateLimitTriggered(email, 'login', deviceId);
+      return;
+    }
+
     // Validate email format
     const emailValidation = validateData(emailSchema, email);
     if (!emailValidation.success) {
@@ -60,15 +85,29 @@ export const AuthScreen = () => {
     }
 
     setLoading(true);
-    const { error } = await signInWithPassword(email, password);
+    const { error, data } = await signInWithPassword(email, password);
     setLoading(false);
 
     if (error) {
       Alert.alert('Error', error.message);
+      await rateLimiter.recordAttempt('login', email);
+      await auditHelpers.loginFailed(email, error.message, deviceId);
+    } else if (data?.user) {
+      await rateLimiter.clearLimit('login', email);
+      await auditHelpers.loginSuccess(data.user.id, email, deviceId);
     }
   };
 
   const handleForgotPassword = async () => {
+    // Check rate limit
+    const rateLimit = await rateLimiter.checkRateLimit('passwordReset', email);
+    if (rateLimit.isBlocked && rateLimit.timeRemaining) {
+      const timeStr = rateLimiter.formatTimeRemaining(rateLimit.timeRemaining);
+      Alert.alert('Too Many Requests', `Please try again in ${timeStr}`);
+      await auditHelpers.rateLimitTriggered(email, 'password_reset', deviceId);
+      return;
+    }
+
     // Validate email format
     const emailValidation = validateData(emailSchema, email);
     if (!emailValidation.success) {
@@ -82,7 +121,10 @@ export const AuthScreen = () => {
 
     if (error) {
       Alert.alert('Error', error.message);
+      await rateLimiter.recordAttempt('passwordReset', email);
     } else {
+      await rateLimiter.clearLimit('passwordReset', email);
+      await auditHelpers.passwordResetRequested(email);
       Alert.alert('Success', 'Password reset link sent to your email');
       setShowForgotPassword(false);
     }

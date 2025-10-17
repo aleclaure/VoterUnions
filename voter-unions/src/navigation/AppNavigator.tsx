@@ -22,6 +22,7 @@ import { PostDetailScreen } from '../screens/PostDetailScreen';
 import { UnionsTabNavigator } from './UnionsTabNavigator';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
+import { useSessionTimeout } from '../hooks/useSessionTimeout';
 import { Text } from 'react-native';
 
 const Stack = createNativeStackNavigator();
@@ -130,6 +131,9 @@ const MainStack = () => {
 export const AppNavigator = () => {
   const { user, isLoading: authLoading } = useAuth();
   const { needsOnboarding, isLoading: profileLoading } = useProfile();
+  
+  // Enable session timeout for logged-in users
+  useSessionTimeout();
 
   if (authLoading || (user && profileLoading)) {
     return null;

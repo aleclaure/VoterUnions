@@ -6,11 +6,16 @@ import { useProfile } from '../hooks/useProfile';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../services/supabase';
 import { passwordSchema, validateData } from '../lib/validations';
+import { auditHelpers } from '../services/auditLog';
+import { useDeviceId } from '../hooks/useDeviceId';
+import { useAuthStore } from '../contexts/AuthContext';
 
 export const EditProfileScreen = () => {
   const navigation = useNavigation();
   const { profile, updateProfile, isUpdating } = useProfile();
   const { updatePassword } = useAuth();
+  const { user } = useAuthStore();
+  const { deviceId } = useDeviceId();
 
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
@@ -90,6 +95,12 @@ export const EditProfileScreen = () => {
 
     try {
       await updatePassword(newPassword);
+      
+      // Log password change
+      if (user) {
+        await auditHelpers.passwordChanged(user.id, user.email || '', deviceId);
+      }
+      
       Alert.alert('Success', 'Password updated successfully');
       setNewPassword('');
       setConfirmPassword('');

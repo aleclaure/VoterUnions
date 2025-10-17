@@ -1,9 +1,12 @@
 import { useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../contexts/AuthContext';
+import { auditHelpers } from '../services/auditLog';
+import { useDeviceId } from './useDeviceId';
 
 export const useAuth = () => {
   const { user, session, isLoading, setUser, setSession, setIsLoading, clearAuth } = useAuthStore();
+  const { deviceId } = useDeviceId();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -76,6 +79,11 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
+    // Log logout before signing out
+    if (user && deviceId) {
+      await auditHelpers.logout(user.id, user.email || '', deviceId);
+    }
+    
     const { error } = await supabase.auth.signOut();
     if (!error) {
       clearAuth();

@@ -18,13 +18,23 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   
   -- What action was performed
   action_type VARCHAR(50) NOT NULL CHECK (action_type IN (
+    -- Authentication events (Phase 2 Security)
+    'login_success', 'login_failed', 'logout',
+    'signup_success', 'signup_failed',
+    'password_reset_requested', 'password_reset_success', 'password_changed',
+    'session_expired', 'rate_limit_triggered',
+    -- Voting events
     'vote_cast', 'vote_changed', 'vote_deleted',
+    -- Union events
     'union_created', 'union_joined', 'union_left', 'union_deleted',
+    -- Debate events
     'debate_created', 'debate_deleted',
     'argument_created', 'argument_deleted',
+    -- Action events
     'boycott_proposed', 'boycott_voted', 'boycott_activated',
     'strike_proposed', 'strike_voted', 'strike_activated',
-    'profile_updated', 'password_changed',
+    -- Account events
+    'profile_updated',
     'account_created', 'account_deleted',
     'suspicious_activity'
   )),
@@ -34,7 +44,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     'user', 'union', 'debate', 'argument', 'vote', 
     'boycott', 'strike', 'proposal', 'profile'
   )),
-  entity_id UUID NOT NULL, -- ID of the affected entity
+  entity_id UUID, -- ID of the affected entity (nullable for events without entities)
   
   -- Context and metadata
   description TEXT, -- Human-readable description
