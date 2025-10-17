@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../contexts/AuthContext';
 import { useEmailVerificationGuard } from '../hooks/useEmailVerificationGuard';
+import { stripHtml } from '../lib/inputSanitization';
 
 export const CreateUnionScreen = ({ navigation }: any) => {
   const { user } = useAuthStore();
@@ -20,11 +21,15 @@ export const CreateUnionScreen = ({ navigation }: any) => {
       const allowed = await guardAction('CREATE_UNION');
       if (!allowed) throw new Error('Email verification required');
       
+      // Sanitize inputs to prevent XSS attacks
+      const sanitizedName = stripHtml(name);
+      const sanitizedDescription = stripHtml(description);
+      
       const { data: unionData, error: unionError } = await supabase
         .from('unions')
         .insert({
-          name,
-          description,
+          name: sanitizedName,
+          description: sanitizedDescription,
           is_public: isPublic,
           created_by: user?.id,
         })

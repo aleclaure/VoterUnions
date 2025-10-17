@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { Demand, DemandNegotiation, NegotiationUpdate } from '../../types';
+import { stripHtml } from '../../lib/inputSanitization';
 
 export const ActivatedDemandsTab = () => {
   const { user } = useAuth();
@@ -74,13 +75,20 @@ export const ActivatedDemandsTab = () => {
 
   const createNegotiationMutation = useMutation({
     mutationFn: async (negotiation: { demand_id: string; target_name: string; target_description: string }) => {
+      // Sanitize inputs to prevent XSS attacks
+      const sanitizedNegotiation = {
+        demand_id: negotiation.demand_id,
+        target_name: stripHtml(negotiation.target_name),
+        target_description: stripHtml(negotiation.target_description),
+      };
+      
       const { data, error } = await supabase
         .from('demand_negotiations')
         .insert([
           {
-            demand_id: negotiation.demand_id,
-            target_name: negotiation.target_name,
-            target_description: negotiation.target_description,
+            demand_id: sanitizedNegotiation.demand_id,
+            target_name: sanitizedNegotiation.target_name,
+            target_description: sanitizedNegotiation.target_description,
             outcome_status: 'in_progress',
             created_by: user?.id,
           },
@@ -102,12 +110,15 @@ export const ActivatedDemandsTab = () => {
 
   const addUpdateMutation = useMutation({
     mutationFn: async (update: { negotiation_id: string; update_text: string }) => {
+      // Sanitize update text to prevent XSS attacks
+      const sanitizedText = stripHtml(update.update_text);
+      
       const { data, error } = await supabase
         .from('negotiation_updates')
         .insert([
           {
             negotiation_id: update.negotiation_id,
-            update_text: update.update_text,
+            update_text: sanitizedText,
             created_by: user?.id,
           },
         ])

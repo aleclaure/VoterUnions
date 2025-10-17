@@ -13,6 +13,7 @@ import {
 import { usePowerBills, useCreateBill } from '../../hooks/usePowerBills';
 import { useAuth } from '../../hooks/useAuth';
 import { PowerBill, BillStatus } from '../../types';
+import { stripHtml, sanitizeUrl } from '../../lib/inputSanitization';
 
 export const BillsTab = () => {
   const { user } = useAuth();
@@ -36,10 +37,18 @@ export const BillsTab = () => {
     }
 
     try {
-      await createBill.mutateAsync({
-        ...formData,
+      // Sanitize inputs to prevent XSS attacks
+      const sanitizedData = {
+        bill_number: stripHtml(formData.bill_number),
+        title: stripHtml(formData.title),
+        summary: stripHtml(formData.summary),
+        status: formData.status, // Enum value, already validated
+        analysis: stripHtml(formData.analysis),
+        source_link: sanitizeUrl(formData.source_link) || undefined,
         created_by: user?.id || '',
-      });
+      };
+      
+      await createBill.mutateAsync(sanitizedData);
       setShowAddModal(false);
       setFormData({
         bill_number: '',

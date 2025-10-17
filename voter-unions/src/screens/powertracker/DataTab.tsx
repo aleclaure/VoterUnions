@@ -14,6 +14,7 @@ import {
 import { usePowerGraphics, useCreateGraphic } from '../../hooks/usePowerGraphics';
 import { useAuth } from '../../hooks/useAuth';
 import { PowerGraphic, GraphicCategory } from '../../types';
+import { stripHtml, sanitizeUrl } from '../../lib/inputSanitization';
 
 export const DataTab = () => {
   const { user } = useAuth();
@@ -36,10 +37,17 @@ export const DataTab = () => {
     }
 
     try {
-      await createGraphic.mutateAsync({
-        ...formData,
+      // Sanitize inputs to prevent XSS attacks
+      const sanitizedData = {
+        title: stripHtml(formData.title),
+        description: stripHtml(formData.description),
+        image_url: sanitizeUrl(formData.image_url) || '',
+        category: formData.category, // Enum value, already validated
+        source_link: sanitizeUrl(formData.source_link) || undefined,
         created_by: user?.id || '',
-      });
+      };
+      
+      await createGraphic.mutateAsync(sanitizedData);
       setShowAddModal(false);
       setFormData({
         title: '',

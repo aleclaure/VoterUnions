@@ -16,6 +16,7 @@ import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useEmailVerificationGuard } from '../../hooks/useEmailVerificationGuard';
 import { Demand, DemandComment } from '../../types';
+import { stripHtml } from '../../lib/inputSanitization';
 
 export const ProposalsTab = () => {
   const { user } = useAuth();
@@ -68,13 +69,20 @@ export const ProposalsTab = () => {
       const allowed = await guardAction('CREATE_POST');
       if (!allowed) throw new Error('Email verification required');
       
+      // Sanitize inputs to prevent XSS attacks
+      const sanitizedDemand = {
+        title: stripHtml(demand.title),
+        description: stripHtml(demand.description),
+        category: stripHtml(demand.category),
+      };
+      
       const { data, error } = await supabase
         .from('demands')
         .insert([
           {
-            title: demand.title,
-            description: demand.description,
-            category: demand.category,
+            title: sanitizedDemand.title,
+            description: sanitizedDemand.description,
+            category: sanitizedDemand.category,
             status: 'draft',
             created_by: user?.id,
           },
@@ -96,13 +104,16 @@ export const ProposalsTab = () => {
 
   const addCommentMutation = useMutation({
     mutationFn: async (comment: { demand_id: string; text: string; type: string }) => {
+      // Sanitize comment text to prevent XSS attacks
+      const sanitizedText = stripHtml(comment.text);
+      
       const { data, error } = await supabase
         .from('demand_comments')
         .insert([
           {
             demand_id: comment.demand_id,
             user_id: user?.id,
-            comment_text: comment.text,
+            comment_text: sanitizedText,
             comment_type: comment.type,
           },
         ])

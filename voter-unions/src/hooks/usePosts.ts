@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { Post, PostReaction, Comment } from '../types';
 import { useEmailVerificationGuard } from './useEmailVerificationGuard';
+import { stripHtml } from '../lib/inputSanitization';
 
 export interface PostWithDetails extends Post {
   author_email?: string;
@@ -176,9 +177,12 @@ export const useCreatePost = () => {
       const allowed = await guardAction('CREATE_POST');
       if (!allowed) throw new Error('Email verification required');
       
+      // Sanitize content to prevent XSS attacks
+      const sanitizedContent = stripHtml(content);
+      
       console.log('📝 Creating post:', { 
         unionId, 
-        content: content.substring(0, 50) + '...', 
+        content: sanitizedContent.substring(0, 50) + '...', 
         channelIds, 
         isPublic,
         userId 
@@ -189,7 +193,7 @@ export const useCreatePost = () => {
         .insert({
           union_id: unionId,
           author_id: userId,
-          content,
+          content: sanitizedContent,
           is_public: isPublic,
         })
         .select()
@@ -394,12 +398,15 @@ export const useCreateComment = () => {
       userId: string;
       content: string;
     }) => {
+      // Sanitize comment content to prevent XSS attacks
+      const sanitizedContent = stripHtml(content);
+      
       const { data, error } = await supabase
         .from('comments')
         .insert({
           post_id: postId,
           author_id: userId,
-          content,
+          content: sanitizedContent,
         })
         .select()
         .single();

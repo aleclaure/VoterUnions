@@ -13,6 +13,7 @@ import {
 import { usePowerPoliticians, useCreatePolitician } from '../../hooks/usePowerPoliticians';
 import { useAuth } from '../../hooks/useAuth';
 import { PowerPolitician } from '../../types';
+import { stripHtml } from '../../lib/inputSanitization';
 
 export const PoliticiansTab = () => {
   const { user } = useAuth();
@@ -35,10 +36,17 @@ export const PoliticiansTab = () => {
     }
 
     try {
-      await createPolitician.mutateAsync({
-        ...formData,
+      // Sanitize inputs to prevent XSS attacks
+      const sanitizedData = {
+        name: stripHtml(formData.name),
+        office: stripHtml(formData.office),
+        party: stripHtml(formData.party),
+        state: stripHtml(formData.state),
+        bio: stripHtml(formData.bio),
         created_by: user?.id || '',
-      });
+      };
+      
+      await createPolitician.mutateAsync(sanitizedData);
       setShowAddModal(false);
       setFormData({ name: '', office: '', party: '', state: '', bio: '' });
       Alert.alert('Success', 'Politician added successfully');

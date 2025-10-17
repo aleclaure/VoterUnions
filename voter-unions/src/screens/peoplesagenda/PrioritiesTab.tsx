@@ -17,6 +17,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useDeviceId } from '../../hooks/useDeviceId';
 import { useEmailVerificationGuard } from '../../hooks/useEmailVerificationGuard';
 import { Policy, PolicyVote } from '../../types';
+import { stripHtml } from '../../lib/inputSanitization';
 
 export const PrioritiesTab = () => {
   const { user } = useAuth();
@@ -59,13 +60,20 @@ export const PrioritiesTab = () => {
 
   const createPolicyMutation = useMutation({
     mutationFn: async (policy: { title: string; description: string; issue_area: string }) => {
+      // Sanitize inputs to prevent XSS attacks
+      const sanitizedPolicy = {
+        title: stripHtml(policy.title),
+        description: stripHtml(policy.description),
+        issue_area: stripHtml(policy.issue_area),
+      };
+      
       const { data, error } = await supabase
         .from('policies')
         .insert([
           {
-            title: policy.title,
-            description: policy.description,
-            issue_area: policy.issue_area,
+            title: sanitizedPolicy.title,
+            description: sanitizedPolicy.description,
+            issue_area: sanitizedPolicy.issue_area,
             created_by: user?.id,
             vote_count: 0,
           },
