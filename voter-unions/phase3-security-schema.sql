@@ -337,6 +337,7 @@ $$;
 CREATE OR REPLACE FUNCTION calculate_security_score(p_user_id UUID)
 RETURNS INTEGER
 LANGUAGE plpgsql
+SECURITY DEFINER
 AS $$
 DECLARE
   v_score INTEGER := 0;
@@ -385,6 +386,7 @@ $$;
 CREATE OR REPLACE FUNCTION trigger_update_security_score()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SECURITY DEFINER
 AS $$
 BEGIN
   PERFORM calculate_security_score(NEW.user_id);
