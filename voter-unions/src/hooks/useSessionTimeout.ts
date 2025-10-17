@@ -79,7 +79,7 @@ export const useSessionTimeout = () => {
     resetTimer();
 
     // Handle app state changes (foreground/background)
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
       if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
         // App came to foreground
         const timeSinceLastActivity = Date.now() - lastActivityRef.current;
@@ -89,10 +89,10 @@ export const useSessionTimeout = () => {
           console.log('🔒 Session expired while app was in background');
           
           if (user.email && deviceId) {
-            auditHelpers.sessionExpired(user.id, user.email, deviceId);
+            await auditHelpers.sessionExpired(user.id, user.email, deviceId);
           }
           
-          signOut();
+          await signOut();
         } else {
           // Session still valid, reset timer
           resetTimer();

@@ -123,13 +123,14 @@ export const auditHelpers = {
       deviceId,
     }),
 
-  passwordResetRequested: (email: string) =>
+  passwordResetRequested: (email: string, deviceId?: string | null) =>
     logAuditEvent({
       actionType: 'password_reset_requested',
       entityType: 'user',
       entityId: null,
       description: `Password reset link requested for ${email}`,
       metadata: { email },
+      deviceId,
     }),
 
   sessionExpired: (userId: string, username: string, deviceId?: string | null) =>

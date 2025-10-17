@@ -124,7 +124,7 @@ export const AuthScreen = () => {
       await rateLimiter.recordAttempt('passwordReset', email);
     } else {
       await rateLimiter.clearLimit('passwordReset', email);
-      await auditHelpers.passwordResetRequested(email);
+      await auditHelpers.passwordResetRequested(email, deviceId);
       Alert.alert('Success', 'Password reset link sent to your email');
       setShowForgotPassword(false);
     }
