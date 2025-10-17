@@ -18,6 +18,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useDeviceId } from '../../hooks/useDeviceId';
 import { useEmailVerificationGuard } from '../../hooks/useEmailVerificationGuard';
 import { PlatformSection, PlatformAmendment, AmendmentVote } from '../../types';
+import { stripHtml } from '../../lib/inputSanitization';
 
 export const PlatformTab = () => {
   const { user } = useAuth();
@@ -86,14 +87,21 @@ export const PlatformTab = () => {
       const allowed = await guardAction('CREATE_POST');
       if (!allowed) throw new Error('Email verification required');
       
+      // Sanitize inputs to prevent XSS attacks
+      const sanitizedSection = {
+        title: stripHtml(section.title),
+        content: stripHtml(section.content),
+        issue_area: stripHtml(section.issue_area),
+      };
+      
       const maxOrder = sections?.length || 0;
       const { data, error } = await supabase
         .from('platform_sections')
         .insert([
           {
-            title: section.title,
-            content: section.content,
-            issue_area: section.issue_area,
+            title: sanitizedSection.title,
+            content: sanitizedSection.content,
+            issue_area: sanitizedSection.issue_area,
             section_order: maxOrder + 1,
             created_by: user?.id,
           },
@@ -115,14 +123,21 @@ export const PlatformTab = () => {
 
   const proposeAmendmentMutation = useMutation({
     mutationFn: async (amendment: { section_id: string; text: string; rationale: string }) => {
+      // Sanitize amendment inputs to prevent XSS attacks
+      const sanitizedAmendment = {
+        section_id: amendment.section_id,
+        text: stripHtml(amendment.text),
+        rationale: stripHtml(amendment.rationale),
+      };
+      
       const { data, error } = await supabase
         .from('platform_amendments')
         .insert([
           {
-            section_id: amendment.section_id,
+            section_id: sanitizedAmendment.section_id,
             user_id: user?.id,
-            proposed_text: amendment.text,
-            rationale: amendment.rationale,
+            proposed_text: sanitizedAmendment.text,
+            rationale: sanitizedAmendment.rationale,
             status: 'proposed',
           },
         ])

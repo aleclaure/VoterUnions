@@ -5,6 +5,7 @@ import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useEmailVerificationGuard } from '../../hooks/useEmailVerificationGuard';
 import { WorkerProposal } from '../../types';
+import { stripHtml } from '../../lib/inputSanitization';
 
 export default function WorkerProposalsTab() {
   const { user } = useAuth();
@@ -42,14 +43,26 @@ export default function WorkerProposalsTab() {
       const allowed = await guardAction('CREATE_STRIKE');
       if (!allowed) throw new Error('Email verification required');
       
-      const testimoniesArray = proposal.worker_testimonies
-        ? proposal.worker_testimonies.split('\n').filter(t => t.trim())
+      // Sanitize inputs to prevent XSS attacks
+      const sanitizedProposal = {
+        title: stripHtml(proposal.title),
+        employer_name: stripHtml(proposal.employer_name),
+        industry: stripHtml(proposal.industry),
+        location: stripHtml(proposal.location),
+        workplace_size: stripHtml(proposal.workplace_size),
+        demands: stripHtml(proposal.demands),
+        background: stripHtml(proposal.background),
+        worker_testimonies: proposal.worker_testimonies,
+      };
+      
+      const testimoniesArray = sanitizedProposal.worker_testimonies
+        ? sanitizedProposal.worker_testimonies.split('\n').map(t => stripHtml(t)).filter(t => t.trim())
         : [];
 
       const { data, error } = await supabase
         .from('worker_proposals')
         .insert([{
-          ...proposal,
+          ...sanitizedProposal,
           worker_testimonies: testimoniesArray.length > 0 ? testimoniesArray : null,
           created_by: user?.id,
         }])

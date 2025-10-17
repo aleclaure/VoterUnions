@@ -6,6 +6,7 @@ import { supabase } from '../services/supabase';
 import { useAuthStore } from '../contexts/AuthContext';
 import { useEmailVerificationGuard } from '../hooks/useEmailVerificationGuard';
 import { Union } from '../types';
+import { stripHtml } from '../lib/inputSanitization';
 
 interface UnionMemberData {
   unions: Union;
@@ -41,13 +42,20 @@ export const CreateDebateScreen = ({ navigation }: {navigation: any}) => {
       const allowed = await guardAction('CREATE_DEBATE');
       if (!allowed) throw new Error('Email verification required');
       
+      // Sanitize inputs to prevent XSS attacks
+      const sanitizedData = {
+        title: stripHtml(title),
+        description: stripHtml(description),
+        issue_area: stripHtml(issueArea),
+      };
+      
       const { data, error } = await supabase
         .from('debates')
         .insert({
           union_id: selectedUnionId,
-          title,
-          description,
-          issue_area: issueArea,
+          title: sanitizedData.title,
+          description: sanitizedData.description,
+          issue_area: sanitizedData.issue_area,
           created_by: user?.id,
         })
         .select()

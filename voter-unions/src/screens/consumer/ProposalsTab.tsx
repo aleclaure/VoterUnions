@@ -5,6 +5,7 @@ import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { useEmailVerificationGuard } from '../../hooks/useEmailVerificationGuard';
 import { BoycottProposal, BoycottComment } from '../../types';
+import { sanitizeProposal } from '../../lib/inputSanitization';
 
 export default function ProposalsTab() {
   const { user } = useAuth();
@@ -42,10 +43,13 @@ export default function ProposalsTab() {
       const allowed = await guardAction('CREATE_BOYCOTT');
       if (!allowed) throw new Error('Email verification required');
       
+      // Sanitize proposal data to prevent XSS attacks
+      const sanitizedProposal = sanitizeProposal(proposal);
+      
       const { data, error } = await supabase
         .from('boycott_proposals')
         .insert([{
-          ...proposal,
+          ...sanitizedProposal,
           created_by: user?.id,
         }])
         .select()

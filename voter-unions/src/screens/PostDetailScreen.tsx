@@ -19,6 +19,7 @@ import { usePostComments, useCreateComment, usePostReaction, usePostReactionsRea
 import { PostCard } from '../components/PostCard';
 import { CommentCard } from '../components/CommentCard';
 import { PostWithDetails } from '../hooks/usePosts';
+import { sanitizeContent } from '../lib/inputSanitization';
 
 export const PostDetailScreen = ({ route, navigation }: any) => {
   const { postId } = route.params;
@@ -91,11 +92,14 @@ export const PostDetailScreen = ({ route, navigation }: any) => {
   const handleSubmitComment = async () => {
     if (!user || !commentText.trim()) return;
 
+    // Sanitize comment content to prevent XSS attacks
+    const sanitizedContent = sanitizeContent(commentText);
+
     createCommentMutation.mutate(
       {
         postId,
         userId: user.id,
-        content: commentText.trim(),
+        content: sanitizedContent,
       },
       {
         onSuccess: () => {

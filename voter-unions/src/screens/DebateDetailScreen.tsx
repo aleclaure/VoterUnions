@@ -10,6 +10,7 @@ import { useDebateStats } from '../hooks/useDebateStats';
 import { useProfiles } from '../hooks/useProfile';
 import { useDeviceId } from '../hooks/useDeviceId';
 import { useEmailVerificationGuard } from '../hooks/useEmailVerificationGuard';
+import { sanitizeContent, sanitizeUrl } from '../lib/inputSanitization';
 
 export const DebateDetailScreen = ({ route, navigation }: any) => {
   const { debateId } = route.params;
@@ -73,15 +74,18 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
       const allowed = await guardAction('CREATE_ARGUMENT');
       if (!allowed) throw new Error('Email verification required');
       
-      const sourceLinks = sourceLink.trim() ? [sourceLink.trim()] : [];
+      // Sanitize inputs to prevent XSS attacks
+      const cleanContent = sanitizeContent(argumentContent);
+      const sanitizedSourceLinks = sourceLink.trim() ? [sanitizeUrl(sourceLink.trim())] : [];
+      
       const { data, error} = await supabase
         .from('arguments')
         .insert({
           debate_id: debateId,
           user_id: user?.id,
           stance: selectedStance,
-          content: argumentContent,
-          source_links: sourceLinks,
+          content: cleanContent,
+          source_links: sanitizedSourceLinks,
           parent_id: replyingTo,
         })
         .select()

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import type { CorporateInfluence, CorporateInfluenceType } from '../../types';
+import { stripHtml } from '../../lib/inputSanitization';
 
 export default function CorporateInfluenceTab() {
   const { user } = useAuth();
@@ -33,13 +34,18 @@ export default function CorporateInfluenceTab() {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase.from('corporate_influence').insert({
-        corporation_name: data.corporation_name,
+      // Sanitize inputs to prevent XSS attacks
+      const sanitizedData = {
+        corporation_name: stripHtml(data.corporation_name),
         influence_type: data.influence_type,
-        title: data.title,
-        description: data.description,
+        title: stripHtml(data.title),
+        description: stripHtml(data.description),
         amount_spent: data.amount_spent ? parseFloat(data.amount_spent) : null,
         year: data.year ? parseInt(data.year) : null,
+      };
+      
+      const { error } = await supabase.from('corporate_influence').insert({
+        ...sanitizedData,
         created_by: user?.id,
       });
       if (error) throw error;
