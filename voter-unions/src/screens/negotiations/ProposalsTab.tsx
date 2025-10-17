@@ -14,11 +14,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { useEmailVerificationGuard } from '../../hooks/useEmailVerificationGuard';
 import { Demand, DemandComment } from '../../types';
 
 export const ProposalsTab = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { guardAction } = useEmailVerificationGuard();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedDemand, setSelectedDemand] = useState<Demand | null>(null);
   const [showCommentsModal, setShowCommentsModal] = useState(false);
@@ -62,6 +64,10 @@ export const ProposalsTab = () => {
 
   const createDemandMutation = useMutation({
     mutationFn: async (demand: { title: string; description: string; category: string }) => {
+      // Email verification guard
+      const allowed = await guardAction('CREATE_POST');
+      if (!allowed) throw new Error('Email verification required');
+      
       const { data, error } = await supabase
         .from('demands')
         .insert([

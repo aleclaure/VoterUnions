@@ -249,6 +249,7 @@ export const useCreatePost = () => {
 
 export const usePostReaction = () => {
   const queryClient = useQueryClient();
+  const { guardAction } = useEmailVerificationGuard();
 
   return useMutation({
     mutationFn: async ({
@@ -262,6 +263,10 @@ export const usePostReaction = () => {
       reactionType: 'upvote' | 'downvote';
       deviceId?: string | null;
     }) => {
+      // Email verification guard
+      const allowed = await guardAction('VOTE');
+      if (!allowed) throw new Error('Email verification required');
+      
       if (!deviceId) {
         throw new Error('Device verification in progress. Please wait and try again.');
       }
