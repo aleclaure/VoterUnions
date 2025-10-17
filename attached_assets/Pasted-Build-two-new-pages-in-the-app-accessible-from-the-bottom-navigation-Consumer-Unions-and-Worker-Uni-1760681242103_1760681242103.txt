@@ -1,0 +1,53 @@
+Build two new pages in the app accessible from the bottom navigation: Consumer Unions and Worker Unions. Each page includes four horizontal subtabs with their own feeds and actions. These pages should follow the same style, structure, and behavior as the existing “Power” section.
+
+⸻
+
+Consumer Unions
+
+Header Title: Corporate Power
+Purpose: Educate users about how large corporations affect consumers, workers, and the economy.
+
+Subtabs:
+	1.	Corporate Influence
+Focus: How corporations influence politics and regulation through lobbying, campaign donations, and political connections.
+Example content: data and stories on corporate lobbying expenditures, revolving door appointments, and major regulatory captures.
+	2.	Consumer Impact
+Focus: How corporate practices raise prices and reduce quality of life for consumers.
+Example content: price fixing, monopolies, junk fees, deceptive pricing, and inflation profiteering.
+	3.	Worker Impact
+Focus: The connection between consumer spending and worker conditions.
+Example content: labor violations, underpayment, unsafe conditions, and worker treatment within major corporations.
+	4.	Corporate Accountability
+Focus: Highlight campaigns and actions to hold corporations accountable.
+Example content: ongoing boycotts, petitions, and corporate pledges.
+Users can view and join boycotts or track progress toward reforms.
+
+⸻
+
+Worker Unions
+
+Header Title: Labor Power
+Purpose: Inform and empower workers by exposing corporate labor practices, promoting organization, and celebrating victories.
+
+Subtabs:
+	1.	Corporate Exploitation
+Focus: Expose wage theft, unsafe working conditions, and union-busting tactics.
+Example content: OSHA fines, legal cases, and corporate violations by sector.
+	2.	Organizing and Resistance
+Focus: Showcase union drives, strikes, and grassroots organizing efforts.
+Example content: strike maps, local campaign updates, and calls to support union efforts.
+	3.	Worker Rights and Legislation
+Focus: Educate workers about current and upcoming laws that affect labor rights.
+Example content: summaries of state and federal bills, rights explainers, and updates on pro-labor reforms.
+	4.	Solidarity and Victories
+Focus: Celebrate worker successes and highlight cross-movement collaboration.
+Example content: major labor wins, new contracts, and stories of solidarity across industries.
+
+⸻
+
+Overall Goals
+	•	Both pages should be accessible from the bottom navigation bar.
+	•	Each subtab functions as an independent feed with stories, updates, and actions.
+	•	Content includes summaries, metrics, and external sources when available.
+	•	Pages support consistent interaction patterns: viewing details, sharing, saving, and participating in campaigns.
+	•	Visual design and language should remain cohesive with the existing app structure and tone.
