@@ -186,7 +186,7 @@ export const DebateDetailScreen = ({ route, navigation }: any) => {
 
   const ArgumentCard = ({ argument, debateId, onReply, showThread, deviceId }: { argument: Argument; debateId: string; onReply: (id: string) => void; showThread?: boolean; deviceId?: string | null }) => {
     const voteMutation = useVoteOnArgument();
-    const { data: userVote } = useUserVote(argument.id);
+    const { data: userVote } = useUserVote(argument.id, deviceId);
 
     const handleVote = (voteType: 'upvote' | 'downvote') => {
       if (!deviceId) {
