@@ -9,7 +9,10 @@
     "web": "expo start --web",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "lint:security": "eslint src --ext .ts,.tsx --plugin security"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.1.2",
