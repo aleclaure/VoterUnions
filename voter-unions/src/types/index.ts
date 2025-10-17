@@ -612,3 +612,288 @@ export interface StrikeOutcome {
   updated_at: string;
   deleted_at?: string;
 }
+
+// ============================================================================
+// Corporate Power Types
+// ============================================================================
+
+export type CorporateInfluenceType = 'lobbying' | 'campaign_donations' | 'revolving_door' | 'regulatory_capture' | 'think_tank' | 'other';
+
+export interface CorporateInfluence {
+  id: string;
+  created_by: string;
+  corporation_name: string;
+  influence_type: CorporateInfluenceType;
+  title: string;
+  description: string;
+  amount_spent?: number;
+  year?: number;
+  politicians_involved?: string[];
+  agencies_involved?: string[];
+  sources?: string[];
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+  view_count: number;
+  share_count: number;
+  bookmark_count: number;
+}
+
+export type ConsumerImpactType = 'price_fixing' | 'monopoly' | 'junk_fees' | 'deceptive_pricing' | 'inflation_profiteering' | 'quality_reduction' | 'other';
+
+export interface ConsumerImpact {
+  id: string;
+  created_by: string;
+  corporation_name: string;
+  impact_type: ConsumerImpactType;
+  title: string;
+  description: string;
+  price_increase_percent?: number;
+  affected_products?: string[];
+  geographic_scope?: string;
+  sources?: string[];
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+  view_count: number;
+  share_count: number;
+  bookmark_count: number;
+}
+
+export type WorkerImpactType = 'wage_theft' | 'unsafe_conditions' | 'underpayment' | 'no_benefits' | 'union_busting' | 'discrimination' | 'other';
+
+export interface WorkerImpact {
+  id: string;
+  created_by: string;
+  corporation_name: string;
+  impact_type: WorkerImpactType;
+  title: string;
+  description: string;
+  workers_affected?: number;
+  industry?: string;
+  violation_details?: string;
+  legal_case_number?: string;
+  fine_amount?: number;
+  sources?: string[];
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+  view_count: number;
+  share_count: number;
+  bookmark_count: number;
+}
+
+export type CorporateAccountabilityType = 'boycott' | 'petition' | 'shareholder_action' | 'legal_action' | 'public_pressure' | 'other';
+export type AccountabilityCampaignStatus = 'active' | 'victory' | 'partial_victory' | 'ongoing' | 'closed';
+
+export interface CorporateAccountability {
+  id: string;
+  created_by: string;
+  corporation_name: string;
+  campaign_type: CorporateAccountabilityType;
+  title: string;
+  description: string;
+  goal: string;
+  status: AccountabilityCampaignStatus;
+  start_date: string;
+  end_date?: string;
+  participants_count: number;
+  petition_signatures: number;
+  funds_raised: number;
+  demands?: string[];
+  concessions_won?: string[];
+  next_steps?: string;
+  sources?: string[];
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+  view_count: number;
+  share_count: number;
+  bookmark_count: number;
+}
+
+export type AccountabilityParticipationType = 'joined_boycott' | 'signed_petition' | 'donated' | 'shared' | 'other';
+
+export interface AccountabilityParticipation {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  participation_type: AccountabilityParticipationType;
+  notes?: string;
+  created_at: string;
+  deleted_at?: string;
+}
+
+// ============================================================================
+// Labor Power Types
+// ============================================================================
+
+export type CorporateExploitationType = 'wage_theft' | 'unsafe_conditions' | 'union_busting' | 'misclassification' | 'forced_overtime' | 'retaliation' | 'other';
+export type LegalCaseStatus = 'investigation' | 'filed' | 'settled' | 'verdict' | 'appeal' | 'closed';
+
+export interface CorporateExploitation {
+  id: string;
+  created_by: string;
+  corporation_name: string;
+  exploitation_type: CorporateExploitationType;
+  title: string;
+  description: string;
+  workers_affected?: number;
+  industry?: string;
+  location?: string;
+  osha_fines?: number;
+  legal_case_number?: string;
+  case_status?: LegalCaseStatus;
+  settlement_amount?: number;
+  violation_date?: string;
+  sources?: string[];
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+  view_count: number;
+  share_count: number;
+  bookmark_count: number;
+}
+
+export type OrganizingCampaignType = 'union_drive' | 'strike' | 'walkout' | 'petition' | 'protest' | 'slowdown' | 'other';
+export type OrganizingStatus = 'organizing' | 'active' | 'victory' | 'partial_victory' | 'defeated' | 'ongoing';
+
+export interface OrganizingResistance {
+  id: string;
+  created_by: string;
+  campaign_type: OrganizingCampaignType;
+  title: string;
+  description: string;
+  corporation_name: string;
+  workplace_location?: string;
+  city?: string;
+  state?: string;
+  industry?: string;
+  workers_involved?: number;
+  union_affiliation?: string;
+  key_demands?: string[];
+  status: OrganizingStatus;
+  start_date: string;
+  end_date?: string;
+  how_to_support?: string;
+  donation_link?: string;
+  contact_info?: string;
+  sources?: string[];
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+  view_count: number;
+  share_count: number;
+  bookmark_count: number;
+  support_pledges: number;
+}
+
+export type LegislationType = 'federal_bill' | 'state_bill' | 'local_ordinance' | 'regulation' | 'court_ruling' | 'executive_order' | 'other';
+export type LegislationStatus = 'proposed' | 'committee' | 'floor_vote' | 'passed' | 'signed' | 'enacted' | 'defeated' | 'stalled';
+
+export interface WorkerRightsLegislation {
+  id: string;
+  created_by: string;
+  legislation_type: LegislationType;
+  title: string;
+  description: string;
+  bill_number?: string;
+  jurisdiction?: string;
+  status: LegislationStatus;
+  rights_affected?: string[];
+  workers_affected_count?: number;
+  industries_affected?: string[];
+  pro_labor: boolean;
+  key_provisions: string;
+  potential_impact?: string;
+  opposition_arguments?: string;
+  support_arguments?: string;
+  introduced_date?: string;
+  vote_date?: string;
+  effective_date?: string;
+  sources?: string[];
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+  view_count: number;
+  share_count: number;
+  bookmark_count: number;
+}
+
+export type VictoryType = 'contract_win' | 'union_recognition' | 'wage_increase' | 'safety_improvement' | 'legislation_passed' | 'strike_victory' | 'coalition_formed' | 'other';
+
+export interface SolidarityVictory {
+  id: string;
+  created_by: string;
+  victory_type: VictoryType;
+  title: string;
+  description: string;
+  corporation_name?: string;
+  union_affiliation?: string;
+  industry?: string;
+  location?: string;
+  workers_affected?: number;
+  wage_increase_percent?: number;
+  wage_increase_amount?: number;
+  new_benefits?: string[];
+  new_policies?: string[];
+  contract_duration_years?: number;
+  allied_organizations?: string[];
+  solidarity_actions?: string[];
+  lessons_learned?: string;
+  victory_date: string;
+  sources?: string[];
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+  view_count: number;
+  share_count: number;
+  bookmark_count: number;
+  celebration_count: number;
+}
+
+export type OrganizingSupportType = 'pledge_support' | 'donated' | 'shared' | 'attended' | 'volunteered' | 'other';
+
+export interface OrganizingSupport {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  support_type: OrganizingSupportType;
+  notes?: string;
+  created_at: string;
+  deleted_at?: string;
+}
+
+export interface VictoryCelebration {
+  id: string;
+  victory_id: string;
+  user_id: string;
+  message?: string;
+  created_at: string;
+  deleted_at?: string;
+}
+
+// ============================================================================
+// Bookmark Interfaces
+// ============================================================================
+
+export type CorporatePowerContentType = 'influence' | 'consumer_impact' | 'worker_impact' | 'accountability';
+export type LaborPowerContentType = 'exploitation' | 'organizing' | 'legislation' | 'victory';
+
+export interface CorporatePowerBookmark {
+  id: string;
+  user_id: string;
+  content_type: CorporatePowerContentType;
+  content_id: string;
+  created_at: string;
+  deleted_at?: string;
+}
+
+export interface LaborPowerBookmark {
+  id: string;
+  user_id: string;
+  content_type: LaborPowerContentType;
+  content_id: string;
+  created_at: string;
+  deleted_at?: string;
+}
