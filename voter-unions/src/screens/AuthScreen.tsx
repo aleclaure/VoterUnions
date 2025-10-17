@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
+import { passwordSchema, emailSchema, validateData } from '../lib/validations';
 
 export const AuthScreen = () => {
   const [isSignUp, setIsSignUp] = useState(true);
@@ -13,16 +14,21 @@ export const AuthScreen = () => {
   const { signUp, signInWithPassword, resetPassword } = useAuth();
 
   const handleSignUp = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password');
+    // Validate email
+    const emailValidation = validateData(emailSchema, email);
+    if (!emailValidation.success) {
+      Alert.alert('Invalid Email', emailValidation.error);
       return;
     }
 
-    if (password.length < 8) {
-      Alert.alert('Error', 'Password must be at least 8 characters');
+    // Validate password strength
+    const passwordValidation = validateData(passwordSchema, password);
+    if (!passwordValidation.success) {
+      Alert.alert('Weak Password', passwordValidation.error);
       return;
     }
 
+    // Check password confirmation
     if (password !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
       return;
@@ -41,8 +47,15 @@ export const AuthScreen = () => {
   };
 
   const handleSignIn = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password');
+    // Validate email format
+    const emailValidation = validateData(emailSchema, email);
+    if (!emailValidation.success) {
+      Alert.alert('Invalid Email', emailValidation.error);
+      return;
+    }
+
+    if (!password) {
+      Alert.alert('Error', 'Please enter your password');
       return;
     }
 
@@ -56,8 +69,10 @@ export const AuthScreen = () => {
   };
 
   const handleForgotPassword = async () => {
-    if (!email) {
-      Alert.alert('Error', 'Please enter your email address');
+    // Validate email format
+    const emailValidation = validateData(emailSchema, email);
+    if (!emailValidation.success) {
+      Alert.alert('Invalid Email', emailValidation.error);
       return;
     }
 

@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useProfile } from '../hooks/useProfile';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../services/supabase';
+import { passwordSchema, validateData } from '../lib/validations';
 
 export const EditProfileScreen = () => {
   const navigation = useNavigation();
@@ -75,13 +76,10 @@ export const EditProfileScreen = () => {
   };
 
   const handleChangePassword = async () => {
-    if (!newPassword) {
-      Alert.alert('Error', 'Please enter a new password');
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      Alert.alert('Error', 'Password must be at least 8 characters');
+    // Validate password strength
+    const passwordValidation = validateData(passwordSchema, newPassword);
+    if (!passwordValidation.success) {
+      Alert.alert('Weak Password', passwordValidation.error);
       return;
     }
 
@@ -176,7 +174,7 @@ export const EditProfileScreen = () => {
                   onChangeText={setNewPassword}
                   secureTextEntry
                   autoCapitalize="none"
-                  placeholder="Minimum 8 characters"
+                  placeholder="12+ chars with uppercase, lowercase, number & special char"
                 />
               </View>
 
