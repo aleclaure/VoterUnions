@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Alert } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import { Alert, AppState } from 'react-native';
 import { useAuth } from './useAuth';
 import { 
   checkEmailVerification, 
   canPerformAction, 
   PROTECTED_ACTIONS,
-  resendVerificationEmail 
+  resendVerificationEmail,
+  refreshVerificationStatus
 } from '../services/emailVerification';
 
 /**
@@ -17,14 +18,33 @@ export const useEmailVerificationGuard = () => {
   const [isVerified, setIsVerified] = useState(true);
   const [isChecking, setIsChecking] = useState(false);
 
-  useEffect(() => {
-    const checkVerification = async () => {
-      const status = await checkEmailVerification(user);
-      setIsVerified(status.isVerified);
-    };
-
-    checkVerification();
+  // Reusable verification check function
+  const checkVerification = useCallback(async () => {
+    const status = await checkEmailVerification(user);
+    setIsVerified(status.isVerified);
+    return status.isVerified;
   }, [user]);
+
+  // Check verification on mount and when user changes
+  useEffect(() => {
+    checkVerification();
+  }, [checkVerification]);
+
+  // Recheck verification when app comes to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
+      if (nextAppState === 'active') {
+        // App came to foreground - refresh session and get fresh user
+        const refreshResult = await refreshVerificationStatus();
+        // Update local verification state with fresh result
+        setIsVerified(refreshResult.isVerified);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   /**
    * Guard function - call before protected actions
@@ -34,6 +54,14 @@ export const useEmailVerificationGuard = () => {
     action: keyof typeof PROTECTED_ACTIONS
   ): Promise<boolean> => {
     setIsChecking(true);
+    
+    // First check local refreshed state (more up-to-date than context user)
+    if (isVerified) {
+      setIsChecking(false);
+      return true;
+    }
+    
+    // Fallback to checking context user (for initial load)
     const result = await canPerformAction(user, action);
     setIsChecking(false);
 
@@ -50,7 +78,18 @@ export const useEmailVerificationGuard = () => {
                 if (resendResult.success) {
                   Alert.alert(
                     'Verification Email Sent',
-                    'Please check your inbox for the verification link.'
+                    'Please check your inbox and click the verification link. After verifying, return to the app and try again.',
+                    [
+                      {
+                        text: 'OK',
+                        onPress: async () => {
+                          // Refresh session and get fresh verification status
+                          const refreshResult = await refreshVerificationStatus();
+                          // Update local state with fresh result
+                          setIsVerified(refreshResult.isVerified);
+                        }
+                      }
+                    ]
                   );
                 } else {
                   Alert.alert('Error', resendResult.error || 'Failed to send email');

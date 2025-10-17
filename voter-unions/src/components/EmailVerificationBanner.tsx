@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, AppState } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
-import { checkEmailVerification, resendVerificationEmail } from '../services/emailVerification';
+import { checkEmailVerification, resendVerificationEmail, refreshVerificationStatus } from '../services/emailVerification';
 
 export const EmailVerificationBanner = () => {
   const { user } = useAuth();
@@ -9,14 +9,37 @@ export const EmailVerificationBanner = () => {
   const [isResending, setIsResending] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  React.useEffect(() => {
-    const checkVerification = async () => {
-      const status = await checkEmailVerification(user);
-      setIsVerified(status.isVerified);
-    };
-
-    checkVerification();
+  // Reusable verification check
+  const checkVerification = useCallback(async () => {
+    const status = await checkEmailVerification(user);
+    setIsVerified(status.isVerified);
+    return status.isVerified;
   }, [user]);
+
+  // Check on mount and user change
+  useEffect(() => {
+    checkVerification();
+  }, [checkVerification]);
+
+  // Recheck when app comes to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
+      if (nextAppState === 'active') {
+        // Refresh session and get fresh verification status
+        const refreshResult = await refreshVerificationStatus();
+        // Update local state with fresh result
+        setIsVerified(refreshResult.isVerified);
+        // Auto-dismiss banner if now verified
+        if (refreshResult.isVerified) {
+          setDismissed(true);
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const handleResendVerification = async () => {
     if (!user?.email) {
@@ -31,8 +54,22 @@ export const EmailVerificationBanner = () => {
     if (result.success) {
       Alert.alert(
         'Verification Email Sent',
-        'Please check your inbox and click the verification link to activate your account.',
-        [{ text: 'OK', onPress: () => setDismissed(true) }]
+        'Please check your inbox and click the verification link. After verifying, return to the app to unlock all features.',
+        [
+          {
+            text: 'OK',
+            onPress: async () => {
+              // Refresh session and get fresh verification status
+              const refreshResult = await refreshVerificationStatus();
+              // Update local state with fresh result
+              setIsVerified(refreshResult.isVerified);
+              // Auto-dismiss if verified
+              if (refreshResult.isVerified) {
+                setDismissed(true);
+              }
+            }
+          }
+        ]
       );
     } else {
       Alert.alert('Error', result.error || 'Failed to send verification email');

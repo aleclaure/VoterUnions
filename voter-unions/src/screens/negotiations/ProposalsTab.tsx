@@ -355,7 +355,7 @@ export const ProposalsTab = () => {
               }
             />
 
-            {selectedDemand?.created_by === user?.id && (
+            {selectedDemand?.created_by === user?.id && selectedDemand && (
               <TouchableOpacity
                 style={styles.submitVotingButton}
                 onPress={() => submitToVotingMutation.mutate(selectedDemand.id)}

@@ -70,6 +70,31 @@ export const resendVerificationEmail = async (email: string): Promise<{ success:
 };
 
 /**
+ * Refresh user session to get latest verification status
+ * Call this after user verifies their email
+ */
+export const refreshVerificationStatus = async (): Promise<{ success: boolean; isVerified: boolean }> => {
+  try {
+    const { data, error } = await supabase.auth.refreshSession();
+    
+    if (error) {
+      console.error('Failed to refresh session:', error);
+      return { success: false, isVerified: false };
+    }
+
+    const isVerified = data?.user?.email_confirmed_at !== null && data?.user?.email_confirmed_at !== undefined;
+    
+    return {
+      success: true,
+      isVerified,
+    };
+  } catch (error: any) {
+    console.error('Error refreshing verification status:', error);
+    return { success: false, isVerified: false };
+  }
+};
+
+/**
  * Actions that require email verification
  */
 export const PROTECTED_ACTIONS = {
