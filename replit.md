@@ -35,6 +35,10 @@ The application is built using Expo SDK 52 with React Native and TypeScript. Nav
     - Strong password policy: 12+ characters with uppercase, lowercase, numbers, and special characters
     - Email validation on all authentication entry points
     - Consistent password validation across signup, signin, reset, and profile updates
+  - **Security Enhancements (Phase 2)**:
+    - **Audit Logging**: Comprehensive security event logging for all auth actions (login, logout, password changes, failures) with device tracking, IP address capture, and metadata storage. Immutable audit logs with system-only access via RLS policies.
+    - **Rate Limiting**: Client-side brute force protection with configurable thresholds (5 login attempts per 15 min, 3 signup attempts per hour). Email normalization prevents bypass via casing. Temporary account lockouts after threshold breach.
+    - **Session Timeout**: Automatic logout after 30 minutes of inactivity. Navigation-based activity tracking with 5-minute warning before expiration. Session state preserved across app backgrounding.
 - **User Profiles**: Unique usernames, display names, bios, statistics, editing, and password management.
 - **Union Management**: Browse, create, join unions, and manage members with role-based access control.
 - **Enhanced Debate System**: Supports browsing, creation of debates, arguments with stances (PRO/CON/NEUTRAL), user identity display, upvote/downvote system with real-time tallies, scoreboard for momentum, source attachments, and threaded replies with horizontal thread view.
