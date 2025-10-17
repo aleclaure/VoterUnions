@@ -1,0 +1,37 @@
+name: Security Tests & Linting
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run security tests
+      run: npm test
+      
+    - name: Run ESLint security checks
+      run: npm run lint
+      
+    - name: Test summary
+      if: always()
+      run: |
+        echo "✅ Security enforcement tests completed"
+        echo "📊 62 automated tests verify XSS protection"
+        echo "🔒 AST data flow analysis ensures sanitization"

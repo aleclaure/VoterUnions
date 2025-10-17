@@ -3,6 +3,12 @@
  * 
  * Uses Babel parser to verify sanitized values ACTUALLY reach .insert()
  * This catches scenarios where stripHtml() is called but result is discarded
+ * 
+ * ⚠️ IMPORTANT: When adding new sanitizer functions to inputSanitization.ts:
+ * 1. Add the function name to the CallExpression checks (lines 48-50 and 103-104)
+ * 2. Add the function name to the conditional checks (lines 119-122 and 150-153)
+ * 
+ * Current sanitizers: stripHtml, sanitizeUrl, sanitizeText
  */
 
 import { describe, it, expect } from 'vitest';
@@ -42,6 +48,7 @@ function analyzeHookDataFlow(hookName: string, sourceCode: string): DataFlowResu
     // Traverse AST
     traverse(ast, {
       // Track sanitization calls
+      // ⚠️ ADD NEW SANITIZERS HERE: If you create new sanitizer functions, add them to this list!
       CallExpression(path) {
         if (
           t.isIdentifier(path.node.callee) &&
@@ -99,6 +106,7 @@ function analyzeHookDataFlow(hookName: string, sourceCode: string): DataFlowResu
                   }
                   
                   // Check for inline sanitization
+                  // ⚠️ ADD NEW SANITIZERS HERE: Keep this list in sync with the CallExpression check above
                   if (t.isCallExpression(value) && t.isIdentifier(value.callee)) {
                     if (value.callee.name === 'stripHtml' || 
                         value.callee.name === 'sanitizeUrl') {
@@ -108,6 +116,7 @@ function analyzeHookDataFlow(hookName: string, sourceCode: string): DataFlowResu
                   }
                   
                   // Check for conditional (ternary) sanitization
+                  // ⚠️ ADD NEW SANITIZERS HERE: Keep this list in sync with the CallExpression check above
                   if (t.isConditionalExpression(value)) {
                     const consequent = value.consequent;
                     const alternate = value.alternate;
