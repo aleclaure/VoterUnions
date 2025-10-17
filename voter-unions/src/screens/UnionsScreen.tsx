@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { Union } from '../types';
+import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
 
 export const UnionsScreen = ({ navigation }: any) => {
   const { data: unions, isLoading } = useQuery({
@@ -37,6 +38,7 @@ export const UnionsScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <EmailVerificationBanner />
       <View style={styles.header}>
         <Text style={styles.title}>Voter Unions</Text>
         <TouchableOpacity

@@ -6,6 +6,7 @@ import { PoliticiansTab } from './powertracker/PoliticiansTab';
 import { BillsTab } from './powertracker/BillsTab';
 import { DataTab } from './powertracker/DataTab';
 import { ActionTab } from './powertracker/ActionTab';
+import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
 
 const TopTab = createMaterialTopTabNavigator();
 
@@ -14,6 +15,7 @@ export const PowerTrackerScreen = () => {
 
   return (
     <View style={styles.container}>
+      <EmailVerificationBanner />
       <TopTab.Navigator
         screenOptions={{
           tabBarActiveTintColor: '#2563eb',

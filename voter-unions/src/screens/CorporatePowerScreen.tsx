@@ -6,12 +6,14 @@ import CorporateInfluenceTab from './corporate/CorporateInfluenceTab';
 import ConsumerImpactTab from './corporate/ConsumerImpactTab';
 import WorkerImpactTab from './corporate/WorkerImpactTab';
 import CorporateAccountabilityTab from './corporate/CorporateAccountabilityTab';
+import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
 
 const Tab = createMaterialTopTabNavigator();
 
 export default function CorporatePowerScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <EmailVerificationBanner />
       <Tab.Navigator
         screenOptions={{
           tabBarScrollEnabled: false,

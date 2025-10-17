@@ -6,6 +6,7 @@ import { ProposalsTab } from './negotiations/ProposalsTab';
 import { VotingHallTab } from './negotiations/VotingHallTab';
 import { RatifiedTermsTab } from './negotiations/RatifiedTermsTab';
 import { ActivatedDemandsTab } from './negotiations/ActivatedDemandsTab';
+import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -15,6 +16,7 @@ export const NegotiationsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <EmailVerificationBanner />
       <View style={styles.header}>
         <Text style={styles.title}>People's Terms</Text>
         <Text style={styles.subtitle}>We set the terms — not the billionaires.</Text>

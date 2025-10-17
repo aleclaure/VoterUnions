@@ -6,12 +6,14 @@ import ProposalsTab from './consumer/ProposalsTab';
 import VoteLaunchTab from './consumer/VoteLaunchTab';
 import ActiveBoycottsTab from './consumer/ActiveBoycottsTab';
 import ImpactWinsTab from './consumer/ImpactWinsTab';
+import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
 
 const Tab = createMaterialTopTabNavigator();
 
 export default function ConsumerScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <EmailVerificationBanner />
       <Tab.Navigator
         screenOptions={{
           tabBarScrollEnabled: false,

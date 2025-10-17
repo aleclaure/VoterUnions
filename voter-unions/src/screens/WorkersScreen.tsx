@@ -6,12 +6,14 @@ import WorkerProposalsTab from './workers/WorkerProposalsTab';
 import OrganizeVoteTab from './workers/OrganizeVoteTab';
 import ActiveStrikesTab from './workers/ActiveStrikesTab';
 import OutcomesSolidarityTab from './workers/OutcomesSolidarityTab';
+import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
 
 const Tab = createMaterialTopTabNavigator();
 
 export default function WorkersScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <EmailVerificationBanner />
       <Tab.Navigator
         screenOptions={{
           tabBarScrollEnabled: false,

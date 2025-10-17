@@ -6,12 +6,14 @@ import CorporateExploitationTab from './labor/CorporateExploitationTab';
 import OrganizingResistanceTab from './labor/OrganizingResistanceTab';
 import WorkerRightsTab from './labor/WorkerRightsTab';
 import SolidarityVictoriesTab from './labor/SolidarityVictoriesTab';
+import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
 
 const Tab = createMaterialTopTabNavigator();
 
 export default function LaborPowerScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <EmailVerificationBanner />
       <Tab.Navigator
         screenOptions={{
           tabBarScrollEnabled: false,

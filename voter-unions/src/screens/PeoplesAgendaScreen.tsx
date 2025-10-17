@@ -6,6 +6,7 @@ import { PrioritiesTab } from './peoplesagenda/PrioritiesTab';
 import { PlatformTab } from './peoplesagenda/PlatformTab';
 import { WinsTab } from './peoplesagenda/WinsTab';
 import { OutreachTab } from './peoplesagenda/OutreachTab';
+import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
 
 const TopTab = createMaterialTopTabNavigator();
 
@@ -14,6 +15,7 @@ export const PeoplesAgendaScreen = () => {
 
   return (
     <View style={styles.container}>
+      <EmailVerificationBanner />
       <TopTab.Navigator
         screenOptions={{
           tabBarActiveTintColor: '#2563eb',
