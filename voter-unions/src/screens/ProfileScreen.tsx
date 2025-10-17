@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useProfile, useUserProfile } from '../hooks/useProfile';
 import { useAuth } from '../hooks/useAuth';
+import { useDeleteAccount } from '../hooks/useDeleteAccount';
 import { supabase } from '../services/supabase';
 import { useQuery } from '@tanstack/react-query';
 
@@ -18,6 +19,7 @@ interface ProfileScreenProps {
 export const ProfileScreen = ({ route }: ProfileScreenProps) => {
   const navigation = useNavigation();
   const { user, signOut } = useAuth();
+  const { deleteAccount, isDeleting } = useDeleteAccount();
   const userId = route?.params?.userId || user?.id;
   const isOwnProfile = userId === user?.id;
 
@@ -66,6 +68,54 @@ export const ProfileScreen = ({ route }: ProfileScreenProps) => {
 
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      '⚠️ Delete Account',
+      'This will PERMANENTLY delete your account and ALL your data:\n\n' +
+        '• Profile and personal information\n' +
+        '• Posts, comments, and debates\n' +
+        '• Union memberships and created unions\n' +
+        '• Votes and pledges\n' +
+        '• All other content\n\n' +
+        'This action CANNOT be undone. Are you absolutely sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Forever',
+          style: 'destructive',
+          onPress: () => {
+            // Second confirmation
+            Alert.alert(
+              'Final Confirmation',
+              'This will immediately delete all your content and make your account unusable. Your email and credentials will be removed within 30 days for full GDPR compliance. Tap Delete to confirm.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await deleteAccount();
+                      Alert.alert(
+                        'Account Deletion Initiated',
+                        'Your account data has been deleted from the application. Note: For full GDPR compliance, your email and authentication credentials will be removed within 30 days by our backend systems. The account is now unusable.'
+                      );
+                    } catch (error: any) {
+                      Alert.alert(
+                        'Deletion Failed',
+                        error.message || 'Failed to delete account. Please try again or contact support.'
+                      );
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
   };
 
   if (isLoading || statsLoading) {
@@ -148,6 +198,31 @@ export const ProfileScreen = ({ route }: ProfileScreenProps) => {
           <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
+        )}
+
+        {/* Delete Account Button */}
+        {isOwnProfile && (
+          <TouchableOpacity
+            style={styles.deleteAccountButton}
+            onPress={handleDeleteAccount}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.deleteAccountText}>⚠️ Delete Account (Permanent)</Text>
+            )}
+          </TouchableOpacity>
+        )}
+
+        {/* GDPR Notice */}
+        {isOwnProfile && (
+          <View style={styles.gdprNotice}>
+            <Text style={styles.gdprText}>
+              Your rights: You can export your data or delete your account at any time. See our
+              Privacy Policy for details.
+            </Text>
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -268,6 +343,7 @@ const styles = StyleSheet.create({
   },
   signOutButton: {
     margin: 20,
+    marginBottom: 12,
     padding: 16,
     backgroundColor: '#dc2626',
     borderRadius: 8,
@@ -277,6 +353,34 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  deleteAccountButton: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    padding: 16,
+    backgroundColor: '#7f1d1d',
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#991b1b',
+  },
+  deleteAccountText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  gdprNotice: {
+    marginHorizontal: 20,
+    marginBottom: 32,
+    padding: 16,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+  },
+  gdprText: {
+    fontSize: 12,
+    color: '#64748b',
+    lineHeight: 18,
+    textAlign: 'center',
   },
   errorText: {
     fontSize: 16,
