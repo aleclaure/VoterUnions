@@ -14,8 +14,9 @@ export const useSessionTimeout = () => {
   const { signOut } = useAuth();
   const { deviceId } = useDeviceId();
   const navigation = useNavigation();
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const warningTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<number | undefined>(undefined);
+  const warningTimeoutRef = useRef<number | undefined>(undefined);
+
   const warningShownRef = useRef<boolean>(false);
   const lastActivityRef = useRef<number>(Date.now());
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
