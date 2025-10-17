@@ -4,6 +4,7 @@ import { supabase } from '../services/supabase';
 import { Post, PostReaction, Comment } from '../types';
 import { useEmailVerificationGuard } from './useEmailVerificationGuard';
 import { stripHtml } from '../lib/inputSanitization';
+import { rateLimiter } from '../services/rateLimit';
 
 export interface PostWithDetails extends Post {
   author_email?: string;
@@ -177,6 +178,13 @@ export const useCreatePost = () => {
       const allowed = await guardAction('CREATE_POST');
       if (!allowed) throw new Error('Email verification required');
       
+      // Rate limiting check
+      const rateLimit = await rateLimiter.checkRateLimit('createPost', userId);
+      if (rateLimit.isBlocked && rateLimit.timeRemaining) {
+        const timeStr = rateLimiter.formatTimeRemaining(rateLimit.timeRemaining);
+        throw new Error(`Too many posts. Please wait ${timeStr} before posting again.`);
+      }
+      
       // Sanitize content to prevent XSS attacks
       const sanitizedContent = stripHtml(content);
       
@@ -201,8 +209,12 @@ export const useCreatePost = () => {
 
       if (postError) {
         console.error('❌ Error creating post:', postError);
+        await rateLimiter.recordAttempt('createPost', userId);
         throw postError;
       }
+      
+      // Clear rate limit on success
+      await rateLimiter.clearLimit('createPost', userId);
 
       console.log('✅ Post created successfully!', {
         postId: post.id,
@@ -387,6 +399,7 @@ export const usePostComments = (postId: string) => {
 
 export const useCreateComment = () => {
   const queryClient = useQueryClient();
+  const { guardAction } = useEmailVerificationGuard();
 
   return useMutation({
     mutationFn: async ({
@@ -398,6 +411,17 @@ export const useCreateComment = () => {
       userId: string;
       content: string;
     }) => {
+      // Email verification guard
+      const allowed = await guardAction('CREATE_COMMENT');
+      if (!allowed) throw new Error('Email verification required');
+      
+      // Rate limiting check
+      const rateLimit = await rateLimiter.checkRateLimit('createComment', userId);
+      if (rateLimit.isBlocked && rateLimit.timeRemaining) {
+        const timeStr = rateLimiter.formatTimeRemaining(rateLimit.timeRemaining);
+        throw new Error(`Too many comments. Please wait ${timeStr} before commenting again.`);
+      }
+      
       // Sanitize comment content to prevent XSS attacks
       const sanitizedContent = stripHtml(content);
       
@@ -411,7 +435,13 @@ export const useCreateComment = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        await rateLimiter.recordAttempt('createComment', userId);
+        throw error;
+      }
+      
+      // Clear rate limit on success
+      await rateLimiter.clearLimit('createComment', userId);
       return data;
     },
     onSuccess: (_, variables) => {

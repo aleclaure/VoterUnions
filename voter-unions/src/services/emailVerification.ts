@@ -99,6 +99,8 @@ export const refreshVerificationStatus = async (): Promise<{ success: boolean; i
  */
 export const PROTECTED_ACTIONS = {
   CREATE_POST: 'create post',
+  CREATE_COMMENT: 'create comment',
+  CREATE_CHANNEL: 'create channel',
   CREATE_DEBATE: 'create debate',
   CREATE_ARGUMENT: 'create argument',
   VOTE: 'vote',
@@ -106,6 +108,7 @@ export const PROTECTED_ACTIONS = {
   CREATE_BOYCOTT: 'create boycott proposal',
   CREATE_STRIKE: 'create strike proposal',
   UPDATE_PROFILE: 'update profile',
+  CREATE_POWER_PLEDGE: 'create power pledge',
 } as const;
 
 /**

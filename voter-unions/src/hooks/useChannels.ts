@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import { Channel } from '../types';
 import { stripHtml } from '../lib/inputSanitization';
+import { rateLimiter } from '../services/rateLimit';
+import { useEmailVerificationGuard } from './useEmailVerificationGuard';
 
 export const useChannels = (unionId: string) => {
   return useQuery({
@@ -22,6 +24,7 @@ export const useChannels = (unionId: string) => {
 
 export const useCreateChannel = () => {
   const queryClient = useQueryClient();
+  const { guardAction } = useEmailVerificationGuard();
 
   return useMutation({
     mutationFn: async ({
@@ -39,6 +42,17 @@ export const useCreateChannel = () => {
       isPublic: boolean;
       userId: string;
     }) => {
+      // Email verification guard
+      const allowed = await guardAction('CREATE_CHANNEL');
+      if (!allowed) throw new Error('Email verification required');
+      
+      // Rate limiting check
+      const rateLimit = await rateLimiter.checkRateLimit('createChannel', userId);
+      if (rateLimit.isBlocked && rateLimit.timeRemaining) {
+        const timeStr = rateLimiter.formatTimeRemaining(rateLimit.timeRemaining);
+        throw new Error(`Too many channels created. Please wait ${timeStr} before creating another channel.`);
+      }
+      
       // Sanitize inputs to prevent XSS attacks
       const sanitizedName = stripHtml(name);
       const sanitizedHashtag = stripHtml(hashtag);
@@ -57,7 +71,13 @@ export const useCreateChannel = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        await rateLimiter.recordAttempt('createChannel', userId);
+        throw error;
+      }
+      
+      // Clear rate limit on success
+      await rateLimiter.clearLimit('createChannel', userId);
       return data;
     },
     onSuccess: (_, variables) => {

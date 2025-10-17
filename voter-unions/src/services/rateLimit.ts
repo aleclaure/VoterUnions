@@ -13,6 +13,7 @@ interface RateLimitAttempt {
 }
 
 const RATE_LIMIT_CONFIGS: Record<string, RateLimitConfig> = {
+  // Authentication
   login: {
     maxAttempts: 5,
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -25,6 +26,66 @@ const RATE_LIMIT_CONFIGS: Record<string, RateLimitConfig> = {
   },
   passwordReset: {
     maxAttempts: 3,
+    windowMs: 60 * 60 * 1000, // 1 hour
+    blockDurationMs: 60 * 60 * 1000, // 1 hour block
+  },
+  
+  // Content Creation (prevent spam)
+  createPost: {
+    maxAttempts: 10,
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    blockDurationMs: 15 * 60 * 1000, // 15 minutes block
+  },
+  createComment: {
+    maxAttempts: 20,
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    blockDurationMs: 10 * 60 * 1000, // 10 minutes block
+  },
+  createChannel: {
+    maxAttempts: 3,
+    windowMs: 60 * 60 * 1000, // 1 hour
+    blockDurationMs: 2 * 60 * 60 * 1000, // 2 hours block
+  },
+  
+  // Union & Organization (prevent abuse)
+  createUnion: {
+    maxAttempts: 2,
+    windowMs: 24 * 60 * 60 * 1000, // 24 hours
+    blockDurationMs: 24 * 60 * 60 * 1000, // 24 hours block
+  },
+  joinUnion: {
+    maxAttempts: 10,
+    windowMs: 60 * 60 * 1000, // 1 hour
+    blockDurationMs: 60 * 60 * 1000, // 1 hour block
+  },
+  
+  // Voting (prevent manipulation)
+  vote: {
+    maxAttempts: 100,
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    blockDurationMs: 10 * 60 * 1000, // 10 minutes block
+  },
+  
+  // Consumer & Worker Actions
+  createBoycott: {
+    maxAttempts: 3,
+    windowMs: 24 * 60 * 60 * 1000, // 24 hours
+    blockDurationMs: 48 * 60 * 60 * 1000, // 48 hours block
+  },
+  createStrike: {
+    maxAttempts: 3,
+    windowMs: 24 * 60 * 60 * 1000, // 24 hours
+    blockDurationMs: 48 * 60 * 60 * 1000, // 48 hours block
+  },
+  
+  // Power Tracker
+  createPolitician: {
+    maxAttempts: 5,
+    windowMs: 60 * 60 * 1000, // 1 hour
+    blockDurationMs: 2 * 60 * 60 * 1000, // 2 hours block
+  },
+  createPowerPledge: {
+    maxAttempts: 20,
     windowMs: 60 * 60 * 1000, // 1 hour
     blockDurationMs: 60 * 60 * 1000, // 1 hour block
   },
