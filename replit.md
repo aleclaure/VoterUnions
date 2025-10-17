@@ -41,7 +41,14 @@ The application is built using Expo SDK 52 with React Native and TypeScript. Nav
     - **Session Timeout**: Automatic logout after 30 minutes of inactivity. Navigation-based activity tracking with 5-minute warning before expiration. Session state preserved across app backgrounding.
   - **Security Enhancements (Phase 3)** - Advanced Session Management & Monitoring:
     - **Multi-Device Session Tracking**: Complete device fingerprinting with device name, type, OS version, and app version. Active sessions table tracks all logged-in devices with last activity timestamps. Service-role protected RLS policies ensure users can only access their own session data.
-    - **Email Verification Enforcement**: Comprehensive guard system to block unverified users from protected actions (voting, posting, creating content). Reusable `useEmailVerificationGuard` hook with user-friendly alerts and one-click resend functionality. Integration guide provided for all protected mutations.
+    - **Email Verification Enforcement**: 
+      - **Protection Coverage**: All 16 protected mutations enforced (7 voting actions + 9 content creation actions)
+      - **Voting Protection**: Argument votes, policy votes, amendment votes, demand votes, boycott votes, worker votes, post reactions
+      - **Content Protection**: Posts, debates, arguments, unions, platform sections, demand proposals, boycott proposals, worker proposals, amendment proposals
+      - **Guard Hook**: Reusable `useEmailVerificationGuard` hook with user-friendly alerts and one-click resend functionality
+      - **UI Integration**: EmailVerificationBanner component displayed on all 8 main navigation screens
+      - **User Experience**: Contextual alerts explain verification requirement, provide instant email resend, dismissible banner per session
+      - **Security Model**: Client-side guard + Supabase auth verification + RLS policies = defense in depth
     - **Session Management Service**: Remote session revocation for compromised devices. Bulk "revoke all other sessions" for security incidents. Trusted device management with configurable trust duration. Session activity tracking for security monitoring.
     - **Database Schema**: `active_sessions`, `user_security_settings`, `security_alerts`, and `trusted_devices` tables with comprehensive RLS policies. Helper functions for session management (upsert_active_session, revoke_session, calculate_security_score). Security views for monitoring suspicious activity patterns.
 - **User Profiles**: Unique usernames, display names, bios, statistics, editing, and password management.
