@@ -1,0 +1,44 @@
+# Expo Snack Ignore File
+# These files should not be uploaded to Expo Snack
+
+# Backend / Supabase Edge Functions
+supabase/
+
+# Testing
+__tests__/
+*.test.ts
+*.test.tsx
+vitest.config.ts
+coverage/
+
+# Linting & Type Checking
+eslint.config.js
+.eslintrc.*
+tsconfig.json
+
+# CI/CD
+.github/
+.replit
+replit.nix
+
+# Documentation
+*.md
+!README.md
+
+# Development
+node_modules/
+.expo/
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Environment
+.env
+.env.*
+
+# Build outputs
+dist/
+build/

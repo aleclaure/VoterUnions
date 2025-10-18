@@ -1,0 +1,49 @@
+
+package.json (22:5)
+Failed to resolve dependency 'eslint@9.0.0' (Cannot resolve module crypto after installing it as a dependency)
+Retry
+package.json (30:5)
+Failed to resolve dependency '@typescript-eslint/parser@*' (Can't resolve '' in '/tmp/snackager/snackager/buildStatus/1/@typescript-eslint~parser@8.46.1-ios,android,web/package')
+Retry
+package.json (32:5)
+Failed to resolve dependency 'vitest@3.2.4' (Module build failed (from ../../../../../../../app/node_modules/babel-loader/lib/index.js):
+Retry
+package.json (33:5)
+Failed to resolve dependency '@edge-runtime/vm@*' (npm install --ignore-scripts --production --ignore-engines --ignore-platform --non-interactive vm@* assert@* http@* stream@* net@* buffer@* util@* querystring@* events@* diagnostics_channel@* tls@* worker_threads@* zlib@* perf_hooks@* crypto@* url@* async_hooks@* console@* string_decoder@* module@* exited with non-zero code: 1)
+Retry
+package.json (34:5)
+Resolving '@vitest/browser@3.2.4' ...
+(Dependencies)
+package.json (36:5)
+Failed to resolve dependency '@types/node@^22.0.0' (ENOENT: no such file or directory, open '/tmp/snackager/snackager/buildStatus/1/@types~node@22.18.11-ios,android,web/package.json')
+Retry
+package.json (37:5)
+Failed to resolve dependency '@vitest/ui@3.2.4' (Invalid module ../../../src/node/constants.ts - Module not found: Error: Package path . is not exported from package /tmp/snackager/snackager/buildStatus/1/@vitest~ui@3.2.4-ios,android,web/package/node_modules/estree-walker (see exports field in /tmp/snackager/snackager/buildStatus/1/@vitest~ui@3.2.4-ios,android,web/package/node_modules/estree-walker/package.json))
+Retry
+package.json (38:5)
+Failed to resolve dependency 'happy-dom@*' (Cannot resolve module http after installing it as a dependency)
+Retry
+package.json (39:5)
+Resolving 'jsdom@*' ...
+(Dependencies)
+package.json (40:5)
+Failed to resolve dependency 'typescript@6.0.0' (Version '6.0.0' for package 'typescript' not found)
+Retry
+supabase/functions/cleanup-deleted-users/index.ts (14:23)
+Cannot find file 'https://deno.land/std@0.168.0/http/server.ts'.
+(Dependencies)
+supabase/functions/cleanup-deleted-users/index.ts (15:30)
+Cannot find file 'https://esm.sh/@supabase/supabase-js@2.39.0'.
+(Dependencies)
+eslint.config.js (68:7)
+Duplicate key '@typescript-eslint/no-unused-vars'. (no-dupe-keys)
+(ESLint)
+eslint.config.js (69:7)
+Duplicate key '@typescript-eslint/no-explicit-any'. (no-dupe-keys)
+(ESLint)
+src/screens/DebateDetailScreen.tsx (708:3)
+Unused style detected: styles.argumentMeta (react-native/no-unused-styles)
+(ESLint)
+src/screens/MyUnionsScreen.tsx (98:6)
+React Hook React.useMemo has a missing dependency: 'selectedUnionId'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps)
+(ESLint)
