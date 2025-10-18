@@ -8,12 +8,12 @@ import Constants from 'expo-constants';
 const supabaseUrl = 
   Constants.expoConfig?.extra?.supabaseUrl || 
   process.env.EXPO_PUBLIC_SUPABASE_URL ||
-  'https://sonyiatltmqdyoezfbnj.supabase.co';
+  'https://yznjhfaeplbwozbhhull.supabase.co';
 
 const supabaseAnonKey = 
   Constants.expoConfig?.extra?.supabaseAnonKey || 
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6bmpoZmFlcGxid296YmhodWxsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2NDE2ODYsImV4cCI6MjA3NTIxNzY4Nn0.4PvbUvdYVHYV-6bzlW7bRBBIsejkPv59gIEzLmFroeA';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6bmpoZmFlcGxid296YmhodWxsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ0OTk2NDYsImV4cCI6MjA1MDA3NTY0Nn0.L3zKME6dGhqmHDLXofkDT6y4j6NcRNvEWVq0bNJE4Qc';
 
 // Runtime validation - fail fast if credentials are still missing
 if (!supabaseUrl || !supabaseAnonKey) {
