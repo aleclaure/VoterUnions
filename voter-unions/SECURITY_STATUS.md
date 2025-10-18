@@ -615,6 +615,542 @@ Your security implementation **exceeds**:
 
 ---
 
+## ⚠️ Inherent Security Risks (Awareness Only - Lowest Priority)
+
+These are **residual vulnerabilities** that persist even after implementing all 10 security enhancements above. They cannot be fully eliminated through code/infrastructure changes alone and require non-technical mitigation strategies.
+
+---
+
+### 11. Social Engineering Attacks 🟣 AWARENESS ONLY
+**Priority:** Awareness Only | **Cannot Be Fully Prevented**
+
+**Why this persists:** Humans are the weakest link. Even with perfect security, attackers can manipulate users into giving up credentials.
+
+**Attack Vectors:**
+1. **Phishing Emails** - Fake emails pretending to be from union leaders
+   - "Click here to verify your account or we'll delete your membership"
+   - "Urgent: Vote on this proposal now" with malicious links
+2. **Fake Verification Requests** - Impersonators asking for TOTP codes
+   - "Support needs your 2FA code to fix an issue"
+3. **Organizer Impersonation** - Attackers pretending to be trusted members
+   - Join union, build trust, then manipulate votes or leak strategy
+4. **Phone-Based Attacks** - Calls pretending to be support staff
+   - "We detected suspicious activity, please confirm your password"
+
+**Why Tech Can't Fix It:**
+- ✅ MFA helps, but if someone convinces a user to share their TOTP code, they're in
+- ✅ Email verification helps, but users can be tricked into clicking malicious links
+- ✅ Rate limiting helps, but social engineering bypasses technical controls
+
+**Mitigation Strategies (Non-Technical):**
+1. **Security Awareness Training**
+   - In-app tutorials on phishing recognition
+   - Regular security tips in notifications
+   - "Never share your 2FA code with anyone, including support"
+2. **Verified Communication Channels**
+   - Official support only contacts via in-app messages
+   - Display warnings: "We will NEVER ask for your password"
+3. **Community Education**
+   - Union leaders educate members on common scams
+   - Share examples of phishing attempts
+4. **Incident Response Plan**
+   - How to report suspicious contact
+   - Quick account recovery process
+
+**Implementation Considerations:**
+- Add "Security Tips" section to Settings screen
+- Show warning banners on sensitive actions
+- Provide clear contact info for real support
+
+---
+
+### 12. Insider Threats 🟣 AWARENESS ONLY
+**Priority:** Awareness Only | **Cannot Be Fully Prevented**
+
+**Why this persists:** Admins/moderators NEED elevated privileges to do their jobs. You can't fully lock them out without breaking core functionality.
+
+**Attack Vectors:**
+1. **Data Exfiltration** - Admin exports all member data and leaks it
+   - Email list shared with opposition
+   - Vote records leaked to targeted companies
+2. **Content Sabotage** - Moderator deletes critical organizing content
+   - Delete debate history before important vote
+   - Remove key proposals during campaign
+3. **Infiltration** - Bad actor joins as trusted member, becomes admin
+   - Gains trust over months
+   - Sabotages campaigns from inside
+4. **Strategy Leaks** - Admin shares internal organizing plans
+   - Negotiation terms leaked before meetings
+   - Strike timing shared with employer
+
+**Why Tech Can't Fix It:**
+- ✅ Audit logs help (you have comprehensive logging), but damage occurs before detection
+- ✅ RLS policies help, but admins need bypass capabilities for moderation
+- ✅ Rate limiting helps, but admins have legitimate reasons for bulk actions
+
+**Mitigation Strategies (Non-Technical):**
+1. **Admin Vetting Process**
+   - Require real-world trust (union members, known organizers)
+   - Time-based promotion (must be member for 6+ months)
+   - Background checks for high-sensitivity unions
+2. **Principle of Least Privilege**
+   - Multiple admin tiers (moderator < admin < super admin)
+   - Only super admins can export member data
+   - Require 2+ admins to approve critical actions
+3. **Audit Log Transparency**
+   - All members can see moderation actions (you have this!)
+   - Public accountability for admin decisions
+   - Regular audit reviews by union members
+4. **Separation of Duties**
+   - Different admins handle moderation vs data access
+   - Rotating admin roles
+5. **Offline Trust Networks**
+   - Admins must be known in real-world organizing
+   - Physical meetings to verify identity
+
+**Current Protections:**
+- ✅ Comprehensive audit logging (all admin actions tracked)
+- ✅ Union member visibility into moderation logs
+- ✅ Database triggers track content deletion
+- ⚠️ No multi-admin approval system yet
+
+**Implementation Considerations:**
+- Add admin tier system (multiple permission levels)
+- Add "Require 2 admins for data export" feature
+- Add "Admin activity dashboard" for transparency
+
+---
+
+### 13. Supply Chain Attacks 🟣 AWARENESS ONLY
+**Priority:** Awareness Only | **Requires Infrastructure Migration**
+
+**Why this persists:** Your app depends on 50+ npm packages, Expo build servers, and Supabase cloud. If any get compromised, ALL your security is bypassed.
+
+**Attack Vectors:**
+
+#### **Level 1: Malicious npm Package** 🔴
+If a popular package like `react-native-pager-view` gets hijacked:
+
+**Data Compromised:**
+1. **Authentication Tokens**
+   - Supabase JWT tokens (stored in expo-secure-store)
+   - Session data
+   - **Impact:** Attacker impersonates ANY user
+2. **User Input in Real-Time**
+   - Every keystroke as users type passwords
+   - Private debate messages BEFORE encryption
+   - Proposal text before sanitization
+   - **Impact:** Full visibility into all user activity
+3. **Local App State**
+   - Current profile (name, email, union memberships)
+   - Vote history cached locally
+   - Draft proposals not yet submitted
+   - **Impact:** Track individual organizers
+4. **Device Information**
+   - Device ID (your vote tracking system!)
+   - IP address, location data
+   - **Impact:** Physical tracking of activists
+
+#### **Level 2: Supabase Breach** 🔴🔴
+If Supabase infrastructure is compromised:
+
+**Entire Database Exposed:**
+1. **Identity Data**
+   - All emails (verified and unverified)
+   - Hashed passwords (bcrypt, but still targetable)
+   - Phone numbers (if SMS verification added)
+   - Real names vs pseudonyms
+2. **Political Activity**
+   - Every union membership
+   - Every vote on every proposal
+   - Every debate comment ever made
+   - Every politician/company tracked
+   - Every boycott/strike proposal
+3. **Organizing Intelligence**
+   - Most active unions and campaigns
+   - Campaigns near activation (98% threshold)
+   - Internal strategy discussions
+   - Negotiation terms and demands
+4. **Relationship Networks**
+   - Who votes with whom (organizing patterns)
+   - Union admin hierarchies
+   - Cross-union collaboration
+5. **Audit Trails**
+   - Login times and patterns
+   - Device fingerprints
+   - Geolocation data (city/country from IPs)
+   - All moderation actions
+
+#### **Level 3: Expo Build Servers Compromised** 🔴🔴🔴
+If Expo's infrastructure is hacked:
+
+**Code Injection Attacks:**
+1. **Backdoored App Builds**
+   - Keylogger injected into production iOS/Android builds
+   - Data exfiltration code added silently
+   - Users download "official" app from App Store with malware
+2. **Build Secrets Stolen**
+   - EXPO_PUBLIC_SUPABASE_ANON_KEY
+   - Database credentials
+   - All API keys for third-party services
+3. **Long-Term Surveillance**
+   - Malicious code persists across updates
+   - Extremely hard to detect (looks legitimate)
+
+**Real-World Consequences:**
+- **Organizers Doxxed:** Full member lists leaked to employers → mass firings
+- **Campaigns Sabotaged:** Attackers see 98% boycott threshold → create fake accounts to vote "No"
+- **Government Surveillance:** Police/intelligence buy leaked data → track activists via device IDs
+- **Chilling Effect:** Trust destroyed, users stop organizing, movement loses critical tool
+
+**Why Tech Can't Fix It:**
+- ✅ MFA doesn't help (malware steals tokens AFTER login)
+- ✅ E2E encryption doesn't help (malware sees plaintext BEFORE encryption)
+- ✅ Privacy controls don't help (attacker has database access)
+- ✅ Rate limiting doesn't help (not an API attack)
+- **The attacker IS your app**
+
+**Mitigation Strategies:**
+
+**Short-Term (Current Infrastructure):**
+1. **Dependency Pinning & Auditing**
+   - Lock package versions, audit before upgrading
+   - Use `npm audit` and Snyk/Dependabot
+   - Review dependency changes in pull requests
+2. **Subresource Integrity**
+   - Verify package checksums
+   - Use lockfiles (package-lock.json)
+3. **Bug Bounty Program**
+   - Pay security researchers to find issues first
+   - Reward responsible disclosure
+4. **Incident Response Plan**
+   - How to notify users if breach occurs
+   - Data breach communication templates
+   - Account recovery procedures
+5. **Zero-Trust Architecture**
+   - Assume any service could be compromised
+   - Monitor for anomalous behavior
+   - Defense in depth
+
+**Long-Term (Infrastructure Migration):**
+See **Section 14: Self-Hosting Infrastructure Transition** below for complete guide on migrating to self-hosted infrastructure to eliminate third-party supply chain risks.
+
+---
+
+### 14. Physical Device Compromise 🟣 AWARENESS ONLY
+**Priority:** Awareness Only | **Cannot Be Fully Prevented**
+
+**Why this persists:** Mobile devices can be lost, stolen, or confiscated. Once attacker has physical access, many protections can be bypassed.
+
+**Attack Vectors:**
+1. **Police Seizure During Protests**
+   - Phone confiscated at rally/demonstration
+   - Forensic extraction of app data
+   - Organizer identity revealed
+2. **Stolen Devices**
+   - Phone stolen at public event
+   - App still logged in (no auto-logout)
+   - Attacker accesses union data
+3. **Employer Confiscation**
+   - Workplace phone search
+   - Work phone used for organizing
+   - Employer sees union activity
+4. **Border/Checkpoint Searches**
+   - International travel with phone
+   - Forced unlock at border
+   - Political activity visible
+
+**Why Tech Can't Fix It:**
+- ✅ expo-secure-store helps (hardware-backed encryption)
+- ✅ Auto-logout helps (reduce exposure window)
+- ⚠️ But if device unlocked, attacker has full access
+
+**Mitigation Strategies:**
+
+**Technical (Partial Protection):**
+1. **Auto-Logout/Session Timeout**
+   - Log out after 15 minutes of inactivity
+   - Require biometric re-auth for sensitive actions
+   - You already have session timeout!
+2. **Biometric App Lock**
+   - Require Face ID/fingerprint to open app
+   - Even if device unlocked
+3. **Remote Wipe Capability**
+   - User can remotely log out all sessions
+   - Clear local data from lost device
+4. **Panic Button**
+   - Quick "wipe my data" button
+   - For use before confiscation
+
+**Non-Technical (User Education):**
+1. **Security Best Practices**
+   - Don't use work devices for organizing
+   - Enable device encryption
+   - Use strong device passcodes (not biometrics for high-risk situations)
+2. **Offline Organizing**
+   - Don't store sensitive strategy on phones
+   - Use encrypted messaging for critical comms
+3. **Burner Devices**
+   - Disposable phones for high-risk organizing
+   - Separate device for protests
+4. **Legal Rights Education**
+   - Know your rights during searches
+   - When you can refuse device unlock
+
+**Current Protections:**
+- ✅ Session timeouts (15 min inactivity)
+- ✅ Hardware-backed token storage (expo-secure-store)
+- ⚠️ No biometric app lock yet
+- ⚠️ No remote session management yet
+
+**Implementation Considerations:**
+- Add biometric app lock toggle in Settings
+- Add "Remote logout all sessions" button
+- Add "Security tips for protests" guide
+
+---
+
+## 🏗️ Self-Hosting Infrastructure Transition (Ultimate Supply Chain Mitigation)
+
+**Priority:** Awareness Only | **Eliminates Third-Party Risks** | **Effort:** Very High
+
+For organizations requiring **complete data sovereignty** and elimination of supply chain risks from Expo/Supabase, here's the self-hosting path:
+
+---
+
+### **Why Self-Host?**
+
+✅ **Eliminates Supply Chain Risks:**
+- No dependency on Expo servers (build your own)
+- No dependency on Supabase cloud (run your own Postgres)
+- Full control over infrastructure and secrets
+
+✅ **Data Sovereignty:**
+- Complete control over where data lives
+- No third-party access to organizing intelligence
+- Compliance with strict regulations
+
+❌ **Trade-offs:**
+- Requires DevOps expertise (server management, security patches)
+- Higher time investment (weeks of setup vs minutes)
+- Responsibility for uptime, backups, scaling
+
+---
+
+### **Self-Hosting Cost Comparison**
+
+| Service | Managed (Current) | Self-Hosted | Savings |
+|---------|------------------|-------------|---------|
+| **Supabase** | $25-410/month | $10-54/month (VPS) | $200-400/month |
+| **Expo Builds** | $29+/month (EAS) | $0 (local builds) | $29+/month |
+| **Total** | $100-800/month | $50-150/month | $250-650/month |
+
+**BUT:** Add $500-2,000/month for DevOps personnel if you don't have in-house expertise.
+
+---
+
+### **Supabase Self-Hosting**
+
+#### **Infrastructure Requirements:**
+- **Minimum:** 2GB RAM / 1 vCPU (~$10/month DigitalOcean)
+- **Production:** 8 vCPU / 32GB RAM (~$54/month Hetzner)
+
+#### **Setup (Docker Compose):**
+```bash
+git clone --depth 1 https://github.com/supabase/supabase
+cd supabase/docker
+cp .env.example .env
+# Edit .env with secure secrets
+docker compose up -d
+```
+
+#### **Required Services:**
+- PostgreSQL (database) - 1-2GB RAM
+- PostgREST (REST API) - 0.5GB RAM
+- GoTrue (authentication) - 0.5GB RAM
+- Kong (API gateway) - 0.5GB RAM
+- Realtime (WebSocket) - 0.5GB RAM
+- Storage (file uploads) - 1GB RAM
+
+**Total:** 4-6GB RAM minimum for production
+
+#### **Security Hardening:**
+```bash
+# Generate secure secrets
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# Update .env
+POSTGRES_PASSWORD=<strong-password>
+JWT_SECRET=<generate-above>
+ANON_KEY=<generate-at-supabase-docs>
+SERVICE_ROLE_KEY=<generate>
+SITE_URL=https://yourapp.com
+```
+
+- Firewall: Restrict port 5432 (Postgres) to internal network only
+- SSL: Use Nginx + Certbot for HTTPS
+- Backups: Automate Postgres dumps to off-server storage
+
+#### **Resources:**
+- Official guide: https://supabase.com/docs/guides/self-hosting
+- Docker setup: https://supabase.com/docs/guides/self-hosting/docker
+- Coolify (1-click): https://coolify.io
+
+---
+
+### **React Native Build Alternatives (Expo Replacement)**
+
+#### **Option 1: React Native CLI (Full Control)**
+**Eliminates:** Expo build server dependency
+
+**Setup:**
+```bash
+# Eject from Expo
+npx expo prebuild
+
+# Build locally
+# iOS: Open ios/ folder in Xcode, build
+# Android: Open android/ folder in Android Studio, build
+```
+
+**Tools Needed:**
+- iOS: Xcode, CocoaPods, Fastlane
+- Android: Android Studio, Gradle, JDK
+
+**Deployment Pipeline:**
+1. Local builds (Xcode/Android Studio)
+2. Fastlane (automation for signing, TestFlight, Play Store upload)
+3. Jenkins or GitHub Actions (CI/CD with self-hosted runners)
+4. Self-hosted CodePush Server (OTA updates)
+
+---
+
+#### **Option 2: Self-Hosted CI/CD**
+
+**Jenkins (100% Self-Hosted):**
+- Run on your own hardware
+- No cloud dependency
+- Free and open-source
+- Requires infrastructure maintenance
+
+**GitHub Actions (Self-Hosted Runners):**
+- Free tier for personal projects
+- Run builds on your infrastructure
+- Easy integration with GitHub repos
+
+**Fastlane (Local Automation):**
+```ruby
+# Fastfile
+lane :beta do
+  increment_build_number
+  build_app
+  upload_to_testflight
+end
+```
+
+---
+
+#### **Option 3: Self-Hosted CodePush**
+**For OTA updates without Expo:**
+- GitHub: https://github.com/microsoft/react-native-code-push
+- Self-hosted server: https://github.com/htdcx/code-push-server-go
+- Push JS bundle updates without app store review
+
+**Note:** Microsoft App Center (hosted CodePush) retires March 31, 2025 - self-hosting is the future.
+
+---
+
+### **Complete Self-Hosted Stack**
+
+```
+Your Infrastructure
+    ↓
+Supabase (self-hosted Docker) - Database, Auth, Realtime
+    ↓
+React Native CLI - No Expo dependency
+    ↓
+Local Builds (Xcode/Android Studio)
+    ↓
+Fastlane - Automation
+    ↓
+Jenkins/GitHub Actions (self-hosted runners) - CI/CD
+    ↓
+Self-hosted CodePush - OTA updates
+    ↓
+App Store / Play Store
+```
+
+---
+
+### **When to Self-Host?**
+
+#### ✅ **Good Fit:**
+- High-security requirements (government surveillance risk)
+- Compliance requirements (data must stay in specific location)
+- Budget constraints (>$250/month savings)
+- Team has DevOps expertise
+- Predictable traffic patterns
+- Long-term commitment (years, not months)
+
+#### ❌ **Stick with Managed Services:**
+- Fast time-to-market (launch in weeks, not months)
+- No DevOps resources
+- Unpredictable traffic spikes (need auto-scaling)
+- Small team focused on features
+- Early-stage MVP (validate first, optimize later)
+
+---
+
+### **Migration Timeline**
+
+**Phase 1: Planning (2 weeks)**
+- Audit current Supabase usage
+- Plan infrastructure requirements
+- Set up VPS/cloud server
+- Team training on Docker/DevOps
+
+**Phase 2: Backend Migration (3-4 weeks)**
+- Deploy self-hosted Supabase
+- Migrate database (PostgreSQL dump → restore)
+- Test all API endpoints
+- Update app to point to new backend URL
+
+**Phase 3: Build Pipeline (2-3 weeks)**
+- Set up React Native CLI project
+- Configure Fastlane automation
+- Set up CI/CD (Jenkins/GitHub Actions)
+- Test iOS and Android builds
+
+**Phase 4: Rollout (1-2 weeks)**
+- Deploy new app version pointing to self-hosted backend
+- Monitor for issues
+- Gradually migrate users
+- Decommission Supabase cloud
+
+**Total:** 8-11 weeks + ongoing maintenance
+
+---
+
+### **Bottom Line: Self-Hosting Decision Matrix**
+
+| Factor | Managed (Current) | Self-Hosted |
+|--------|------------------|-------------|
+| **Cost (infrastructure)** | $100-800/mo | $50-150/mo |
+| **Cost (DevOps)** | $0 | $500-2,000/mo (if hiring) |
+| **Setup time** | Minutes | 2-3 months |
+| **Security control** | Limited | Complete |
+| **Supply chain risk** | High | Low |
+| **Time to market** | Fast | Slow |
+| **Recommended for** | MVP, early stage | Mature, high-security needs |
+
+**Recommendation:** Stay on managed services for MVP launch. Migrate to self-hosted infrastructure only when:
+1. You have proven product-market fit
+2. You have DevOps expertise in-house
+3. You face genuine security threats (targeted attacks, government surveillance)
+4. You have 6+ months for migration
+
+---
+
 ## 📝 Security Maintenance Checklist
 
 ### Weekly
