@@ -1,0 +1,32 @@
+Chromium Edge:
+Error: "The requested version (1) is less than the existing version (2)." in No stacktrace available
+...
+16
+iPhone 16 Pro:
+SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+Chromium Edge:
+`activateKeepAwake` is deprecated. Use `activateKeepAwakeAsync` instead.
+Chromium Edge:
+Error: "Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only." in ReadOnlyError: Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only. <<     at new Promise (<anonymous>) <<     at async Promise.all (index 1) <<     at async Promise.all (index 0)
+...
+Chromium Edge:
+Error: "Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only." in ReadOnlyError: Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only. <<     at new Promise (<anonymous>) <<     at async Promise.all (index 2) <<     at async Promise.all (index 1)
+...
+Chromium Edge:
+Error: "Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only." in ReadOnlyError: Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only. <<     at new Promise (<anonymous>) <<     at async Promise.all (index 3) <<     at async Promise.all (index 1)
+...
+Chromium Edge:
+Error: "Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only." in ReadOnlyError: Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only. <<     at new Promise (<anonymous>) <<     at async Promise.all (index 1) <<     at async Promise.all (index 1)
+...
+Chromium Edge:
+Error: "Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only." in ReadOnlyError: Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only. <<     at new Promise (<anonymous>) <<     at async Promise.all (index 6) <<     at async Promise.all (index 2)
+...
+Chromium Edge:
+Error: "Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only." in ReadOnlyError: Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only. <<     at new Promise (<anonymous>)
+...
+Chromium Edge:
+Error: "Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only." in ReadOnlyError: Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only. <<     at new Promise (<anonymous>) <<     at async Promise.all (index 2) <<     at async Promise.all (index 0)
+...
+Chromium Edge:
+Error: "Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only." in ReadOnlyError: Failed to execute 'put' on 'IDBObjectStore': The transaction is read-only. <<     at new Promise (<anonymous>) <<     at async Promise.all (index 0) <<     at async Promise.all (index 0)
+...

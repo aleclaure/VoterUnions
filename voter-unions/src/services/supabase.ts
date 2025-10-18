@@ -74,7 +74,10 @@ const getFromAsyncStorageSafely = async (key: string): Promise<string | null> =>
     return await AsyncStorage.getItem(key);
   } catch (error: any) {
     if (typeof window !== 'undefined' && window.indexedDB && 
-        (error?.message?.includes('version') || error?.message?.includes('database'))) {
+        (error?.message?.includes('version') || 
+         error?.message?.includes('database') ||
+         error?.message?.includes('read-only') ||
+         error?.name === 'ReadOnlyError')) {
       console.warn('⚠️ IndexedDB error, attempting recovery...');
       await deleteAsyncStorageDB();
       return await AsyncStorage.getItem(key);
@@ -88,7 +91,10 @@ const setToAsyncStorageSafely = async (key: string, value: string): Promise<void
     await AsyncStorage.setItem(key, value);
   } catch (error: any) {
     if (typeof window !== 'undefined' && window.indexedDB && 
-        (error?.message?.includes('version') || error?.message?.includes('database'))) {
+        (error?.message?.includes('version') || 
+         error?.message?.includes('database') ||
+         error?.message?.includes('read-only') ||
+         error?.name === 'ReadOnlyError')) {
       console.warn('⚠️ IndexedDB error, attempting recovery...');
       await deleteAsyncStorageDB();
       await AsyncStorage.setItem(key, value);
@@ -103,7 +109,10 @@ const removeFromAsyncStorageSafely = async (key: string): Promise<void> => {
     await AsyncStorage.removeItem(key);
   } catch (error: any) {
     if (typeof window !== 'undefined' && window.indexedDB && 
-        (error?.message?.includes('version') || error?.message?.includes('database'))) {
+        (error?.message?.includes('version') || 
+         error?.message?.includes('database') ||
+         error?.message?.includes('read-only') ||
+         error?.name === 'ReadOnlyError')) {
       console.warn('⚠️ IndexedDB error, attempting recovery...');
       await deleteAsyncStorageDB();
       await AsyncStorage.removeItem(key);
