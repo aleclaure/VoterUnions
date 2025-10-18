@@ -61,6 +61,20 @@ The application is built using Expo SDK 52 with React Native and TypeScript. Nav
   - **Union Member Visibility**: RLS policies and get_union_moderation_logs() function allow all union members to view moderation actions via ModerationLogsScreen, ensuring admin accountability.
 - **Rate Limiting**: Client-side rate limiting across 11 action types (authentication, posts, comments, channels, power pledges) to prevent abuse and spam.
 
+## Security Documentation
+For a complete security assessment, see **[SECURITY_STATUS.md](voter-unions/SECURITY_STATUS.md)** which provides:
+- Detailed audit of all implemented security features
+- Security scorecard (overall: 8.3/10 - production-ready)
+- Known gaps and future improvement roadmap
+- Security maintenance checklist
+- Comparison with major social platforms
+
+**Key Highlights:**
+- ✅ Vote integrity: 10/10 (dual-trigger protection + device-based voting)
+- ✅ Content security: 9/10 (62 automated XSS tests)
+- ✅ GDPR compliance: 8/10 (data export + hard delete)
+- ✅ Authentication: 7/10 (email verification + rate limiting, missing MFA)
+
 ## External Dependencies
 - **Expo SDK 52 (React Native)**: Core mobile application development.
 - **React Navigation**: In-app navigation.

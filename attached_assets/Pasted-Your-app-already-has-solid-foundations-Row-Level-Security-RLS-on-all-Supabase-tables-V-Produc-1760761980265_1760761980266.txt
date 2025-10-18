@@ -1,0 +1,76 @@
+Your app already has solid foundations:
+Row-Level Security (RLS) on all Supabase tables
+• V Production-grade vote protection with dual triggers (prevents vote manipulation)
+• V Secure token storage with expo-secure-store
+• V Soft deletes (data recovery possible)
+• V Email verification for accounts 
+Highest Level Security Would Include:
+1. Authentication & Identity
+• Multi-factor authentication (MFA) - Essential for political organizing
+• Passwordless auth options - WebAuthn/biometrics for mobile
+• Account activity monitoring - Detect suspicious logins
+• Rate limiting on auth endpoints - Prevent brute force attacks
+2. Data Privacy & Encryption
+• End-to-end encryption for sensitive messages/debates
+• Encrypted user profiles - Political affiliations are sensitive data
+• Zero-knowledge architecture where possible
+• Data anonymization for analytics
+
+3. Vote & Action Integrity
+• V You already have trigger-based vote protection (excellent!)
+• Cryptographic vote receipts - Users verify their vote counted
+• Audit logs - Track all vote changes with timestamps
+• IP/device fingerprinting - Detect duplicate voting attempts
+4. Content Security
+• Content signing - Verify reports haven't been tampered with
+• Source verification - Links to evidence must be validated
+• Spam/bot detection - Prevent coordinated manipulation
+• Moderation queue with transparency
+
+Potential Vulnerabilities to Address:
+Critical:
+1. No rate limiting - Currently vulnerable to:
+• Spam report creation
+• Vote flooding attempts
+• DDoS on endpoints
+2. No account verification beyond email - Risk of:
+• Bot/fake accounts in unions
+• Coordinated manipulation campaigns
+• Astroturfing (fake grassroots movements)
+3. Client-side vote counting - If any vote tallies happen client-side:
+• Could be manipulated before reaching server
+• Should always be server-side aggregation only
+4. No session timeout/rotation - Long-lived tokens risk:
+• Token theft and reuse
+• Compromised devices staying logged in
+
+Important:
+5. Public read access - Anyone can see:
+• Union membership lists
+• Who voted on what (it tracked)
+• Political positions/activity
+• Consider privacy controls per user
+6. No audit trail - Currently can't detect:
+• When/how data was modified
+• Who accessed sensitive information
+• Coordinated attack patterns
+7. No input sanitization verification - Risk of:
+• SQL injection (Supabase helps but verify)
+• XSS attacks via user content
+• Malicious links in evidence fields
+8. File upload vulnerabilities if/when you add):
+• Malware in user uploads
+• Phishing documents
+• Steganography (hidden messages)
+
+Moderate:
+9. No CAPTCHA/human verification - Bots can:
+• Auto-create accounts
+• Spam proposals/ reports
+• Manipulate vote counts
+0. Soft deletes visible in queries - If deleted_at IS NULL filters aren't perfect:
+• "Deleted" data might leak
+• Privacy violations possible
+1. No geographic verification - For local organizing:
+• Can't verify users are actually local
+• Outsiders could manipulate local unions
