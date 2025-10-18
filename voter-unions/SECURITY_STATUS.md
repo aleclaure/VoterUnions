@@ -1151,6 +1151,665 @@ App Store / Play Store
 
 ---
 
+## 🚀 Implementation Blueprint: Transition to Full Security
+
+**TL;DR:** Your current stack (Expo + Supabase + Edge Functions + PostgreSQL RLS) is **exactly right** to implement all 10 security enhancements. This section shows the **lean blueprint** to ship secure features (auth, unions, posts, DMs, votes) while staying compliant.
+
+---
+
+### **✅ How Each Security Requirement is Achieved**
+
+---
+
+#### **1. Authentication & Identity Protection**
+
+**Email Verification Enforcement:**
+Gate all "write" operations with RLS that checks `auth.uid()` + `email_confirmed_at IS NOT NULL`.
+
+```sql
+-- Create reusable verification helper
+CREATE OR REPLACE FUNCTION is_verified() RETURNS BOOLEAN
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(auth.jwt()->>'email_confirmed_at', '') <> ''
+$$;
+
+-- Apply to all write policies (posts, votes, unions, etc.)
+CREATE POLICY insert_verified ON posts
+FOR INSERT TO authenticated
+WITH CHECK (is_verified() AND author_id = auth.uid());
+
+CREATE POLICY insert_vote_verified ON proposal_votes
+FOR INSERT TO authenticated
+WITH CHECK (is_verified() AND voter_id = auth.uid());
+```
+
+**Server-Side Rate Limiting:**
+Move from client-only to Edge Function guards using **Upstash Redis** (HTTP API) or PostgreSQL counter.
+
+```typescript
+// Edge Function: rateLimit.ts
+export async function rateLimit(ip: string, action: string): Promise<boolean> {
+  const key = `rl:${ip}:${action}`;
+  const limit = 10;
+  const windowSec = 300; // 5 minutes
+  
+  const used = await incrWithExpiry(key, windowSec); // Redis or pg function
+  
+  if (used > limit) {
+    return false; // Rate limited
+  }
+  return true;
+}
+
+// Use in any Edge Function
+const allowed = await rateLimit(clientIP, 'create_post');
+if (!allowed) return new Response('Too many requests', { status: 429 });
+```
+
+**Session Timeout & Secure Storage:**
+Already implemented with `expo-secure-store` + `autoRefreshToken`. Keep 30-min idle timeout in SessionManager and call `supabase.auth.refreshSession()` on app foreground.
+
+**Gaps to add later:**
+- MFA using `supabase.auth.mfa.*` methods
+- IP-based heuristics for suspicious login detection
+- Admin activity dashboard
+
+---
+
+#### **2. Data Privacy & GDPR Compliance**
+
+**GDPR Export & Erasure:**
+You already have Edge Functions + cascading deletes. Ensure they're **idempotent** and logged:
+
+```sql
+-- Track deletion requests
+CREATE TABLE user_deletion_requests (
+  user_id UUID PRIMARY KEY,
+  requested_at TIMESTAMPTZ DEFAULT NOW(),
+  status TEXT DEFAULT 'pending', -- pending, processing, completed
+  completed_at TIMESTAMPTZ
+);
+
+-- Hard delete function logs to audit_logs
+CREATE OR REPLACE FUNCTION hard_delete_user(user_uuid UUID)
+RETURNS VOID AS $$
+BEGIN
+  INSERT INTO audit_logs (action, user_id, details)
+  VALUES ('hard_delete_initiated', user_uuid, jsonb_build_object('timestamp', NOW()));
+  
+  -- Cascade deletes handled by foreign key constraints
+  DELETE FROM profiles WHERE id = user_uuid;
+  
+  UPDATE user_deletion_requests 
+  SET status = 'completed', completed_at = NOW()
+  WHERE user_id = user_uuid;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+**RLS Everywhere:**
+Verify with CI tests (see "Compliance CI" section below).
+
+**Device ID Hashing:**
+Continue using SHA-256 + per-app salt stored server-side.
+
+**Gaps to add later:**
+- E2E encryption for DMs/debates (Matrix/Signal Protocol)
+- Analytics anonymization
+- Per-user privacy toggles (hide membership, pseudonyms)
+
+---
+
+#### **3. Vote & Action Integrity**
+
+**Dual-Trigger Protection:**
+Force defaults on insert, block manual updates, recompute tallies automatically.
+
+```sql
+-- Trigger 1: Force default scores to 0 on insert
+CREATE OR REPLACE FUNCTION vote_defaults() RETURNS TRIGGER AS $$
+BEGIN
+  NEW.score_yes := 0;
+  NEW.score_no := 0;
+  NEW.score_abstain := 0;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER enforce_vote_defaults
+BEFORE INSERT ON proposals
+FOR EACH ROW EXECUTE FUNCTION vote_defaults();
+
+-- Trigger 2: Block direct updates (only allow trigger updates)
+CREATE OR REPLACE FUNCTION vote_updates_only_by_triggers() RETURNS TRIGGER AS $$
+BEGIN
+  IF pg_trigger_depth() = 1 THEN
+    RAISE EXCEPTION 'Direct updates to vote counts not allowed';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER block_manual_vote_updates
+BEFORE UPDATE ON proposals
+FOR EACH ROW EXECUTE FUNCTION vote_updates_only_by_triggers();
+
+-- Trigger 3: Recompute tallies when votes change
+CREATE OR REPLACE FUNCTION recompute_proposal_tallies() RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE proposals
+  SET 
+    score_yes = (SELECT COUNT(*) FROM proposal_votes WHERE proposal_id = NEW.proposal_id AND vote = 'yes'),
+    score_no = (SELECT COUNT(*) FROM proposal_votes WHERE proposal_id = NEW.proposal_id AND vote = 'no'),
+    score_abstain = (SELECT COUNT(*) FROM proposal_votes WHERE proposal_id = NEW.proposal_id AND vote = 'abstain')
+  WHERE id = NEW.proposal_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER recount_on_vote
+AFTER INSERT OR UPDATE OR DELETE ON proposal_votes
+FOR EACH ROW EXECUTE FUNCTION recompute_proposal_tallies();
+```
+
+**One Vote Per Device:**
+Unique indexes on `(proposal_id, device_id)` and `(proposal_id, voter_id)`.
+
+```sql
+CREATE UNIQUE INDEX idx_one_vote_per_device 
+ON proposal_votes (proposal_id, device_id);
+
+CREATE UNIQUE INDEX idx_one_vote_per_user 
+ON proposal_votes (proposal_id, voter_id);
+```
+
+**Server-Only Counts:**
+Never trust client. Use database views/aggregates for all vote tallies.
+
+---
+
+#### **4. Content Security (XSS Protection)**
+
+**Sanitization Enforcement:**
+Keep `stripHtml()` function and AST-based enforcement with 62 automated tests.
+
+**Re-Sanitize Legacy Data:**
+Create an RPC to clean existing content on demand.
+
+```sql
+CREATE OR REPLACE FUNCTION resanitize_posts()
+RETURNS INTEGER AS $$
+DECLARE
+  updated_count INTEGER;
+BEGIN
+  UPDATE posts
+  SET body = regexp_replace(body, '<[^>]+>', '', 'g')
+  WHERE body ~ '<[^>]+>';
+  
+  GET DIAGNOSTICS updated_count = ROW_COUNT;
+  RETURN updated_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+**Reporting & Moderation:**
+RLS + audit logging already implemented. Ensure admin actions are logged via database triggers.
+
+**Add CAPTCHA:**
+Use hCaptcha on high-impact paths (signup, voting) via Edge Function verification.
+
+```typescript
+// Edge Function: verifyCaptcha.ts
+export async function verifyCaptcha(token: string): Promise<boolean> {
+  const response = await fetch('https://hcaptcha.com/siteverify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `response=${token}&secret=${Deno.env.get('HCAPTCHA_SECRET')}`
+  });
+  
+  const data = await response.json();
+  return data.success;
+}
+```
+
+---
+
+#### **5. Privacy & Access Control**
+
+**RLS + Email Verification:**
+Already implemented. All write operations gated by verification status.
+
+**Privacy Settings Table (Future):**
+Reference in RLS to hide membership, enable pseudonyms.
+
+```sql
+CREATE TABLE user_privacy_settings (
+  user_id UUID PRIMARY KEY REFERENCES profiles(id),
+  profile_visibility VARCHAR(20) DEFAULT 'public', -- public, union_only, private
+  hide_union_membership BOOLEAN DEFAULT FALSE,
+  hide_voting_activity BOOLEAN DEFAULT FALSE,
+  pseudonym VARCHAR(100),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Update RLS to respect settings
+CREATE POLICY view_profiles ON profiles
+FOR SELECT USING (
+  CASE 
+    WHEN (SELECT profile_visibility FROM user_privacy_settings WHERE user_id = profiles.id) = 'private' 
+    THEN profiles.id = auth.uid()
+    WHEN (SELECT profile_visibility FROM user_privacy_settings WHERE user_id = profiles.id) = 'union_only'
+    THEN EXISTS (
+      SELECT 1 FROM union_members um1
+      JOIN union_members um2 ON um1.union_id = um2.union_id
+      WHERE um1.user_id = auth.uid() AND um2.user_id = profiles.id
+    )
+    ELSE TRUE -- public
+  END
+);
+```
+
+---
+
+### **🔧 Feature Implementation Wiring (Expo App)**
+
+#### **Join a Union**
+```typescript
+async function joinUnion(unionId: string) {
+  await requireVerified(); // Throws if email not verified
+  
+  const { error } = await supabase
+    .from('union_members')
+    .insert({ union_id: unionId, user_id: user.id });
+  
+  if (error) throw error;
+}
+```
+
+#### **Create Post / Comment**
+```typescript
+async function createPost(unionId: string, text: string) {
+  await requireVerified();
+  
+  const sanitized = stripHtml(text); // Client-side sanitization
+  
+  const { error } = await supabase
+    .from('posts')
+    .insert({ union_id: unionId, body: sanitized });
+  
+  if (error) throw error;
+}
+```
+
+#### **Direct Messages**
+```typescript
+// Get or create DM thread
+const { data: thread } = await supabase
+  .rpc('get_or_create_dm_thread', { 
+    participant1: user.id, 
+    participant2: recipientId 
+  });
+
+// Send message (RLS ensures only participants can write)
+await supabase
+  .from('dm_messages')
+  .insert({ thread_id: thread.id, sender_id: user.id, body: stripHtml(text) });
+
+// Subscribe to real-time updates
+const channel = supabase
+  .channel(`dm:${thread.id}`)
+  .on('postgres_changes', {
+    event: 'INSERT',
+    schema: 'public',
+    table: 'dm_messages',
+    filter: `thread_id=eq.${thread.id}`
+  }, handleNewMessage)
+  .subscribe();
+```
+
+#### **Cast Vote**
+```typescript
+async function castVote(proposalId: string, choice: 'yes' | 'no' | 'abstain') {
+  const deviceId = await getDeviceId(); // From expo-application
+  
+  const { error } = await supabase.rpc('cast_vote', {
+    proposal_id: proposalId,
+    choice: choice,
+    device_id: deviceId
+  });
+  
+  if (error) throw error; // RLS + triggers enforce membership, verification, uniqueness
+}
+```
+
+**RPC Implementation:**
+```sql
+CREATE OR REPLACE FUNCTION cast_vote(
+  proposal_id UUID,
+  choice TEXT,
+  device_id TEXT
+) RETURNS VOID AS $$
+BEGIN
+  -- Verification and membership checked by RLS
+  INSERT INTO proposal_votes (proposal_id, voter_id, device_id, vote)
+  VALUES (proposal_id, auth.uid(), device_id, choice);
+  
+  -- Triggers automatically recompute tallies
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+---
+
+### **🛡️ Compliance "Proof Pack" (Make Auditors Happy)**
+
+#### **1. RLS Test Suite (CI)**
+Automated tests that verify security policies using the **anon** key.
+
+```javascript
+// test/rls/posts.test.ts
+describe('Posts RLS', () => {
+  it('should block unverified users from creating posts', async () => {
+    const unverifiedClient = createClient(SUPABASE_URL, ANON_KEY);
+    await unverifiedClient.auth.signUp({ email: 'test@example.com', password: 'password' });
+    
+    const { error } = await unverifiedClient.from('posts').insert({ body: 'Test' });
+    
+    expect(error).toBeDefined();
+    expect(error.message).toContain('verification');
+  });
+  
+  it('should allow verified users to create posts', async () => {
+    const verifiedClient = await getVerifiedClient();
+    
+    const { error } = await verifiedClient.from('posts').insert({ body: 'Test' });
+    
+    expect(error).toBeNull();
+  });
+});
+```
+
+**Run in CI:**
+```bash
+npm run test:rls
+```
+
+---
+
+#### **2. Policy Lint**
+SQL linter to ensure every table has RLS enabled and policies defined.
+
+```javascript
+// scripts/lintRLS.js
+const tables = await getAllTables();
+
+for (const table of tables) {
+  const rlsEnabled = await checkRLSEnabled(table);
+  const policies = await getPolicies(table);
+  
+  if (!rlsEnabled) {
+    console.error(`❌ ${table}: RLS not enabled`);
+  }
+  
+  if (policies.length === 0) {
+    console.error(`❌ ${table}: No policies defined`);
+  }
+}
+```
+
+---
+
+#### **3. Edge Function Security Tests**
+Unit tests for rate limiting, CAPTCHA verification, and service-role requirements.
+
+```typescript
+// test/edgeFunctions/rateLimit.test.ts
+describe('Rate Limit Edge Function', () => {
+  it('should block after 10 requests in 5 minutes', async () => {
+    for (let i = 0; i < 10; i++) {
+      await fetch(EDGE_FUNCTION_URL, { method: 'POST', body: JSON.stringify({ action: 'test' }) });
+    }
+    
+    const response = await fetch(EDGE_FUNCTION_URL, { method: 'POST', body: JSON.stringify({ action: 'test' }) });
+    
+    expect(response.status).toBe(429);
+  });
+});
+```
+
+---
+
+#### **4. XSS Test Suite**
+Keep your existing 62 automated tests. Block PR merges if any test fails.
+
+```bash
+# In CI/CD pipeline
+npm run test:xss
+if [ $? -ne 0 ]; then
+  echo "❌ XSS tests failed - blocking merge"
+  exit 1
+fi
+```
+
+---
+
+#### **5. Audit Log Immutability**
+Make `audit_logs` append-only to prevent tampering.
+
+```sql
+-- Prevent updates and deletes
+CREATE POLICY no_update_audit_logs ON audit_logs
+FOR UPDATE USING (FALSE);
+
+CREATE POLICY no_delete_audit_logs ON audit_logs
+FOR DELETE USING (FALSE);
+
+-- Optional: Add cryptographic signature
+ALTER TABLE audit_logs ADD COLUMN signature BYTEA;
+
+CREATE OR REPLACE FUNCTION sign_audit_log() RETURNS TRIGGER AS $$
+BEGIN
+  NEW.signature := digest(
+    NEW.id || NEW.action || NEW.user_id || NEW.created_at,
+    'sha256'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER sign_audit_entry
+BEFORE INSERT ON audit_logs
+FOR EACH ROW EXECUTE FUNCTION sign_audit_log();
+```
+
+---
+
+#### **6. Secrets & Environment Variables**
+Never commit secrets to repository.
+
+**Supabase Edge Functions:**
+Use environment variables in Supabase dashboard.
+
+**Expo:**
+Use `EXPO_PUBLIC_*` prefix ONLY for public keys (like anon key).
+
+```typescript
+// ✅ Good
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+// ❌ Bad - Never expose service role key
+// const serviceKey = process.env.EXPO_PUBLIC_SERVICE_ROLE_KEY; // NEVER DO THIS
+```
+
+---
+
+### **📋 Implementation Checklist: Not Yet Implemented**
+
+These are the gaps remaining from your 10 security enhancements:
+
+#### **High Priority:**
+- [ ] **MFA** - Add `supabase.auth.mfa` screens (setup & challenge)
+  - `MFASetupScreen.tsx` - QR code display, recovery codes
+  - `MFAChallengeScreen.tsx` - TOTP input on login
+  - Update auth flow to check MFA status
+
+- [ ] **CAPTCHA** - Install `@hcaptcha/react-native-hcaptcha`
+  - Add to signup screen
+  - Add to high-value votes (proposals with >1000 voters)
+  - Create Edge Function to verify tokens server-side
+
+- [ ] **API-Level Rate Limiting** - Move from client to Edge Functions
+  - Create reusable rate limit middleware
+  - Apply to all write RPCs (vote, report, auth events)
+  - Use Upstash Redis or PostgreSQL counter
+
+#### **Medium Priority:**
+- [ ] **E2E Encryption for DMs/Debates** - Matrix SDK integration
+  - Add `is_encrypted` boolean to debates table
+  - Generate encryption keys per debate room
+  - Store keys in `expo-secure-store`
+  - Show lock icon for encrypted debates
+
+- [ ] **Privacy Controls** - User privacy settings
+  - Create `user_privacy_settings` table
+  - Add privacy settings screen
+  - Update RLS policies to respect settings
+  - Show pseudonyms when enabled
+
+#### **Low Priority:**
+- [ ] **Security Alerts Dashboard** - Admin anomaly detection
+  - Create `security_alerts` table
+  - Edge Function to analyze patterns every 5 min
+  - Notify admins of mass reporting, vote flooding
+
+---
+
+### **⚡ Quick-Start SQL Migrations**
+
+**Complete starter migration for vote integrity:**
+
+```sql
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Create proposals table with protected vote fields
+CREATE TABLE proposals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  union_id UUID REFERENCES unions(id),
+  created_by UUID REFERENCES profiles(id),
+  score_yes INTEGER DEFAULT 0 NOT NULL,
+  score_no INTEGER DEFAULT 0 NOT NULL,
+  score_abstain INTEGER DEFAULT 0 NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create votes table with device tracking
+CREATE TABLE proposal_votes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  proposal_id UUID REFERENCES proposals(id) ON DELETE CASCADE,
+  voter_id UUID REFERENCES profiles(id),
+  device_id TEXT NOT NULL,
+  vote TEXT CHECK (vote IN ('yes', 'no', 'abstain')),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Unique constraints (1 vote per device, 1 vote per user)
+CREATE UNIQUE INDEX idx_one_vote_per_device ON proposal_votes (proposal_id, device_id);
+CREATE UNIQUE INDEX idx_one_vote_per_user ON proposal_votes (proposal_id, voter_id);
+
+-- Trigger 1: Force default scores
+CREATE OR REPLACE FUNCTION vote_defaults() RETURNS TRIGGER AS $$
+BEGIN
+  NEW.score_yes := 0;
+  NEW.score_no := 0;
+  NEW.score_abstain := 0;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER enforce_vote_defaults
+BEFORE INSERT ON proposals
+FOR EACH ROW EXECUTE FUNCTION vote_defaults();
+
+-- Trigger 2: Block manual updates
+CREATE OR REPLACE FUNCTION vote_updates_only_by_triggers() RETURNS TRIGGER AS $$
+BEGIN
+  IF pg_trigger_depth() = 1 THEN
+    RAISE EXCEPTION 'Direct updates to vote counts not allowed. Use triggers only.';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER block_manual_vote_updates
+BEFORE UPDATE ON proposals
+FOR EACH ROW EXECUTE FUNCTION vote_updates_only_by_triggers();
+
+-- Trigger 3: Recompute tallies
+CREATE OR REPLACE FUNCTION recompute_proposal_tallies() RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE proposals
+  SET 
+    score_yes = (SELECT COUNT(*) FROM proposal_votes WHERE proposal_id = NEW.proposal_id AND vote = 'yes'),
+    score_no = (SELECT COUNT(*) FROM proposal_votes WHERE proposal_id = NEW.proposal_id AND vote = 'no'),
+    score_abstain = (SELECT COUNT(*) FROM proposal_votes WHERE proposal_id = NEW.proposal_id AND vote = 'abstain')
+  WHERE id = NEW.proposal_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER recount_on_vote
+AFTER INSERT OR UPDATE OR DELETE ON proposal_votes
+FOR EACH ROW EXECUTE FUNCTION recompute_proposal_tallies();
+
+-- Enable RLS
+ALTER TABLE proposals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE proposal_votes ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY view_proposals ON proposals FOR SELECT USING (TRUE);
+
+CREATE POLICY insert_votes_verified ON proposal_votes
+FOR INSERT TO authenticated
+WITH CHECK (
+  is_verified() AND 
+  voter_id = auth.uid() AND
+  EXISTS (SELECT 1 FROM union_members WHERE union_id = (SELECT union_id FROM proposals WHERE id = proposal_id) AND user_id = auth.uid())
+);
+```
+
+---
+
+### **🎯 Bottom Line**
+
+**Yes, it's fully achievable** to keep users authenticated, join unions, post, DM, and vote while meeting all security requirements.
+
+**The enforcement lives on the server:**
+- RLS policies gate all database access
+- Triggers enforce vote integrity
+- RPCs provide secure business logic
+- Edge Functions handle rate limiting and verification
+
+**The client is thin:**
+- Sanitize inputs before sending
+- Show verification gates in UI
+- Call secure RPCs
+- Display real-time updates via Supabase Realtime
+
+**Next steps:**
+1. Implement MFA screens (highest priority)
+2. Add CAPTCHA to signup and voting
+3. Move rate limiting to Edge Functions
+4. Add E2E encryption for sensitive debates
+5. Create privacy controls for hiding membership
+
+**Your current stack is perfect for this.** No need to rebuild or switch technologies. Just layer in the security features systematically using the patterns above.
+
+---
+
 ## 📝 Security Maintenance Checklist
 
 ### Weekly
