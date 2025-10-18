@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import * as Application from 'expo-application';
 import { Platform } from 'react-native';
 import * as Crypto from 'expo-crypto';
 
@@ -8,6 +7,7 @@ import * as Crypto from 'expo-crypto';
  * 
  * iOS: Uses getIosIdForVendorAsync() - unique per vendor, persists across reinstalls
  * Android: Uses getAndroidId() - unique per device, persists across reinstalls
+ * Web: Uses browser fingerprint (user agent + screen dimensions)
  * 
  * The device ID is hashed with SHA256 for privacy before being stored
  */
@@ -22,15 +22,22 @@ export function useDeviceId() {
         setIsLoading(true);
         let rawDeviceId: string | null = null;
 
-        if (Platform.OS === 'ios') {
-          // iOS: Get ID for vendor (stable across app reinstalls)
-          rawDeviceId = await Application.getIosIdForVendorAsync();
-        } else if (Platform.OS === 'android') {
-          // Android: Get Android ID (stable across app reinstalls)
-          rawDeviceId = Application.getAndroidId();
+        if (Platform.OS === 'ios' || Platform.OS === 'android') {
+          // Dynamically import expo-application only on native platforms
+          const Application = await import('expo-application');
+          
+          if (Platform.OS === 'ios') {
+            // iOS: Get ID for vendor (stable across app reinstalls)
+            rawDeviceId = await Application.getIosIdForVendorAsync();
+          } else {
+            // Android: Get Android ID (stable across app reinstalls)
+            rawDeviceId = Application.getAndroidId();
+          }
         } else {
           // Web or other platforms - generate a stable ID based on browser fingerprint
-          rawDeviceId = `web-${navigator.userAgent}-${screen.width}x${screen.height}`;
+          const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
+          const screenInfo = typeof screen !== 'undefined' ? `${screen.width}x${screen.height}` : '0x0';
+          rawDeviceId = `web-${userAgent}-${screenInfo}`;
         }
 
         if (!rawDeviceId) {
