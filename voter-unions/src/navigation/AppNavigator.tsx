@@ -20,9 +20,9 @@ import { CreateDebateScreen } from '../screens/CreateDebateScreen';
 import { CandidateDetailScreen } from '../screens/CandidateDetailScreen';
 import { PostDetailScreen } from '../screens/PostDetailScreen';
 import { UnionsTabNavigator } from './UnionsTabNavigator';
+import { SessionManager } from '../components/SessionManager';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
-import { useSessionTimeout } from '../hooks/useSessionTimeout';
 import { Text } from 'react-native';
 
 const Stack = createNativeStackNavigator();
@@ -131,9 +131,6 @@ const MainStack = () => {
 export const AppNavigator = () => {
   const { user, isLoading: authLoading } = useAuth();
   const { needsOnboarding, isLoading: profileLoading } = useProfile();
-  
-  // Enable session timeout for logged-in users
-  useSessionTimeout();
 
   if (authLoading || (user && profileLoading)) {
     return null;
@@ -141,6 +138,8 @@ export const AppNavigator = () => {
 
   return (
     <NavigationContainer>
+      {/* Session manager must be inside NavigationContainer to access navigation */}
+      <SessionManager />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
           <Stack.Screen name="Auth" component={AuthScreen} />
