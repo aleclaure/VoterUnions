@@ -1,53 +1,31 @@
 export default {
   expo: {
-    name: 'Voter Unions',
-    slug: 'voter-unions',
-    version: '1.0.0',
-    orientation: 'portrait',
-    icon: './assets/icon.png',
-    userInterfaceStyle: 'automatic',
-    newArchEnabled: true,
-    scheme: 'voter-unions',
-    jsEngine: 'hermes',
+    name: "Voter Unions",
+    slug: "voter-unions",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    userInterfaceStyle: "automatic",
     splash: {
-      image: './assets/splash-icon.png',
-      resizeMode: 'contain',
-      backgroundColor: '#2563eb',
+      image: "./assets/splash.png",
+      resizeMode: "contain",
+      backgroundColor: "#ffffff"
+    },
+    extra: {
+      supabaseUrl: "https://sonyiatltmqdyoezfbnj.supabase.co",
+      supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6bmpoZmFlcGxid296YmhodWxsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2NDE2ODYsImV4cCI6MjA3NTIxNzY4Nn0.4PvbUvdYVHYV-6bzlW7bRBBIsejkPv59gIEzLmFroeA",
     },
     ios: {
-      supportsTablet: true,
-      bundleIdentifier: 'com.voterunions.app',
-      associatedDomains: ['applinks:voterunions.app'],
+      supportsTablet: true
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: './assets/adaptive-icon.png',
-        backgroundColor: '#2563eb',
-      },
-      package: 'com.voterunions.app',
-      edgeToEdgeEnabled: true,
-      predictiveBackGestureEnabled: false,
-      intentFilters: [
-        {
-          action: 'VIEW',
-          autoVerify: true,
-          data: [
-            {
-              scheme: 'https',
-              host: 'voterunions.app',
-            },
-          ],
-          category: ['BROWSABLE', 'DEFAULT'],
-        },
-      ],
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#ffffff"
+      }
     },
     web: {
-      favicon: './assets/favicon.png',
-    },
-    plugins: ['expo-secure-store'],
-    extra: {
-      supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
-      supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
-    },
-  },
+      favicon: "./assets/favicon.png"
+    }
+  }
 };
