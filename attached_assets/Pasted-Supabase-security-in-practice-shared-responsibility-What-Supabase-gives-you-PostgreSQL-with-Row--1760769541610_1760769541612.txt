@@ -1,0 +1,75 @@
+Supabase security in practice (shared responsibility)
+
+What Supabase gives you
+
+PostgreSQL with Row-Level Security, JWT-based Auth, built-in policies, Edge Functions isolation, encryption at rest & in transit, backups, org/project access control.
+
+Good primitives to enforce your security model (you’ve already used them well).
+
+Where teams get burned
+
+RLS gaps (one unprotected table/view/rpc).
+
+Putting service_role or other secrets in the client (never do this).
+
+Relying only on client-side rate limiting or validation.
+
+Overly broad Edge Function permissions; missing input validation.
+
+Not rotating keys or monitoring logs.
+
+Mitigations / best practices
+
+RLS on every table + RPC (you’re doing this). Add a CI policy test that tries forbidden actions with the anon key and fails the pipeline if anything slips.
+
+Put privileged logic in Edge Functions; those read SERVICE_ROLE via env vars only.
+
+Add MFA + CAPTCHA + API-level rate limiting (Edge middleware or Redis).
+
+Turn on detailed audit/event logging and alerts.
+
+Secrets in project/edge envs only, rotate on role changes or exposure.
+
+Regular backups & restore drills.
+
+If you do the above, managed Supabase is a strong choice.
+
+Expo security realities
+
+Expo apps run JS; users can inspect bundles. That’s normal for RN apps.
+
+Never ship secrets (service_role, admin tokens) in the app. Keep only the anon public key; everything privileged goes through your Edge Functions.
+
+Use EAS standalone builds for prod (not Expo Go).
+
+Use expo-secure-store for tokens (you already do).
+
+Consider: deep-link validation, TLS pinning (optional, higher friction), device jailbreak/root detection (optional).
+
+OTA updates: restrict who can publish, sign releases, and keep an audit trail.
+
+With those practices, Expo is production-ready.
+
+When self-hosting is worth it
+
+Move off managed hosting (or run a hybrid) if any of these are true:
+
+Hard compliance: legally mandated data residency/sovereignty, private networking, custom encryption/HSM, or certifications your vendor doesn’t cover.
+
+Adversary model: you assume state-level actors or expect compelled access; you want full control of infra/logs and tighter network boundaries (e.g., no public ingress except via your gateway).
+
+Operational needs: custom Postgres extensions, cross-region replication under your control, or specialized scaling patterns.
+
+Trade-offs of self-hosting
+
+Full control, custom network boundaries, bespoke compliance.
+
+– You own on-call, patching, backups, HA, monitoring, key mgmt, incident response. It’s easy to be less secure if ops isn’t world-class.
+
+A pragmatic middle path is keep Supabase managed for now, but:
+
+Put a reverse proxy/WAF (Cloudflare, Fastly) in front of your Edge Functions.
+
+Keep a replica or periodic exports you can migrate from later.
+
+Document a runbook for moving to self-hosted Postgres/Functions if policy changes.

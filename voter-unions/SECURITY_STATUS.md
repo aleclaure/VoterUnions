@@ -1810,6 +1810,568 @@ WITH CHECK (
 
 ---
 
+## 🔐 Production Security Best Practices (Supabase + Expo)
+
+This section covers the **shared responsibility model** and production hardening for your current stack. Supabase and Expo provide strong security primitives, but teams get burned by missing these critical details.
+
+---
+
+### **What Supabase Provides (Out of the Box)**
+
+✅ **Infrastructure Security:**
+- PostgreSQL with Row-Level Security (RLS)
+- JWT-based authentication with email verification
+- Built-in security policies and helpers
+- Edge Functions isolation (Deno runtime)
+- Encryption at rest & in transit (TLS 1.2+)
+- Automated backups (daily snapshots)
+- Organization/project-level access control
+- DDoS protection and rate limiting
+
+✅ **Good Primitives:**
+You already leverage these well: RLS on all tables, email verification gates, audit logging, device-based vote protection.
+
+---
+
+### **Where Teams Get Burned (Common Pitfalls)**
+
+❌ **1. RLS Gaps**
+- Just **one** unprotected table, view, or RPC exposes everything
+- Forgetting to enable RLS on new tables
+- Overly permissive policies (e.g., `USING (true)` on sensitive data)
+
+❌ **2. Secret Leakage**
+- Putting `service_role` key in client code (full database access!)
+- Exposing Edge Function secrets via logs or error messages
+- Committing API keys to Git repositories
+
+❌ **3. Client-Side Only Validation**
+- Relying on client-side rate limiting (easily bypassed)
+- Trusting user input without server-side validation
+- Not re-checking permissions in Edge Functions/RPCs
+
+❌ **4. Edge Function Security**
+- Overly broad permissions (using service_role for everything)
+- Missing input validation in Edge Functions
+- Not sanitizing user data before database operations
+
+❌ **5. Operational Neglect**
+- Never rotating keys or monitoring audit logs
+- No backup restore testing (backups exist but can't restore)
+- Missing security update notifications
+
+---
+
+### **✅ Mitigation Best Practices**
+
+#### **1. RLS Everywhere + CI Enforcement**
+
+**What you already do:**
+- RLS enabled on all tables ✅
+- Policies require email verification for writes ✅
+
+**Add: Automated RLS Testing in CI/CD**
+
+Create tests that **try forbidden actions** with the anon key and **fail the pipeline** if they succeed.
+
+```javascript
+// ci/rls-security-tests.js
+const { createClient } = require('@supabase/supabase-js');
+
+const anonClient = createClient(SUPABASE_URL, ANON_KEY); // Public key only
+
+describe('RLS Security Tests', () => {
+  test('FAIL: Unverified user cannot create post', async () => {
+    await anonClient.auth.signUp({ email: 'test@test.com', password: 'password123' });
+    // User signed up but email NOT verified
+    
+    const { error } = await anonClient.from('posts').insert({ body: 'Test' });
+    
+    expect(error).toBeDefined(); // Must fail
+    expect(error.message).toContain('verification'); // Check error mentions verification
+  });
+  
+  test('FAIL: Non-member cannot vote on union proposal', async () => {
+    const verifiedClient = await getVerifiedUserClient(); // Helper to get verified user
+    
+    const { error } = await verifiedClient.from('proposal_votes').insert({
+      proposal_id: 'some-union-proposal',
+      vote: 'yes'
+    });
+    
+    expect(error).toBeDefined(); // Must fail if user not in that union
+  });
+  
+  test('FAIL: Cannot directly update vote counts', async () => {
+    const adminClient = await getAdminClient();
+    
+    const { error } = await adminClient.from('proposals').update({
+      score_yes: 9999 // Try to manipulate vote count
+    }).eq('id', 'proposal-id');
+    
+    expect(error).toBeDefined(); // Triggers should block this
+  });
+});
+```
+
+**Run in CI:**
+```bash
+npm run test:rls-security
+# If ANY test fails, block merge/deployment
+```
+
+**Add to package.json:**
+```json
+{
+  "scripts": {
+    "test:rls-security": "vitest run ci/rls-security-tests.js"
+  }
+}
+```
+
+---
+
+#### **2. Service Role Key Protection**
+
+**NEVER put service_role key in client code or Expo app.**
+
+✅ **Correct Usage:**
+```typescript
+// ✅ Edge Function (server-side only)
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseAdmin = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, // Only in Edge Function env vars
+  { auth: { persistSession: false } }
+)
+
+// Privileged operation (delete user account, override RLS)
+await supabaseAdmin.auth.admin.deleteUser(userId)
+```
+
+```typescript
+// ✅ Expo App (client-side)
+import { supabase } from './supabase' // Uses ANON key only
+
+// Call Edge Function that uses service_role internally
+const { data } = await supabase.functions.invoke('admin-delete-user', {
+  body: { userId }
+})
+```
+
+❌ **WRONG:**
+```typescript
+// ❌ NEVER DO THIS IN EXPO APP
+const supabaseAdmin = createClient(
+  process.env.EXPO_PUBLIC_SUPABASE_URL,
+  process.env.EXPO_PUBLIC_SERVICE_ROLE_KEY // EXPOSED TO ALL USERS!
+)
+```
+
+**Why this matters:** Users can inspect Expo JS bundles. Any secret in the app is public.
+
+---
+
+#### **3. Backup Restore Drills**
+
+Supabase creates daily backups, but **can you actually restore them?**
+
+**Add to quarterly checklist:**
+```bash
+# Every 3 months, test your restore procedure
+
+1. Download latest backup from Supabase dashboard
+2. Restore to a test project/database
+3. Verify data integrity (run queries)
+4. Time the restore process
+5. Document any issues
+```
+
+**Why this matters:** You don't want to discover backup corruption during an actual incident.
+
+**Automation (optional):**
+```typescript
+// Supabase Edge Function: test-restore-backup (scheduled monthly)
+// Downloads backup, restores to test instance, runs validation queries
+```
+
+---
+
+#### **4. Detailed Audit Logging & Alerts**
+
+You already have comprehensive audit logging. **Now add alerting:**
+
+**Create monitoring queries:**
+```sql
+-- Run every 5 minutes via Edge Function or cron job
+
+-- Alert 1: Mass reporting attack
+SELECT reported_user_id, COUNT(*) as report_count
+FROM reports
+WHERE created_at > NOW() - INTERVAL '1 hour'
+GROUP BY reported_user_id
+HAVING COUNT(*) > 5;
+
+-- Alert 2: Vote flooding
+SELECT voter_id, COUNT(*) as vote_count
+FROM proposal_votes
+WHERE created_at > NOW() - INTERVAL '5 minutes'
+GROUP BY voter_id
+HAVING COUNT(*) > 50;
+
+-- Alert 3: Failed login spike
+SELECT COUNT(*) as failed_attempts
+FROM audit_logs
+WHERE action = 'login_failed'
+  AND created_at > NOW() - INTERVAL '5 minutes'
+HAVING COUNT(*) > 100;
+```
+
+**Send alerts to admin:**
+```typescript
+// Edge Function: security-monitor.ts (runs every 5 min)
+const alerts = await checkForAnomalies();
+
+if (alerts.length > 0) {
+  await supabase.from('security_alerts').insert(alerts);
+  
+  // Send email/push notification to admins
+  await sendAdminNotification({
+    severity: 'high',
+    message: `${alerts.length} security alerts detected`
+  });
+}
+```
+
+---
+
+#### **5. Key Rotation Policy**
+
+**When to rotate keys:**
+- ✅ Employee/contractor leaves team
+- ✅ Key accidentally exposed (Git commit, logs, screenshot)
+- ✅ Scheduled rotation (every 90 days for service_role, annually for JWT secret)
+- ✅ After security incident
+
+**How to rotate:**
+1. Generate new key in Supabase dashboard
+2. Update Edge Function environment variables
+3. Update Expo app config (for anon key only)
+4. Invalidate old key
+5. Test all functionality
+6. Log rotation in audit_logs
+
+---
+
+### **Expo-Specific Security Hardening**
+
+#### **1. Use EAS Standalone Builds for Production**
+
+**❌ Never use Expo Go for production:**
+- Expo Go is for development only
+- Users can inspect bundle easily
+- Limited security controls
+
+**✅ Use EAS Build for production:**
+```bash
+# Install EAS CLI
+npm install -g eas-cli
+
+# Configure production builds
+eas build:configure
+
+# Build for iOS and Android
+eas build --platform all --profile production
+```
+
+**Benefits:**
+- Standalone native apps (better security)
+- Code obfuscation
+- Proper code signing
+- Full control over native modules
+
+---
+
+#### **2. Deep Link Validation**
+
+Prevent malicious deep links from hijacking user sessions.
+
+```typescript
+// app.json
+{
+  "expo": {
+    "scheme": "voterUnions",
+    "android": {
+      "intentFilters": [{
+        "action": "VIEW",
+        "data": [{
+          "scheme": "https",
+          "host": "*.voterUnions.app" // Only accept from your domain
+        }]
+      }]
+    }
+  }
+}
+```
+
+```typescript
+// src/navigation/LinkingConfiguration.ts
+import * as Linking from 'expo-linking';
+
+Linking.addEventListener('url', (event) => {
+  const { url } = event;
+  
+  // Validate URL comes from trusted source
+  if (!url.startsWith('https://voterUnions.app') && 
+      !url.startsWith('voterUnions://')) {
+    console.error('Untrusted deep link blocked:', url);
+    return;
+  }
+  
+  // Process valid link
+  handleDeepLink(url);
+});
+```
+
+---
+
+#### **3. TLS Pinning (Optional - High Security)**
+
+**When to use:** High-security environments where MITM attacks are a concern.
+
+**Trade-off:** More maintenance (must update pins when certs rotate).
+
+```typescript
+// Using expo-ssl-pinning (hypothetical - check compatibility)
+import { pinCertificates } from 'expo-ssl-pinning';
+
+await pinCertificates({
+  'api.yourdomain.com': {
+    includeSubdomains: true,
+    pins: [
+      'sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', // Your cert hash
+      'sha256/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB='  // Backup cert
+    ]
+  }
+});
+```
+
+**Note:** Expo Go doesn't support TLS pinning. Requires custom native module or EAS build.
+
+---
+
+#### **4. Jailbreak/Root Detection (Optional)**
+
+**When to use:** Prevent rooted devices from accessing sensitive organizing data.
+
+**Trade-off:** Users on rooted devices (privacy advocates!) get blocked.
+
+```typescript
+// Using react-native-device-info or similar
+import DeviceInfo from 'react-native-device-info';
+
+const isJailbroken = await DeviceInfo.isJailBroken();
+
+if (isJailbroken) {
+  // Option 1: Block access
+  Alert.alert('Security Notice', 'This app cannot run on jailbroken devices.');
+  
+  // Option 2: Warn but allow (better for political organizing)
+  Alert.alert(
+    'Security Warning',
+    'Your device appears to be jailbroken. This may compromise your privacy.',
+    [{ text: 'I Understand', onPress: () => continueLogin() }]
+  );
+}
+```
+
+**Recommendation for political organizing:** Warn but don't block (many activists use rooted devices for privacy).
+
+---
+
+#### **5. OTA Update Security**
+
+Secure your Over-The-Air (OTA) update process:
+
+**Restrict publishers:**
+```bash
+# Only allow specific users to publish updates
+eas update --branch production --message "Security patch"
+# Requires EAS authentication
+```
+
+**Sign releases:**
+```bash
+# EAS automatically signs updates
+# Verify signature on device before applying
+```
+
+**Audit trail:**
+```typescript
+// Log all OTA updates in your database
+CREATE TABLE ota_updates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  version TEXT NOT NULL,
+  published_by TEXT NOT NULL,
+  published_at TIMESTAMPTZ DEFAULT NOW(),
+  update_message TEXT,
+  signature TEXT
+);
+```
+
+**Monitor update adoption:**
+```typescript
+// Track which users have which version
+CREATE TABLE user_app_versions (
+  user_id UUID REFERENCES profiles(id),
+  app_version TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+// Alert if >10% of users stuck on old version (possible attack or bug)
+```
+
+---
+
+### **🔄 Pragmatic Middle Path (Hybrid Approach)**
+
+You don't have to go all-in on self-hosting. Here's a **pragmatic hybrid** that gives you more control while keeping Supabase's convenience:
+
+#### **1. Add WAF/Reverse Proxy**
+
+Put Cloudflare or Fastly in front of your Supabase Edge Functions:
+
+```
+User → Cloudflare WAF → Supabase Edge Functions → Database
+       ↑
+       Blocks DDoS, bot attacks, suspicious IPs
+```
+
+**Benefits:**
+- Additional DDoS protection
+- IP-based rate limiting (beyond Supabase)
+- Geofencing (block requests from certain countries)
+- Custom firewall rules
+- Traffic analytics
+
+**Setup (Cloudflare):**
+1. Point custom domain to Supabase: `api.voterUnions.app → [Supabase URL]`
+2. Enable Cloudflare proxy (orange cloud)
+3. Configure WAF rules:
+   - Rate limit: max 100 req/min per IP
+   - Block known bad IPs
+   - Require CAPTCHA for suspicious traffic
+
+**Cost:** Free tier available (Cloudflare)
+
+---
+
+#### **2. Keep Database Replicas/Exports**
+
+**Setup periodic exports** to prepare for potential migration:
+
+```bash
+# Run weekly via cron job or Supabase Edge Function
+pg_dump -h db.supabase.co -U postgres -F c -b -v -f backup_$(date +%Y%m%d).dump voterUnions
+
+# Upload to S3 or similar
+aws s3 cp backup_$(date +%Y%m%d).dump s3://your-backup-bucket/
+```
+
+**Why this matters:**
+- Can migrate to self-hosted quickly if needed
+- Protects against vendor lock-in
+- Additional disaster recovery layer
+
+---
+
+#### **3. Document Migration Runbook**
+
+Create a **runbook** for migrating from managed Supabase to self-hosted:
+
+```markdown
+# Migration Runbook: Supabase → Self-Hosted
+
+## Pre-Migration (1-2 weeks before)
+- [ ] Set up VPS (Hetzner 8 vCPU / 32GB RAM)
+- [ ] Deploy self-hosted Supabase via Docker Compose
+- [ ] Test restore from backup
+- [ ] Configure DNS for new backend URL
+- [ ] Set up SSL certificates
+
+## Migration Day
+- [ ] Enable maintenance mode (disable writes)
+- [ ] Take final database dump
+- [ ] Restore to self-hosted Postgres
+- [ ] Verify data integrity (run test queries)
+- [ ] Update Expo app config (new Supabase URL)
+- [ ] Deploy new app version via EAS Update
+- [ ] Monitor error rates
+- [ ] Disable maintenance mode
+
+## Post-Migration (1 week after)
+- [ ] Monitor performance and errors
+- [ ] Keep old Supabase project active for 30 days (rollback option)
+- [ ] Migrate Edge Functions to self-hosted
+- [ ] Update DNS to point to self-hosted
+- [ ] Archive old Supabase project
+```
+
+**Update this runbook quarterly** to reflect infrastructure changes.
+
+---
+
+### **🎯 When to Activate the Hybrid/Self-Hosted Path**
+
+**Stick with managed Supabase if:**
+- ✅ You're in MVP/early growth phase
+- ✅ No legal data residency requirements
+- ✅ Team focused on features, not infrastructure
+- ✅ Budget allows for managed services
+
+**Activate hybrid (WAF + replicas) when:**
+- ⚠️ You start seeing coordinated attacks (DDoS, bot signups)
+- ⚠️ Traffic grows significantly (>100k requests/day)
+- ⚠️ You want more visibility into traffic patterns
+
+**Migrate to self-hosted when:**
+- 🔴 Legal compliance requires data sovereignty
+- 🔴 You face state-level adversaries or surveillance risk
+- 🔴 Budget constraints (>$500/mo on managed services)
+- 🔴 You have DevOps expertise in-house
+
+---
+
+### **✅ Production Security Checklist**
+
+Before deploying to production, verify:
+
+#### **Supabase:**
+- [ ] RLS enabled on ALL tables (no exceptions)
+- [ ] RLS CI tests passing (forbidden actions blocked)
+- [ ] Service_role key NEVER in client code
+- [ ] Edge Functions use environment variables only
+- [ ] Backup restore tested (within last 90 days)
+- [ ] Audit logging enabled and monitored
+- [ ] Key rotation policy documented
+
+#### **Expo:**
+- [ ] Using EAS standalone builds (not Expo Go)
+- [ ] Deep link validation implemented
+- [ ] Secrets in `expo-secure-store` only
+- [ ] OTA update process secured (signed releases)
+- [ ] App version tracking enabled
+- [ ] TLS pinning considered (if high security need)
+
+#### **Operations:**
+- [ ] Monitoring alerts configured (mass reporting, vote flooding, failed logins)
+- [ ] Incident response plan documented
+- [ ] Migration runbook up to date
+- [ ] WAF/reverse proxy considered for high traffic
+
+---
+
 ## 📝 Security Maintenance Checklist
 
 ### Weekly
