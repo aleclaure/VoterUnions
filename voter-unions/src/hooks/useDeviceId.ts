@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Platform } from 'react-native';
-import * as Crypto from 'expo-crypto';
 
 /**
  * Hook to get a hashed device identifier for duplicate vote prevention
@@ -17,6 +16,24 @@ export function useDeviceId() {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    async function hashString(input: string): Promise<string> {
+      if (Platform.OS === 'web') {
+        // Web: Use Web Crypto API
+        const encoder = new TextEncoder();
+        const data = encoder.encode(input);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      } else {
+        // Native: Use expo-crypto
+        const Crypto = await import('expo-crypto');
+        return await Crypto.digestStringAsync(
+          Crypto.CryptoDigestAlgorithm.SHA256,
+          input
+        );
+      }
+    }
+
     async function getDeviceId() {
       try {
         setIsLoading(true);
@@ -45,11 +62,7 @@ export function useDeviceId() {
         }
 
         // Hash the device ID with SHA256 for privacy
-        // This ensures we can't reverse-engineer the actual device ID
-        const hashedDeviceId = await Crypto.digestStringAsync(
-          Crypto.CryptoDigestAlgorithm.SHA256,
-          rawDeviceId
-        );
+        const hashedDeviceId = await hashString(rawDeviceId);
 
         setDeviceId(hashedDeviceId);
         setError(null);
