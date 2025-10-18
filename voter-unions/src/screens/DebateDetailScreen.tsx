@@ -705,10 +705,6 @@ const styles = StyleSheet.create({
   voteScoreNegative: {
     color: '#dc2626',
   },
-  argumentMeta: {
-    fontSize: 12,
-    color: '#94a3b8',
-  },
   emptyText: {
     textAlign: 'center',
     color: '#94a3b8',

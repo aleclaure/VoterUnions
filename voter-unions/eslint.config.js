@@ -47,10 +47,6 @@ export default [
       security: security,
     },
     rules: {
-      // TypeScript rules
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      
       // Security rules
       'no-eval': 'error',
       'no-implied-eval': 'error',
@@ -63,7 +59,7 @@ export default [
       'security/detect-non-literal-require': 'warn',
       'security/detect-possible-timing-attacks': 'off', // False positive on password comparison
       
-      // Disable problematic rules that create noise
+      // TypeScript rules (disabled to reduce noise in existing code)
       'no-unused-vars': 'off', // Using TypeScript version instead
       '@typescript-eslint/no-unused-vars': 'off', // Too noisy for existing code
       '@typescript-eslint/no-explicit-any': 'off', // Too noisy for existing code

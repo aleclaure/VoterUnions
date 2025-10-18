@@ -95,7 +95,7 @@ export const MyUnionsScreen = ({ navigation }: any) => {
     });
     
     return filtered;
-  }, [posts, selectedChannelId, channels]);
+  }, [posts, selectedChannelId, channels, selectedUnionId]);
 
   const handleCreatePost = async (content: string, channelIds: string[], isPublic: boolean) => {
     if (!user || !selectedUnionId) return;
