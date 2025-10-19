@@ -156,49 +156,73 @@ Comprehensive checklist for migrating from Supabase to WebAuthn-based backend.
 
 ## 📱 Week 5: Frontend Integration
 
-**Goal:** Integrate WebAuthn auth in Expo app.  
+### **🔀 Choose Your Path:**
+
+#### **Option 5A: Device Token Auth (Expo Go)** ⭐ RECOMMENDED
+**Goal:** Implement privacy-first device authentication in Expo Go  
+**Duration:** 3-5 days  
+**Status:** ⏳ Next  
+**Works in:** ✅ Expo Go (current workflow)
+
+#### **Option 5B: WebAuthn (Development Builds)**
+**Goal:** Integrate WebAuthn auth with biometric support  
 **Duration:** 5 days  
+**Status:** ⏳ Future (requires abandoning Expo Go)  
+**Works in:** ❌ Requires development builds (`expo prebuild`)
+
+---
+
+### **Week 5A: Device Token Frontend (Expo Go Compatible)**
+
+**Goal:** Connect Expo app to auth backend using device-based cryptographic authentication.  
+**Duration:** 3-5 days  
 **Status:** ⏳ Pending
 
-### Day 1: Passkey Library Integration
+### Day 1: Device Auth Service
 
-- [ ] Research Expo-compatible passkey library
-- [ ] Install `@simplewebauthn/browser` or equivalent
-- [ ] Create `src/services/webauthn.ts` wrapper
-- [ ] Test browser compatibility (iOS Safari, Android Chrome)
+- [ ] Create `src/services/deviceAuth.ts`
+- [ ] Implement device keypair generation (`expo-crypto`)
+- [ ] Implement challenge signing
+- [ ] Implement device fingerprinting
+- [ ] Add secure storage functions (`expo-secure-store`)
+- [ ] Test keypair generation and storage
 
-### Day 2: Registration UI
-
-- [ ] Create `RegisterScreen.tsx` (or update `AuthScreen.tsx`)
-- [ ] Add "Register with Passkey" button
-- [ ] Implement registration flow (call backend `/auth/register/init` + `/verify`)
-- [ ] Handle success (store JWT in SecureStore)
-- [ ] Handle errors (display user-friendly messages)
-
-### Day 3: Login UI
-
-- [ ] Create `LoginScreen.tsx` (or update `AuthScreen.tsx`)
-- [ ] Add "Login with Passkey" button
-- [ ] Implement login flow (call backend `/auth/login/init` + `/verify`)
-- [ ] Handle success (store JWT + refresh token in SecureStore)
-- [ ] Handle errors
-
-### Day 4: Auth Context Update
+### Day 2: Update AuthContext
 
 - [ ] Update `src/contexts/AuthContext.tsx`
-- [ ] Add WebAuthn authentication methods
-- [ ] Implement token refresh logic
-- [ ] Handle session expiration
-- [ ] Update `useAuth` hook
+- [ ] Add `registerWithDevice()` method
+- [ ] Add `loginWithDevice()` method
+- [ ] Implement token storage (access + refresh)
+- [ ] Test context methods work correctly
 
-### Day 5: Testing & Polish
+### Day 3: Registration UI
 
-- [ ] Test registration on iOS (real device + simulator)
-- [ ] Test registration on Android (real device + emulator)
-- [ ] Test login flow on both platforms
-- [ ] Test token refresh
-- [ ] Test logout
-- [ ] UI/UX polish (loading states, error messages)
+- [ ] Create `DeviceRegisterScreen.tsx`
+- [ ] Add "Create Account with This Device" UI
+- [ ] Implement registration flow
+- [ ] Show loading states
+- [ ] Handle errors with user-friendly messages
+- [ ] Test on iOS simulator
+- [ ] Test on Android emulator
+
+### Day 4: Login UI
+
+- [ ] Create `DeviceLoginScreen.tsx`
+- [ ] Add "Login with This Device" UI
+- [ ] Implement auto-login on app start
+- [ ] Handle errors gracefully
+- [ ] Test login flow works
+- [ ] Test logout clears credentials
+
+### Day 5: Backend Integration & Testing
+
+- [ ] Modify backend to support device token endpoints
+- [ ] Create `device_credentials` database table
+- [ ] Test full registration flow (frontend → backend)
+- [ ] Test full login flow
+- [ ] Test token refresh works
+- [ ] Verify works in Expo Go (iOS + Android)
+- [ ] Update documentation
 
 ---
 

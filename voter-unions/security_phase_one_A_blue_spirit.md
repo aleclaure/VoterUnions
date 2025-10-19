@@ -1,9 +1,29 @@
-# Phase 1A: Blue Spirit - Secure User Sign-In (WebAuthn)
+# Phase 1A: Blue Spirit - Secure User Sign-In
 
 **Code Name:** Blue Spirit (representing the protective identity layer)  
 **Duration:** 3 weeks (Weeks 3-5 of Phase 1)  
-**Goal:** Replace email/password authentication with WebAuthn passkeys  
-**Privacy Improvement:** Zero email collection, hardware-backed biometric auth
+**Goal:** Replace email/password authentication with privacy-first device authentication  
+**Privacy Improvement:** Zero email collection, cryptographic device identity
+
+---
+
+## 🔀 Implementation Paths
+
+### **Path A: Device Token Authentication** ⭐ RECOMMENDED
+- ✅ Works in Expo Go (no native modules)
+- ✅ Privacy-first (no email collection)
+- ✅ Uses only Expo SDK modules
+- ⚠️ No biometric UI (Face ID/Touch ID)
+- ⚠️ Device-specific (no cross-device sync)
+- 📖 **See:** [DEVICE_TOKEN_AUTH_PLAN.md](./DEVICE_TOKEN_AUTH_PLAN.md)
+
+### **Path B: WebAuthn Passkeys** (Future Production)
+- ❌ Requires development builds (no Expo Go)
+- ✅ Privacy-first (no email collection)  
+- ✅ Biometric authentication (Face ID/Touch ID)
+- ✅ Cross-device sync (iCloud Keychain)
+- ⚠️ Requires domain verification + SSL
+- 📖 **Continue reading this document for WebAuthn**
 
 ---
 
@@ -13,14 +33,16 @@
 2. [Migration Strategy](#migration-strategy)
 3. [Risk Mitigation Strategies](#risk-mitigation-strategies)
 4. [Overview](#overview)
-5. [Week 0: Pre-Migration Preparation](#week-0-pre-migration-preparation) ⭐ **START HERE**
-6. [Week 3: Backend WebAuthn Registration](#week-3-backend-webauthn-registration)
-7. [Week 4: Backend WebAuthn Authentication](#week-4-backend-webauthn-authentication)
-8. [Week 5: Frontend Integration](#week-5-frontend-integration)
-9. [Critical Migration Tasks](#critical-migration-tasks)
-10. [Testing & Validation](#testing--validation)
-11. [Deployment Checklist](#deployment-checklist)
-12. [Rollback Procedures](#rollback-procedures)
+5. [Week 0: Pre-Migration Preparation](#week-0-pre-migration-preparation) ⭐ **COMPLETED**
+6. [**Option 1A: Device Token Auth (Expo Go)](#option-1a-device-token-authentication-expo-go)** ⭐ **RECOMMENDED**
+7. [Option 1B: WebAuthn (Development Builds)](#week-3-backend-webauthn-registration)
+8. [Week 3: Backend WebAuthn Registration](#week-3-backend-webauthn-registration)
+9. [Week 4: Backend WebAuthn Authentication](#week-4-backend-webauthn-authentication)
+10. [Week 5: Frontend Integration](#week-5-frontend-integration)
+11. [Critical Migration Tasks](#critical-migration-tasks)
+12. [Testing & Validation](#testing--validation)
+13. [Deployment Checklist](#deployment-checklist)
+14. [Rollback Procedures](#rollback-procedures)
 
 ---
 
