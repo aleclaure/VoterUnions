@@ -1,0 +1,112 @@
+===========================================
+SECURITY ACCEPTANCE CRITERIA – UNITED UNIONS APP
+===========================================
+
+Purpose:
+This checklist defines the minimum security and privacy requirements
+for the United Unions app (Expo + React Native build).
+The app enables voter unions, consumer boycotts, and worker strikes
+while minimizing user data collection and maximizing anonymity.
+
+-------------------------------------------
+1. IDENTITY & KEY MANAGEMENT
+-------------------------------------------
+- Accounts use WebAuthn/passkeys (no passwords, emails, or phones).
+- Private keys stored only in Secure Enclave (iOS) or StrongBox (Android).
+- Items marked “ThisDeviceOnly” to prevent cloud restore.
+- All signing/decryption happens locally; private keys never leave device.
+- Users can rotate keys and revoke old ones.
+- Optional recovery via social recovery or user-controlled encrypted backup.
+- Server never holds private keys.
+
+-------------------------------------------
+2. DATA MINIMIZATION & STORAGE
+-------------------------------------------
+- No personal identifiers (emails, phone numbers, device IDs) collected.
+- Membership records stored only as encrypted ciphertexts.
+- Votes stored as blind-signed ballots; server cannot link user → vote.
+- Logs kept for max 72 hours, encrypted, no plain IPs or user agents.
+- Analytics limited to aggregate counts (e.g., total members).
+- Local data encrypted (SQLCipher or encrypted storage module).
+- No sensitive data stored in AsyncStorage.
+
+-------------------------------------------
+3. NETWORK & TRANSPORT SECURITY
+-------------------------------------------
+- HTTPS enforced (ATS on iOS; cleartext traffic disabled on Android).
+- Certificate pinning enabled and rotated per release.
+- Access tokens valid ≤ 15 minutes; refresh tokens ≤ 24 hours.
+- Requests include nonce and timestamp for replay protection.
+- Rate limiting enabled per endpoint.
+- Origin servers allow traffic only from CDN/WAF IP ranges.
+- .onion mirror maintained for censorship resistance.
+- App provides “Open in Tor Browser” link for high-risk users.
+
+-------------------------------------------
+4. APP INTEGRITY & RUNTIME HARDENING
+-------------------------------------------
+- Release builds use Hermes JS engine; no dev menu or debug symbols.
+- OTA updates signed or fully disabled.
+- Dependency lockfile committed; CI fails build on high-severity vulns.
+- Jailbreak/root/emulator detection blocks sensitive actions.
+- App Attest / DeviceCheck (iOS) and Play Integrity (Android) active for voting.
+- Code minified/obfuscated; app verifies its own signature at runtime.
+
+-------------------------------------------
+5. VOTING & UNION LOGIC
+-------------------------------------------
+- Only members with valid blind-signed tokens can vote.
+- Used-token IDs hash-tracked to prevent double voting.
+- No mapping of user ID → vote stored on server.
+- Each vote generates a verifiable hash receipt (no vote contents revealed).
+- Results published as aggregates only.
+
+-------------------------------------------
+6. SUPPLY-CHAIN & RELEASE CONTROLS
+-------------------------------------------
+- Weekly dependency and license audits.
+- CI verifies reproducible build hashes for releases.
+- SBOM (Software Bill of Materials) generated for each version.
+- Manual review required for crypto, auth, and networking dependencies.
+
+-------------------------------------------
+7. INCIDENT RESPONSE & KEY ROTATION
+-------------------------------------------
+- Server-side feature flags can disable vote/join flows instantly.
+- Key rotation tested quarterly; keys stored in HSM/KMS with split custody.
+- Encrypted, geo-redundant backups tested quarterly.
+- Breach containment target: 24 hours.
+- User notification (if any PII ever affected): within 72 hours.
+
+-------------------------------------------
+8. COMPLIANCE & TRANSPARENCY
+-------------------------------------------
+- Public privacy policy declares “no personal data collected.”
+- All crypto and vote code open source and auditable.
+- Annual transparency report lists any data requests and responses.
+- Independent security audit required before public launch.
+
+-------------------------------------------
+9. USER EDUCATION & UX SAFETY
+-------------------------------------------
+- Onboarding explains passkeys and personal data protection.
+- Clear instructions to open .onion mirror via Tor Browser.
+- “Join union” and “Cast vote” actions require explicit confirmation.
+- Privacy disclosures shown in plain language.
+
+-------------------------------------------
+PASSING CRITERIA
+-------------------------------------------
+To pass security acceptance:
+
+✓ No plaintext personal data stored or transmitted.
+✓ All secrets device-bound and hardware-protected.
+✓ All network traffic encrypted and pinned.
+✓ Server breach yields no usable user identities or votes.
+✓ Users can verify their own participation privately.
+✓ Crypto and policies auditable by third parties.
+✓ System designed for resilience against censorship, seizure, and coercion.
+
+-------------------------------------------
+END OF DOCUMENT
+-------------------------------------------
