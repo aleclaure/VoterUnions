@@ -1,0 +1,359 @@
+Security Acceptance Criteria - Phase 1 Implementation Plan (TEXT VERSION)
+
+Goal: Achieve 86% privacy compliance while staying 100% within Expo + React Native ecosystem
+Timeline: 2-4 months (8-16 weeks)
+Budget: $175-375/mo ongoing infrastructure costs
+Team: 1-2 full-stack developers
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+1. Executive Summary
+2. Architecture Overview
+3. Week-by-Week Implementation
+4. Service Specifications
+5. Database Migration Strategy
+6. Testing & Quality Assurance
+7. Deployment & Infrastructure
+8. Risk Mitigation
+9. Success Metrics
+--------------------------------------------------------------------------------
+
+EXECUTIVE SUMMARY
+
+What We're Building
+Replace Supabase Auth with custom privacy-first backend services while keeping the Expo + React Native frontend. Phase 1 now also includes text & image posts, Direct Messaging (E2EE), and text Debates with privacy-preserving defaults.
+
+Before (Current):
+Expo App -> Supabase Auth (email/password) -> Single PostgreSQL DB
+          [X] Collects emails
+          [X] Plaintext memberships
+          [X] Linkable votes
+
+After (Phase 1):
+Expo App -> Custom Auth (WebAuthn) -> 5 Services / 4 DBs + Encrypted Object Storage
+          [â] Zero email collection                 (content_db)
+          [â] Encrypted memberships                 (membership_db)
+          [â] Unlinkable votes (Mode B)             (ballot_db)
+          [â] E2EE Direct Messaging (default)       (dm_db)
+          [â] Encrypted, EXIF-free media pipeline   (object storage)
+
+Deliverables
+1) 6 Node.js microservices (auth, union, voting, messaging (posts/comments/debates), dm (E2EE), media (encrypted uploads))
+2) 4 PostgreSQL databases (separated by sensitivity: content, membership, ballot, dm)
+3) Expo frontend with client-side crypto libraries
+4) Mode B blind-signature voting system
+5) Pseudonymous content (no user_id in posts/comments/threads)
+6) PII-free logging (24h retention)
+7) E2EE DMs (forward secrecy) + encrypted, EXIF-free media
+8) 86% privacy compliance (up from 18%)
+
+Cost Breakdown (typical)
+- 4x PostgreSQL DBs (Railway/Render): $90â180
+- 6x Node.js services (Railway/Render): $60â120
+- Redis (Upstash): $10â20
+- Object Storage (R2/S3): $5â15
+- CDN/WAF (Phase 2, Cloudflare): $0â25
+Total: $165â360 (fits the $175â375 envelope)
+
+--------------------------------------------------------------------------------
+
+ARCHITECTURE OVERVIEW
+
+Microservices Architecture (ports)
+- Auth (3001): WebAuthn
+- Union (3002): Encrypted membership tokens
+- Voting (3003): Blind signatures
+- Messaging (3004): Posts/Comments/Debates
+- DM (3005): E2EE direct messaging
+- Media (3006): Encrypted uploads + presigned URLs
+
+Data Stores
+- content_db (threads/posts/comments, media_objects metadata)
+- membership_db (encrypted membership tokens)
+- ballot_db (ballots & votes)
+- dm_db (DM conversations/messages)
+- Encrypted Object Store (R2/S3)
+
+ASCII Diagram
+[Expo + React Native] -> [Cloudflare CDN/WAF (Phase 2)]
+ -> Auth (3001), Union (3002), Voting (3003), Messaging (3004), DM (3005), Media (3006)
+ -> Encrypted Object Store (R2/S3)
+DBs: content_db, membership_db, ballot_db, dm_db
+
+Technology Stack
+Frontend: Expo SDK 52, React Native, TypeScript, React Query
+New client libs:
+  react-native-passkey, @noble/curves, @noble/ciphers, @noble/hashes, ulid, blind-signatures,
+  expo-image-manipulator, expo-file-system, piexifjs
+
+Backend: Node.js 20+ / TypeScript, Fastify, PostgreSQL 15+, Redis (Upstash), Docker
+Crypto libs:
+  @simplewebauthn/server, @simplewebauthn/browser, @noble/curves, @noble/ciphers, @noble/hashes, blind-signatures
+
+--------------------------------------------------------------------------------
+
+WEEK-BY-WEEK IMPLEMENTATION
+
+Weeks 1â2: Project Setup & Infrastructure
+- Monorepo, 4 Postgres DBs, Redis, shared TS configs, Docker, CI/CD.
+
+Weeks 3â5: Auth Service (WebAuthn)
+- Registration, authentication, JWT, no email columns.
+
+Weeks 6â8: Union Service (Encrypted Membership)
+- Client-side encryption, membership tokens, ciphertext-only retrieval.
+
+Week 6 (NEW): Media Client Pipeline
+- On-device re-encode images (drop EXIF), downscale (<= 1440px long edge), create thumbnail (~256px).
+- Client-side encryption (XChaCha20-Poly1305) of original + thumbnail.
+- Upload via presigned URL; server stores ciphertext + minimal metadata.
+
+Week 7 (NEW): DM Service (E2EE) Scaffold
+- dm_service + dm_db.
+- Conversation creation with X25519 -> HKDF root key.
+- Symmetric ratchet per message for forward secrecy.
+- Store only ciphertext, sender_binding, timestamps, optional encrypted media refs.
+
+Week 8 (NEW): Debates in Messaging
+- threads.type in ('discussion','debate'); debate_round_window; max_rounds.
+- Aggregates only; no identity enumeration.
+
+Weeks 9â11: Voting Service (Blind Signatures)
+- Token issuance, anonymous vote submission with nullifier, tally endpoints.
+
+Week 12: Messaging Service & Migration
+- Remove user_id from content tables; use author_pseudonym.
+- PII-free logs with 24h retention.
+
+Weeks 13â14: Integration Testing & Deployment
+- End-to-end tests, performance, security tests, production launch.
+
+--------------------------------------------------------------------------------
+
+SERVICE SPECIFICATIONS
+
+auth_service (as previously defined)
+- WebAuthn register/verify, short-lived JWT, no email column.
+
+union_service (as previously defined)
+- Encrypted membership tokens, ciphertext-only retrieval, revocations.
+
+voting_service (as previously defined)
+- Ballot creation, Mode A/B/C, default Mode B blind-signatures, aggregate-only tally.
+
+messaging_service (Posts/Comments/Debates) â UPDATED
+- Pseudonymous content only (author_pseudonym).
+- Debate threads: type='debate', debate_round_window INTERVAL, max_rounds INT.
+- Admin views are aggregate-only (no member lists).
+
+dm_service (E2EE Direct Messaging) â NEW
+Endpoints:
+- POST /dm/conversations { participants_pub_keys[] } -> encrypted header blob
+- POST /dm/:convId/messages -> ciphertext body (+ encrypted media keys optional)
+- GET  /dm/:convId/messages?cursor= -> ciphertexts + routing metadata
+- DELETE /dm/:convId/messages/:id -> tombstone
+
+Schema (dm_db):
+CREATE TABLE dm_conversations (
+  conv_id TEXT PRIMARY KEY,
+  participant_bindings TEXT[] NOT NULL,  -- SHA256(client_pub_key)
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE dm_messages (
+  msg_id TEXT PRIMARY KEY,
+  conv_id TEXT NOT NULL REFERENCES dm_conversations(conv_id),
+  sender_binding TEXT NOT NULL,
+  ts TIMESTAMPTZ DEFAULT NOW(),
+  ciphertext TEXT NOT NULL,
+  media_keys JSONB,
+  ttl_until TIMESTAMPTZ
+);
+CREATE INDEX idx_dm_conv_ts ON dm_messages(conv_id, ts);
+
+Security:
+- End-to-end encryption, per-message symmetric ratchet.
+- No user_id columns; no plaintext server-side.
+
+media_service (Encrypted Uploads) â NEW
+Endpoints:
+- POST /media/presign -> { upload_url, object_key } after size/mime validation
+- GET /media/:object_key -> served via CDN; client decrypts
+
+Storage (content_db or media_db):
+CREATE TABLE media_objects (
+  object_key TEXT PRIMARY KEY,
+  owner_binding TEXT NOT NULL,    -- SHA256(client_pub_key)
+  union_id TEXT,
+  size INTEGER,
+  mime TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+Client rules:
+- Re-encode to remove EXIF; deny presign if EXIF present.
+- Encrypt original + thumbnail client-side with same content key.
+- Provide alt-text with post payload (not in blob).
+
+--------------------------------------------------------------------------------
+
+DATABASE MIGRATION STRATEGY
+
+- Create dm_db and media_objects table.
+- Backfill legacy images: re-encode & re-upload as EXIF-free encrypted blobs.
+- Verify no user_id columns in posts/comments/threads.
+- Keep membership_db and ballot_db schemas per Phase 1.
+
+--------------------------------------------------------------------------------
+
+TESTING & QUALITY ASSURANCE
+
+Existing Integration & Unit (auth, union, voting, logging) as defined previously.
+
+E2EE DM Tests (NEW):
+- dm_e2e_cannot_decrypt_on_server: server cannot decrypt any DM content.
+- dm_forward_secrecy: compromise of current chain key does not decrypt past messages.
+- dm_ttl_enforced: messages auto-delete past TTL.
+
+Media Pipeline Tests (NEW):
+- exif_strip_verification: presign denied when EXIF present; client verifies EXIF removed.
+- encrypted_blob_only: blobs lack plaintext magic headers; only encrypted envelopes exist.
+- thumb_and_original_present: both encrypted; client renders after decrypt.
+
+Debate Flow Tests (NEW):
+- debate_rounds_progress: advancing rounds updates metadata only; no identity leakage.
+- no_member_list_in_threads: admin queries never return member identitiesâonly counts.
+
+Logging Tests (extended):
+- No logging of object keys together with DM routes (to avoid reconstructing conversation graphs).
+- 24h deletion covers dm_service and media_service routes.
+
+--------------------------------------------------------------------------------
+
+DEPLOYMENT & INFRASTRUCTURE
+
+Additions:
+- Object Storage (R2/S3): client-encrypted blobs; also enable server-side encryption.
+- CORS restricted to CDN origins.
+- Presigned URL expiry <= 10 minutes; enforce content-type & size caps.
+
+Sample railway/render additions:
+- dm-service (env: DM_DB_URL, REDIS_URL)
+- media-service (env: CONTENT_DB_URL, OBJECT_STORE_BUCKET, OBJECT_STORE_ACCESS, OBJECT_STORE_SECRET)
+
+--------------------------------------------------------------------------------
+
+RISK MITIGATION
+
+Technical (updated):
+- E2EE Moderation Blindness: client-side Report submits user-approved plaintext excerpt + msg proof (msg_id + MAC); strict rate limits.
+- EXIF Leakage: force on-device re-encode; deny presign if EXIF present.
+- Media Abuse/Costs: size caps, downscale, daily quotas, mime allow-list.
+
+Operational:
+- Blue/green deploys for dm/media; billing alerts for storage/egress.
+
+--------------------------------------------------------------------------------
+
+SUCCESS METRICS (Revised)
+
+Privacy Compliance
+- Authentication: 8% -> 90% [OK]
+- Data Architecture: 0% -> 80% [OK]
+- Membership Storage: 0% -> 90% [OK]
+- Voting System: 13% -> 80% [OK]
+- Content & Messaging: 50% -> 90% [OK]
+- Direct Messaging (E2EE): 0% -> 90% [OK]
+- Media Privacy (EXIF-free + encrypted): 0% -> 85% [OK]
+- Debate Privacy (aggregate-only): 0% -> 90% [OK]
+- Logging & Analytics: 0% -> 90% [OK]
+- Network Security: 11% -> 60% [Phase 2]
+- Cryptography: 0% -> 95% [OK]
+- Abuse Controls: 67% -> 85% [OK]
+- Operations: 0% -> 50% [Phase 2]
+OVERALL: 18% -> 86% [OK]
+
+Acceptance Criteria
+- AC1 WebAuthn signup, no email [OK]
+- AC2 Encrypted membership retrieval [OK]
+- AC3 Mode B blind-signature voting [OK]
+- AC4 Aggregate-only admin view [OK]
+- AC5 24h PII-free logs [OK]
+- AC6 CDN/Tor origin allowlist [Phase 2]
+- AC7 Public privacy policy [OK]
+- AC8 DM E2EE: server stores ciphertext only [Pending]
+- AC9 DM forward secrecy ratchet verified [Pending]
+- AC10 Media EXIF: all uploads EXIF-free [Pending]
+- AC11 Media encryption: blobs & thumbnails encrypted [Pending]
+- AC12 Debate privacy: no member enumeration [Pending]
+
+--------------------------------------------------------------------------------
+
+RED LINES (Extended)
+
+- Do NOT store plaintext media or thumbnails.
+- Do NOT accept uploads with EXIF/GPS intact.
+- Do NOT log object keys with DM routes in ways that reconstruct conversation graphs.
+- Do NOT add any DM backdoor to decrypt content without user-provided plaintext sample.
+- Do NOT store per-user read receipts/typing indicators as persistent identifiers.
+- Do NOT store email/IP/UA tied to user_id.
+- Do NOT export combined dumps that include both membership tokens and identifiers.
+- Do NOT expose per-user votes to admins (any mode).
+- Do NOT implement custom cryptographic primitives.
+
+--------------------------------------------------------------------------------
+
+TIMELINE SUMMARY
+
+Week | Focus | Deliverable
+1â2  | Backend setup | 3 DBs -> 4 DBs, shared libs
+3â5  | Auth service  | WebAuthn working
+6    | Union + Media | Encrypted, EXIF-free uploads
+7    | DM service    | E2EE conversations/messages
+8    | Admin + Debate| Debate threads, aggregate-only
+9â11 | Voting        | Blind-signature voting
+12   | Messaging     | Pseudonyms only + logs
+13â14| Tests/Deploy  | Production launch
+
+Total: 14 weeks (3.5 months)
+
+--------------------------------------------------------------------------------
+
+BUDGET SUMMARY (Monthly / One-Time)
+
+- 4x PostgreSQL DBs: $90â180 / -
+- 6x Node.js services: $60â120 / -
+- Redis cache: $10â20 / -
+- Object Storage (R2/S3): $5â15 / -
+- CDN/WAF (Phase 2): $0â25 / -
+- Development: - / $20â40k (if outsourced)
+Total Ongoing: $165â360
+
+--------------------------------------------------------------------------------
+
+DEFINITION OF DONE
+
+Phase 1 is complete when:
+- All 6 microservices deployed and healthy (auth, union, voting, messaging, dm, media)
+- All 4 databases separated and secured
+- WebAuthn works on iOS/Android (no email collection)
+- Encrypted memberships work end-to-end
+- Blind-signature voting (Mode B) works (unlinkable)
+- DMs are E2EE; server stores ciphertext only; forward secrecy tests pass
+- Media uploads are EXIF-free & encrypted (original + thumbnail)
+- Logs auto-delete after 24h; no PII in logs (verified)
+- All integration tests pass
+- Expo app updated (auth + DM + media + debates)
+- Documentation updated
+- 86% privacy compliance achieved
+
+--------------------------------------------------------------------------------
+
+NEXT STEPS (Phase 2)
+1) Cloudflare CDN/WAF (1â2 days)
+2) Tor .onion mirror (1â2 weeks)
+3) KMS/HSM integration (2â3 weeks)
+4) Quarterly backup drills (ongoing)
+5) Transparency reports (semiannual)
+Target: 93% privacy compliance
+
+END OF PHASE 1 IMPLEMENTATION PLAN

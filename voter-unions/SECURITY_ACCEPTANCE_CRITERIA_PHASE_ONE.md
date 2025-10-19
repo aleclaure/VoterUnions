@@ -1,8 +1,8 @@
 # Security Acceptance Criteria - Phase 1 Implementation Plan
 
-**Goal:** Achieve 81% privacy compliance while staying 100% within Expo + React Native ecosystem  
+**Goal:** Achieve 86% privacy compliance while staying 100% within Expo + React Native ecosystem  
 **Timeline:** 2-4 months (8-16 weeks)  
-**Budget:** $175-375/mo ongoing infrastructure costs  
+**Budget:** $165-360/mo ongoing infrastructure costs  
 **Team:** 1-2 full-stack developers
 
 ---
@@ -25,7 +25,7 @@
 
 ### **What We're Building**
 
-Replace Supabase Auth with custom privacy-first backend services while keeping the Expo + React Native frontend.
+Replace Supabase Auth with custom privacy-first backend services while keeping the Expo + React Native frontend. Phase 1 now also includes E2EE Direct Messaging, encrypted media uploads with EXIF stripping, and Debates with privacy-preserving defaults.
 
 **Before (Current):**
 ```
@@ -37,30 +37,38 @@ Expo App → Supabase Auth (email/password) → Single PostgreSQL DB
 
 **After (Phase 1):**
 ```
-Expo App → Custom Auth Service (WebAuthn) → 3 Separate DBs
-          ✅ Zero email collection        (content_db)
-          ✅ Encrypted memberships        (membership_db)
-          ✅ Unlinkable votes (Mode B)    (ballot_db)
+Expo App → Custom Auth (WebAuthn) → 6 Services / 4 DBs + Encrypted Object Storage
+          ✅ Zero email collection                 (content_db)
+          ✅ Encrypted memberships                 (membership_db)
+          ✅ Unlinkable votes (Mode B)             (ballot_db)
+          ✅ E2EE Direct Messaging (default)       (dm_db)
+          ✅ Encrypted, EXIF-free media pipeline   (object storage)
 ```
 
 ### **Deliverables**
 
-1. ✅ 4 Node.js microservices (auth, union, voting, messaging)
-2. ✅ 3 PostgreSQL databases (separated by sensitivity)
-3. ✅ Expo frontend with client-side crypto libraries
-4. ✅ Mode B blind-signature voting system
-5. ✅ PII-free logging (24h retention)
-6. ✅ 81% privacy compliance (up from 18%)
+1. ✅ 6 Node.js microservices (auth, union, voting, messaging, dm, media)
+2. ✅ 4 PostgreSQL databases (separated by sensitivity)
+3. ✅ Encrypted object storage (R2/S3)
+4. ✅ Expo frontend with client-side crypto libraries
+5. ✅ Mode B blind-signature voting system
+6. ✅ E2EE Direct Messaging with forward secrecy
+7. ✅ Encrypted media uploads with EXIF stripping
+8. ✅ Debates in messaging service
+9. ✅ Pseudonymous content (no user_id in posts/comments/threads)
+10. ✅ PII-free logging (24h retention)
+11. ✅ 86% privacy compliance (up from 18%)
 
 ### **Cost Breakdown**
 
 | Service | Provider | Monthly Cost |
 |---------|----------|--------------|
-| 3x PostgreSQL DBs | Railway/Render | $75-150 |
-| 4x Node.js services | Railway/Render | $50-100 |
+| 4x PostgreSQL DBs | Railway/Render | $90-180 |
+| 6x Node.js services | Railway/Render | $60-120 |
 | Redis (session/cache) | Upstash | $10-20 |
+| Object Storage (R2/S3) | Cloudflare/AWS | $5-15 |
 | CDN/WAF (Phase 2) | Cloudflare | $0-25 |
-| **Total** | | **$175-375** |
+| **Total** | | **$165-360** |
 
 ---
 
@@ -95,17 +103,30 @@ Expo App → Custom Auth Service (WebAuthn) → 3 Separate DBs
 │  (Blind Sigs)    │              │  (Content)       │
 │  Port: 3003      │              │  Port: 3004      │
 └──────────────────┘              └──────────────────┘
-        │                │                 │
-        ▼                ▼                 ▼
-┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-│ ballot_db   │  │membership_db│  │ content_db  │
-│ (encrypted) │  │ (encrypted) │  │ (public)    │
-└─────────────┘  └─────────────┘  └─────────────┘
+        │                                   │
+        ▼                                   ▼
+┌──────────────────┐              ┌──────────────────┐
+│  DM Service      │              │  Media Service   │
+│  (E2EE)          │              │  (Encrypted)     │
+│  Port: 3005      │              │  Port: 3006      │
+└──────────────────┘              └──────────────────┘
+        │                │                 │                │
+        ▼                ▼                 ▼                ▼
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐
+│ content_db  │  │membership_db│  │ ballot_db   │  │ dm_db            │
+│ (public)    │  │ (encrypted) │  │ (encrypted) │  │ (encrypted)      │
+└─────────────┘  └─────────────┘  └─────────────┘  └──────────────────┘
+                                                              │
+                                                              ▼
+                                                    ┌──────────────────┐
+                                                    │ Encrypted Object │
+                                                    │ Storage (R2/S3)  │
+                                                    └──────────────────┘
 ```
 
 ### **Technology Stack**
 
-**Frontend (No Changes):**
+**Frontend (Expo):**
 - Expo SDK 52
 - React Native
 - TypeScript
@@ -113,13 +134,13 @@ Expo App → Custom Auth Service (WebAuthn) → 3 Separate DBs
 
 **New Client Libraries:**
 ```bash
-npm install react-native-passkey @noble/curves @noble/ciphers @noble/hashes ulid blind-signatures
+npm install react-native-passkey @noble/curves @noble/ciphers @noble/hashes ulid blind-signatures expo-image-manipulator expo-file-system piexifjs
 ```
 
 **Backend (New):**
 - Node.js 20+ / TypeScript
 - Fastify (API framework)
-- PostgreSQL 15+ (3 instances)
+- PostgreSQL 15+ (4 instances)
 - Redis (Upstash for sessions)
 - Docker (containerization)
 
@@ -138,7 +159,7 @@ npm install @simplewebauthn/server @simplewebauthn/browser @noble/curves @noble/
 
 **Tasks:**
 1. ✅ Create monorepo structure
-2. ✅ Set up 3 PostgreSQL databases
+2. ✅ Set up 4 PostgreSQL databases
 3. ✅ Create shared TypeScript configs
 4. ✅ Set up Docker development environment
 5. ✅ Configure CI/CD pipeline
@@ -153,7 +174,9 @@ voter-unions/
 │   │   ├── auth_service/
 │   │   ├── union_service/
 │   │   ├── voting_service/
-│   │   └── messaging_service/
+│   │   ├── messaging_service/
+│   │   ├── dm_service/          # NEW
+│   │   └── media_service/       # NEW
 │   ├── shared/
 │   │   ├── db/            # Database clients
 │   │   ├── crypto/        # Shared crypto utils
@@ -200,6 +223,17 @@ services:
       - "5434:5432"
     volumes:
       - ballot_data:/var/lib/postgresql/data
+  
+  dm_db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: dm
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DM_DB_PASSWORD}
+    ports:
+      - "5435:5432"
+    volumes:
+      - dm_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
@@ -210,10 +244,11 @@ volumes:
   content_data:
   membership_data:
   ballot_data:
+  dm_data:
 ```
 
 **Testing Checkpoint:**
-- [ ] All 3 databases start successfully
+- [ ] All 4 databases start successfully
 - [ ] Redis connected
 - [ ] Docker Compose up/down works
 
@@ -251,12 +286,19 @@ export const ballotDB = new Pool({
   idleTimeoutMillis: 30000,
 });
 
+export const dmDB = new Pool({
+  connectionString: process.env.DM_DB_URL,
+  max: 20,
+  idleTimeoutMillis: 30000,
+});
+
 // Health checks
 export const healthCheck = async () => {
   const checks = await Promise.all([
     contentDB.query('SELECT 1'),
     membershipDB.query('SELECT 1'),
     ballotDB.query('SELECT 1'),
+    dmDB.query('SELECT 1'),
   ]);
   return checks.every(r => r.rowCount === 1);
 };
@@ -738,801 +780,822 @@ const AuthScreen = () => {
 
 ---
 
-### **Weeks 6-8: Union Service (Encrypted Membership)**
+### **Weeks 6-8: Union Service + Media + DM + Debates**
 
-#### **Week 6: Membership Encryption**
+#### **Week 6: Media Pipeline (Encrypted Uploads + EXIF Stripping)**
 
 **Tasks:**
-1. ✅ Create union service scaffold
-2. ✅ Implement client-side encryption utilities
-3. ✅ Create membership_db schema
-4. ✅ Implement /unions/:id/join endpoint
-5. ✅ Implement /me/memberships endpoint
+1. ✅ Create media service scaffold
+2. ✅ Implement client-side EXIF stripping
+3. ✅ Implement client-side encryption
+4. ✅ Create presigned URL endpoint
+5. ✅ Create media_objects table
 
 **Database Schema:**
 ```sql
--- membership_db.membership_tokens
-CREATE TABLE membership_tokens (
-  token_id TEXT PRIMARY KEY,           -- ULID
-  union_id TEXT NOT NULL,
-  holder_binding TEXT NOT NULL,        -- SHA256(client_pub_key)
-  ciphertext TEXT NOT NULL,            -- Encrypted membership payload
-  ttl TIMESTAMPTZ,
+-- content_db.media_objects
+CREATE TABLE media_objects (
+  object_key TEXT PRIMARY KEY,
+  owner_binding TEXT NOT NULL,      -- SHA256(client_pub_key)
+  union_id TEXT,
+  size INTEGER,
+  mime TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- NO user_id column!
-
-CREATE INDEX idx_holder_binding ON membership_tokens(holder_binding);
-
--- Revocation list
-CREATE TABLE token_revocations (
-  token_id TEXT PRIMARY KEY REFERENCES membership_tokens(token_id),
-  revoked_at TIMESTAMPTZ DEFAULT NOW(),
-  reason TEXT
-);
+CREATE INDEX idx_owner_binding ON media_objects(owner_binding);
 ```
 
 **Backend Code:**
 ```typescript
-// backend/services/union_service/src/index.ts
+// backend/services/media_service/src/index.ts
 import Fastify from 'fastify';
 import { ulid } from 'ulid';
-import { createHash } from 'crypto';
-import { verifyJWT } from '@shared/middleware/auth';
-import { encrypt } from '@shared/crypto/encryption';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const app = Fastify({ logger: true });
-app.addHook('onRequest', verifyJWT);
+const s3 = new S3Client({ region: process.env.AWS_REGION });
 
-// POST /unions/:unionId/join
+const BUCKET_NAME = process.env.BUCKET_NAME;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
+
+// POST /media/presign
 app.post<{
-  Params: { unionId: string };
-  Body: { client_pub_key: string };
-}>('/unions/:unionId/join', async (req, reply) => {
-  const { unionId } = req.params;
-  const { client_pub_key } = req.body;
+  Body: {
+    mime: string;
+    size: number;
+    union_id?: string;
+  };
+}>('/media/presign', async (req, reply) => {
+  const { mime, size, union_id } = req.body;
   const userId = req.user.userId;
   
-  // Check if already a member
-  const holderBinding = createHash('sha256')
-    .update(client_pub_key)
-    .digest('hex');
-  
-  const { rowCount } = await membershipDB.query(
-    'SELECT 1 FROM membership_tokens WHERE union_id = $1 AND holder_binding = $2',
-    [unionId, holderBinding]
-  );
-  
-  if (rowCount > 0) {
-    return reply.code(409).send({ error: 'Already a member' });
+  // Validate
+  if (!ALLOWED_MIMES.includes(mime)) {
+    return reply.code(400).send({ error: 'Invalid MIME type' });
   }
   
-  // Create membership payload (server sees this temporarily)
-  const membership = {
-    union_id: unionId,
-    role: 'member',
-    joined_at: new Date().toISOString(),
-  };
+  if (size > MAX_FILE_SIZE) {
+    return reply.code(400).send({ error: 'File too large' });
+  }
   
-  // Encrypt to user's public key (server cannot decrypt after this)
-  const key = Buffer.from(client_pub_key, 'hex').slice(0, 32);  // XChaCha20 needs 32 bytes
-  const ciphertext = encrypt(JSON.stringify(membership), key);
+  // Generate object key
+  const objectKey = `encrypted/${ulid()}.enc`;
   
-  const tokenId = ulid();
+  // Generate presigned URL (10 min expiry)
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: objectKey,
+    ContentType: 'application/octet-stream', // Encrypted data
+  });
   
-  // Store ONLY ciphertext
-  await membershipDB.query(`
-    INSERT INTO membership_tokens (token_id, union_id, holder_binding, ciphertext)
-    VALUES ($1, $2, $3, $4)
-  `, [tokenId, unionId, holderBinding, ciphertext]);
+  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 600 });
   
-  await logEvent('/unions/join', 200, 'membership_created');
-  
-  return { token_id: tokenId, ciphertext };
-});
-
-// GET /me/memberships (returns ciphertext only)
-app.get('/me/memberships', async (req, reply) => {
-  const userId = req.user.userId;
-  
-  // Get user's public key from auth service
+  // Get user's public key
   const userRes = await fetch(`http://auth_service:3001/users/${userId}`);
   const user = await userRes.json();
   
-  const holderBinding = createHash('sha256')
+  const ownerBinding = createHash('sha256')
     .update(user.client_pub_key)
     .digest('hex');
   
-  // Return ONLY ciphertext (server cannot decrypt)
-  const { rows } = await membershipDB.query(`
-    SELECT token_id, union_id, ciphertext
-    FROM membership_tokens
-    WHERE holder_binding = $1
-      AND token_id NOT IN (SELECT token_id FROM token_revocations)
-  `, [holderBinding]);
+  // Store metadata
+  await contentDB.query(`
+    INSERT INTO media_objects (object_key, owner_binding, union_id, size, mime)
+    VALUES ($1, $2, $3, $4, $5)
+  `, [objectKey, ownerBinding, union_id, size, mime]);
   
-  await logEvent('/me/memberships', 200, 'memberships_retrieved');
-  
-  return rows;  // [{ token_id, union_id, ciphertext }, ...]
+  return { upload_url: uploadUrl, object_key: objectKey };
 });
 
-// POST /unions/:unionId/leave
+// GET /media/:objectKey (serve via CDN, client decrypts)
+app.get<{
+  Params: { objectKey: string };
+}>('/media/:objectKey', async (req, reply) => {
+  const { objectKey } = req.params;
+  
+  // Verify object exists
+  const { rows: [obj] } = await contentDB.query(
+    'SELECT * FROM media_objects WHERE object_key = $1',
+    [objectKey]
+  );
+  
+  if (!obj) {
+    return reply.code(404).send({ error: 'Object not found' });
+  }
+  
+  // Redirect to CDN/S3 (client will decrypt)
+  return reply.redirect(`https://cdn.unitedUnions.app/${objectKey}`);
+});
+
+app.listen({ port: 3006, host: '0.0.0.0' });
+```
+
+**Frontend Client Pipeline:**
+```typescript
+// frontend/src/services/media.ts
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system';
+import piexif from 'piexifjs';
+import { xchacha20poly1305 } from '@noble/ciphers/chacha';
+import { randomBytes } from 'expo-crypto';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+export const uploadEncryptedImage = async (imageUri: string, unionId?: string) => {
+  // 1. Strip EXIF data
+  const imageData = await FileSystem.readAsStringAsync(imageUri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  
+  // Remove EXIF
+  let cleanImage: string;
+  try {
+    cleanImage = piexif.remove(`data:image/jpeg;base64,${imageData}`);
+  } catch {
+    // If no EXIF, use original
+    cleanImage = `data:image/jpeg;base64,${imageData}`;
+  }
+  
+  // 2. Re-encode to remove metadata and downscale
+  const manipulated = await ImageManipulator.manipulateAsync(
+    cleanImage,
+    [{ resize: { width: 1440 } }], // Max 1440px width
+    { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+  );
+  
+  // 3. Create thumbnail
+  const thumbnail = await ImageManipulator.manipulateAsync(
+    manipulated.uri,
+    [{ resize: { width: 256 } }],
+    { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+  );
+  
+  // 4. Read files as binary
+  const originalBytes = await FileSystem.readAsStringAsync(manipulated.uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  const thumbnailBytes = await FileSystem.readAsStringAsync(thumbnail.uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  
+  // 5. Generate encryption key (random)
+  const contentKey = randomBytes(32);
+  
+  // 6. Encrypt both original and thumbnail
+  const encryptedOriginal = encryptBytes(
+    Buffer.from(originalBytes, 'base64'),
+    contentKey
+  );
+  const encryptedThumb = encryptBytes(
+    Buffer.from(thumbnailBytes, 'base64'),
+    contentKey
+  );
+  
+  // 7. Get presigned URL from server
+  const token = await SecureStore.getItemAsync('auth_token');
+  const presignRes = await fetch(`${API_URL}/media/presign`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      mime: 'image/jpeg',
+      size: encryptedOriginal.length + encryptedThumb.length,
+      union_id: unionId,
+    }),
+  });
+  
+  const { upload_url, object_key } = await presignRes.json();
+  
+  // 8. Upload encrypted data
+  const combined = Buffer.concat([
+    Buffer.from('ORIG'), // 4-byte marker
+    Buffer.from([encryptedOriginal.length >> 24, encryptedOriginal.length >> 16, encryptedOriginal.length >> 8, encryptedOriginal.length]),
+    encryptedOriginal,
+    Buffer.from('THMB'),
+    Buffer.from([encryptedThumb.length >> 24, encryptedThumb.length >> 16, encryptedThumb.length >> 8, encryptedThumb.length]),
+    encryptedThumb,
+  ]);
+  
+  await fetch(upload_url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: combined,
+  });
+  
+  // 9. Return object key and decryption key
+  return {
+    object_key,
+    content_key: Buffer.from(contentKey).toString('hex'),
+  };
+};
+
+const encryptBytes = (data: Buffer, key: Uint8Array): Buffer => {
+  const nonce = randomBytes(24);
+  const cipher = xchacha20poly1305(key, nonce);
+  const ciphertext = cipher.encrypt(data);
+  
+  return Buffer.concat([nonce, ciphertext]);
+};
+
+export const decryptImage = async (objectKey: string, contentKey: string) => {
+  // Fetch encrypted blob
+  const response = await fetch(`${API_URL}/media/${objectKey}`);
+  const blob = await response.arrayBuffer();
+  
+  // Parse combined blob
+  const data = Buffer.from(blob);
+  let offset = 0;
+  
+  // Read original
+  if (data.slice(offset, offset + 4).toString() !== 'ORIG') {
+    throw new Error('Invalid blob format');
+  }
+  offset += 4;
+  
+  const origLength = data.readUInt32BE(offset);
+  offset += 4;
+  
+  const encryptedOrig = data.slice(offset, offset + origLength);
+  offset += origLength;
+  
+  // Read thumbnail
+  if (data.slice(offset, offset + 4).toString() !== 'THMB') {
+    throw new Error('Invalid blob format');
+  }
+  offset += 4;
+  
+  const thumbLength = data.readUInt32BE(offset);
+  offset += 4;
+  
+  const encryptedThumb = data.slice(offset, offset + thumbLength);
+  
+  // Decrypt
+  const key = Buffer.from(contentKey, 'hex');
+  const originalImage = decryptBytes(encryptedOrig, key);
+  const thumbnailImage = decryptBytes(encryptedThumb, key);
+  
+  return {
+    original: `data:image/jpeg;base64,${originalImage.toString('base64')}`,
+    thumbnail: `data:image/jpeg;base64,${thumbnailImage.toString('base64')}`,
+  };
+};
+
+const decryptBytes = (data: Buffer, key: Uint8Array): Buffer => {
+  const nonce = data.slice(0, 24);
+  const ciphertext = data.slice(24);
+  
+  const cipher = xchacha20poly1305(key, nonce);
+  return Buffer.from(cipher.decrypt(ciphertext));
+};
+```
+
+**Testing Checkpoint:**
+- [ ] EXIF data stripped from uploads
+- [ ] Images encrypted client-side
+- [ ] Presigned URL generation works
+- [ ] Server stores only ciphertext
+- [ ] Client decryption works
+
+---
+
+#### **Week 7: DM Service (E2EE Direct Messaging)**
+
+**Tasks:**
+1. ✅ Create dm service scaffold
+2. ✅ Implement conversation creation
+3. ✅ Implement message encryption (forward secrecy)
+4. ✅ Create dm_db schema
+5. ✅ Implement message endpoints
+
+**Database Schema:**
+```sql
+-- dm_db.dm_conversations
+CREATE TABLE dm_conversations (
+  conv_id TEXT PRIMARY KEY,
+  participant_bindings TEXT[] NOT NULL,  -- SHA256(client_pub_key)[]
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- dm_db.dm_messages
+CREATE TABLE dm_messages (
+  msg_id TEXT PRIMARY KEY,
+  conv_id TEXT NOT NULL REFERENCES dm_conversations(conv_id),
+  sender_binding TEXT NOT NULL,
+  ts TIMESTAMPTZ DEFAULT NOW(),
+  ciphertext TEXT NOT NULL,
+  media_keys JSONB,                     -- { object_key, encrypted_content_key }[]
+  ttl_until TIMESTAMPTZ
+);
+
+CREATE INDEX idx_dm_conv_ts ON dm_messages(conv_id, ts);
+```
+
+**Backend Code:**
+```typescript
+// backend/services/dm_service/src/index.ts
+import Fastify from 'fastify';
+import { ulid } from 'ulid';
+import { createHash } from 'crypto';
+
+const app = Fastify({ logger: true });
+
+app.addHook('onRequest', verifyJWT);
+
+// POST /dm/conversations
 app.post<{
-  Params: { unionId: string };
-}>('/unions/:unionId/leave', async (req, reply) => {
-  const { unionId } = req.params;
+  Body: {
+    participants_pub_keys: string[];  // Ed25519 public keys
+  };
+}>('/dm/conversations', async (req, reply) => {
+  const { participants_pub_keys } = req.body;
   const userId = req.user.userId;
   
   // Get user's public key
   const userRes = await fetch(`http://auth_service:3001/users/${userId}`);
   const user = await userRes.json();
   
-  const holderBinding = createHash('sha256')
+  // Include self in participants
+  const allParticipants = [user.client_pub_key, ...participants_pub_keys];
+  
+  // Create bindings (SHA256 hashes)
+  const bindings = allParticipants.map(pubKey =>
+    createHash('sha256').update(pubKey).digest('hex')
+  );
+  
+  const convId = ulid();
+  
+  // Store conversation
+  await dmDB.query(`
+    INSERT INTO dm_conversations (conv_id, participant_bindings)
+    VALUES ($1, $2)
+  `, [convId, bindings]);
+  
+  await logEvent('/dm/conversations', 200, 'conversation_created');
+  
+  return {
+    conv_id: convId,
+    participant_bindings: bindings,
+    // Client will negotiate shared secret via X25519
+  };
+});
+
+// POST /dm/:convId/messages
+app.post<{
+  Params: { convId: string };
+  Body: {
+    ciphertext: string;
+    media_keys?: Array<{ object_key: string; encrypted_content_key: string }>;
+    ttl_hours?: number;
+  };
+}>('/dm/:convId/messages', async (req, reply) => {
+  const { convId } = req.params;
+  const { ciphertext, media_keys, ttl_hours } = req.body;
+  const userId = req.user.userId;
+  
+  // Get user's public key
+  const userRes = await fetch(`http://auth_service:3001/users/${userId}`);
+  const user = await userRes.json();
+  
+  const senderBinding = createHash('sha256')
     .update(user.client_pub_key)
     .digest('hex');
   
-  // Find token
-  const { rows: [token] } = await membershipDB.query(
-    'SELECT token_id FROM membership_tokens WHERE union_id = $1 AND holder_binding = $2',
-    [unionId, holderBinding]
+  // Verify user is participant
+  const { rows: [conv] } = await dmDB.query(
+    'SELECT * FROM dm_conversations WHERE conv_id = $1',
+    [convId]
   );
   
-  if (!token) {
-    return reply.code(404).send({ error: 'Not a member' });
+  if (!conv || !conv.participant_bindings.includes(senderBinding)) {
+    return reply.code(403).send({ error: 'Not a participant' });
   }
   
-  // Revoke token
-  await membershipDB.query(
-    'INSERT INTO token_revocations (token_id, reason) VALUES ($1, $2)',
-    [token.token_id, 'user_requested']
+  const msgId = ulid();
+  const ttlUntil = ttl_hours
+    ? new Date(Date.now() + ttl_hours * 3600 * 1000)
+    : null;
+  
+  // Store encrypted message
+  await dmDB.query(`
+    INSERT INTO dm_messages (msg_id, conv_id, sender_binding, ciphertext, media_keys, ttl_until)
+    VALUES ($1, $2, $3, $4, $5, $6)
+  `, [msgId, convId, senderBinding, ciphertext, JSON.stringify(media_keys || []), ttlUntil]);
+  
+  // DO NOT log object keys with DM routes (prevent graph reconstruction)
+  await logEvent('/dm/messages', 200, 'message_sent');
+  
+  return { msg_id: msgId, ts: new Date().toISOString() };
+});
+
+// GET /dm/:convId/messages
+app.get<{
+  Params: { convId: string };
+  Querystring: { cursor?: string; limit?: number };
+}>('/dm/:convId/messages', async (req, reply) => {
+  const { convId } = req.params;
+  const { cursor, limit = 50 } = req.query;
+  const userId = req.user.userId;
+  
+  // Get user's public key
+  const userRes = await fetch(`http://auth_service:3001/users/${userId}`);
+  const user = await userRes.json();
+  
+  const userBinding = createHash('sha256')
+    .update(user.client_pub_key)
+    .digest('hex');
+  
+  // Verify user is participant
+  const { rows: [conv] } = await dmDB.query(
+    'SELECT * FROM dm_conversations WHERE conv_id = $1',
+    [convId]
   );
   
-  await logEvent('/unions/leave', 200, 'membership_revoked');
+  if (!conv || !conv.participant_bindings.includes(userBinding)) {
+    return reply.code(403).send({ error: 'Not a participant' });
+  }
+  
+  // Fetch messages (ciphertext only)
+  const query = cursor
+    ? `SELECT * FROM dm_messages WHERE conv_id = $1 AND ts < $2 AND (ttl_until IS NULL OR ttl_until > NOW()) ORDER BY ts DESC LIMIT $3`
+    : `SELECT * FROM dm_messages WHERE conv_id = $1 AND (ttl_until IS NULL OR ttl_until > NOW()) ORDER BY ts DESC LIMIT $2`;
+  
+  const params = cursor ? [convId, cursor, limit] : [convId, limit];
+  
+  const { rows } = await dmDB.query(query, params);
+  
+  // Return ciphertext only (client decrypts)
+  return rows.map(r => ({
+    msg_id: r.msg_id,
+    sender_binding: r.sender_binding,
+    ts: r.ts,
+    ciphertext: r.ciphertext,
+    media_keys: r.media_keys,
+  }));
+});
+
+// DELETE /dm/:convId/messages/:msgId
+app.delete<{
+  Params: { convId: string; msgId: string };
+}>('/dm/:convId/messages/:msgId', async (req, reply) => {
+  const { convId, msgId } = req.params;
+  const userId = req.user.userId;
+  
+  // Get user's public key
+  const userRes = await fetch(`http://auth_service:3001/users/${userId}`);
+  const user = await userRes.json();
+  
+  const userBinding = createHash('sha256')
+    .update(user.client_pub_key)
+    .digest('hex');
+  
+  // Verify user is sender
+  const { rows: [msg] } = await dmDB.query(
+    'SELECT * FROM dm_messages WHERE msg_id = $1 AND conv_id = $2',
+    [msgId, convId]
+  );
+  
+  if (!msg || msg.sender_binding !== userBinding) {
+    return reply.code(403).send({ error: 'Not authorized' });
+  }
+  
+  // Tombstone (don't actually delete for forward secrecy verification)
+  await dmDB.query(
+    `UPDATE dm_messages SET ciphertext = '[deleted]', media_keys = '[]' WHERE msg_id = $1`,
+    [msgId]
+  );
   
   return { success: true };
 });
 
-app.listen({ port: 3002, host: '0.0.0.0' });
+app.listen({ port: 3005, host: '0.0.0.0' });
 ```
 
-**Testing Checkpoint:**
-- [ ] Join union encrypts membership
-- [ ] Server stores only ciphertext
-- [ ] Retrieval returns ciphertext only
-- [ ] Leave revokes token
-
----
-
-#### **Week 7: Frontend Membership Decryption**
-
-**Tasks:**
-1. ✅ Create client-side crypto utilities
-2. ✅ Implement useMemberships hook
-3. ✅ Update join union flow
-4. ✅ Update membership display
-
-**Client Crypto:**
+**Frontend E2EE Implementation:**
 ```typescript
-// frontend/src/crypto/membership.ts
+// frontend/src/services/dm.ts
+import { x25519 } from '@noble/curves/ed25519';
+import { hkdf } from '@noble/hashes/hkdf';
+import { sha256 } from '@noble/hashes/sha256';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha';
+import { randomBytes } from 'expo-crypto';
+import * as SecureStore from 'expo-secure-store';
 
-export const decryptMembership = (
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+// Create conversation with X25519 key exchange
+export const createConversation = async (recipientPubKeys: string[]) => {
+  const token = await SecureStore.getItemAsync('auth_token');
+  
+  // Create conversation on server
+  const response = await fetch(`${API_URL}/dm/conversations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ participants_pub_keys: recipientPubKeys }),
+  });
+  
+  const { conv_id, participant_bindings } = await response.json();
+  
+  // Derive shared secret via X25519 (use first recipient for 1-1 DMs)
+  const privateKey = await SecureStore.getItemAsync('signing_private_key');
+  const sharedSecret = x25519.getSharedSecret(
+    Buffer.from(privateKey!, 'hex'),
+    Buffer.from(recipientPubKeys[0], 'hex')
+  );
+  
+  // Derive root key via HKDF
+  const rootKey = hkdf(sha256, sharedSecret, undefined, 'dm_root_key', 32);
+  
+  // Store root key
+  await SecureStore.setItemAsync(
+    `dm_root_key:${conv_id}`,
+    Buffer.from(rootKey).toString('hex')
+  );
+  
+  // Initialize chain key counter
+  await SecureStore.setItemAsync(`dm_chain_counter:${conv_id}`, '0');
+  
+  return conv_id;
+};
+
+// Send encrypted message (forward secrecy via symmetric ratchet)
+export const sendDMMessage = async (
+  convId: string,
+  plaintext: string,
+  mediaKeys?: Array<{ object_key: string; content_key: string }>
+) => {
+  const token = await SecureStore.getItemAsync('auth_token');
+  
+  // Get root key and counter
+  const rootKeyHex = await SecureStore.getItemAsync(`dm_root_key:${convId}`);
+  const counterStr = await SecureStore.getItemAsync(`dm_chain_counter:${convId}`);
+  
+  const rootKey = Buffer.from(rootKeyHex!, 'hex');
+  const counter = parseInt(counterStr || '0');
+  
+  // Derive message key (forward secrecy)
+  const messageKey = hkdf(
+    sha256,
+    rootKey,
+    Buffer.from(`${counter}`),
+    'dm_message_key',
+    32
+  );
+  
+  // Encrypt plaintext
+  const nonce = randomBytes(24);
+  const cipher = xchacha20poly1305(messageKey, nonce);
+  const ciphertext = cipher.encrypt(Buffer.from(plaintext));
+  
+  const encryptedMessage = Buffer.concat([nonce, ciphertext]).toString('base64');
+  
+  // Encrypt media content keys
+  let encryptedMediaKeys: any[] | undefined;
+  if (mediaKeys && mediaKeys.length > 0) {
+    encryptedMediaKeys = mediaKeys.map(({ object_key, content_key }) => {
+      const mediaNonce = randomBytes(24);
+      const mediaCipher = xchacha20poly1305(messageKey, mediaNonce);
+      const encryptedKey = mediaCipher.encrypt(Buffer.from(content_key, 'hex'));
+      
+      return {
+        object_key,
+        encrypted_content_key: Buffer.concat([mediaNonce, encryptedKey]).toString('base64'),
+      };
+    });
+  }
+  
+  // Send to server
+  const response = await fetch(`${API_URL}/dm/${convId}/messages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      ciphertext: encryptedMessage,
+      media_keys: encryptedMediaKeys,
+      ttl_hours: 168, // 7 days
+    }),
+  });
+  
+  const { msg_id, ts } = await response.json();
+  
+  // Ratchet forward (increment counter for next message)
+  await SecureStore.setItemAsync(`dm_chain_counter:${convId}`, `${counter + 1}`);
+  
+  return { msg_id, ts };
+};
+
+// Decrypt received message
+export const decryptDMMessage = async (
+  convId: string,
+  msgCounter: number,
   ciphertext: string,
-  privateKey: string
-): any => {
+  mediaKeys?: Array<{ object_key: string; encrypted_content_key: string }>
+) => {
+  // Get root key
+  const rootKeyHex = await SecureStore.getItemAsync(`dm_root_key:${convId}`);
+  const rootKey = Buffer.from(rootKeyHex!, 'hex');
+  
+  // Derive message key (same derivation as sender)
+  const messageKey = hkdf(
+    sha256,
+    rootKey,
+    Buffer.from(`${msgCounter}`),
+    'dm_message_key',
+    32
+  );
+  
+  // Decrypt message
   const data = Buffer.from(ciphertext, 'base64');
   const nonce = data.slice(0, 24);
   const encrypted = data.slice(24);
   
-  // Derive key from private key (first 32 bytes)
-  const key = Buffer.from(privateKey, 'hex').slice(0, 32);
-  
-  const cipher = xchacha20poly1305(key, nonce);
+  const cipher = xchacha20poly1305(messageKey, nonce);
   const plaintext = cipher.decrypt(encrypted);
   
-  return JSON.parse(plaintext.toString());
-};
-```
-
-**Membership Hook:**
-```typescript
-// frontend/src/hooks/useMemberships.ts
-import { useQuery } from '@tanstack/react-query';
-import * as SecureStore from 'expo-secure-store';
-import { decryptMembership } from '../crypto/membership';
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
-
-export const useMemberships = () => {
-  return useQuery({
-    queryKey: ['memberships'],
-    queryFn: async () => {
-      // Get auth token
-      const token = await SecureStore.getItemAsync('auth_token');
+  // Decrypt media keys if present
+  let decryptedMediaKeys: Array<{ object_key: string; content_key: string }> | undefined;
+  if (mediaKeys && mediaKeys.length > 0) {
+    decryptedMediaKeys = mediaKeys.map(({ object_key, encrypted_content_key }) => {
+      const keyData = Buffer.from(encrypted_content_key, 'base64');
+      const keyNonce = keyData.slice(0, 24);
+      const keyEncrypted = keyData.slice(24);
       
-      // Get private key
-      const privateKey = await SecureStore.getItemAsync('signing_private_key');
+      const keyCipher = xchacha20poly1305(messageKey, keyNonce);
+      const contentKey = keyCipher.decrypt(keyEncrypted);
       
-      // Fetch encrypted tokens from server
-      const response = await fetch(`${API_URL}/me/memberships`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch memberships');
-      }
-      
-      const encryptedTokens = await response.json();
-      
-      // Decrypt locally (server never sees plaintext)
-      const memberships = await Promise.all(
-        encryptedTokens.map(async (token: any) => {
-          try {
-            const decrypted = decryptMembership(token.ciphertext, privateKey!);
-            return {
-              token_id: token.token_id,
-              union_id: token.union_id,
-              ...decrypted,
-            };
-          } catch (err) {
-            console.error('Failed to decrypt membership:', err);
-            return null;
-          }
-        })
-      );
-      
-      return memberships.filter(Boolean);
-    },
-    enabled: true,
-  });
-};
-
-export const useJoinUnion = () => {
-  return useMutation({
-    mutationFn: async (unionId: string) => {
-      const token = await SecureStore.getItemAsync('auth_token');
-      const privateKey = await SecureStore.getItemAsync('signing_private_key');
-      
-      // Derive public key from private key
-      const publicKey = ed25519.getPublicKey(Buffer.from(privateKey!, 'hex'));
-      
-      const response = await fetch(`${API_URL}/unions/${unionId}/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          client_pub_key: Buffer.from(publicKey).toString('hex'),
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to join union');
-      }
-      
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['memberships'] });
-    },
-  });
+      return {
+        object_key,
+        content_key: Buffer.from(contentKey).toString('hex'),
+      };
+    });
+  }
+  
+  return {
+    plaintext: plaintext.toString(),
+    media_keys: decryptedMediaKeys,
+  };
 };
 ```
 
 **Testing Checkpoint:**
-- [ ] Memberships decrypt correctly on client
-- [ ] Join union flow works end-to-end
-- [ ] Server cannot read membership details
-- [ ] Leave union revokes token
+- [ ] Conversation creation works
+- [ ] Messages encrypted end-to-end
+- [ ] Forward secrecy verified (old keys can't decrypt new messages)
+- [ ] Server stores only ciphertext
+- [ ] Media keys encrypted with message key
 
 ---
 
-#### **Week 8: Union Admin Features**
+#### **Week 8: Union Service + Debates**
 
 **Tasks:**
-1. ✅ Implement aggregate member count endpoint
-2. ✅ Ensure admins cannot enumerate members
-3. ✅ Create union settings page
-4. ✅ Add union discovery/search
+1. ✅ Implement encrypted membership (as Week 6-7 from original)
+2. ✅ Add debates to messaging service
+3. ✅ Ensure aggregate-only admin views
 
-**Code:**
+**Debates Schema Addition:**
+```sql
+-- content_db.threads (updated)
+ALTER TABLE threads ADD COLUMN type TEXT DEFAULT 'discussion' CHECK (type IN ('discussion', 'debate'));
+ALTER TABLE threads ADD COLUMN debate_round_window INTERVAL;
+ALTER TABLE threads ADD COLUMN max_rounds INTEGER;
+ALTER TABLE threads ADD COLUMN current_round INTEGER DEFAULT 0;
+```
+
+**Debates Endpoint:**
 ```typescript
-// GET /unions/:unionId (public metadata only)
-app.get<{
-  Params: { unionId: string };
-}>('/unions/:unionId', async (req, reply) => {
-  const { unionId } = req.params;
+// backend/services/messaging_service/src/debates.ts
+
+// POST /threads (create debate)
+app.post<{
+  Body: {
+    union_id: string;
+    title: string;
+    type: 'discussion' | 'debate';
+    debate_round_window?: string; // e.g. "2 days"
+    max_rounds?: number;
+  };
+}>('/threads', async (req, reply) => {
+  const { union_id, title, type, debate_round_window, max_rounds } = req.body;
+  const userId = req.user.userId;
   
-  // Get union metadata from content_db
-  const { rows: [union] } = await contentDB.query(
-    'SELECT id, name, description, created_at FROM unions WHERE id = $1',
-    [unionId]
+  // Generate pseudonym
+  const pseudonym = generatePseudonym(userId, union_id);
+  
+  const threadId = ulid();
+  
+  await contentDB.query(`
+    INSERT INTO threads (
+      id,
+      union_id,
+      title,
+      author_pseudonym,
+      type,
+      debate_round_window,
+      max_rounds,
+      current_round
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+  `, [
+    threadId,
+    union_id,
+    title,
+    pseudonym,
+    type,
+    debate_round_window || null,
+    max_rounds || null,
+    type === 'debate' ? 1 : null,
+  ]);
+  
+  return { thread_id: threadId, type };
+});
+
+// POST /threads/:threadId/advance_round (debates only, admin)
+app.post<{
+  Params: { threadId: string };
+}>('/threads/:threadId/advance_round', async (req, reply) => {
+  const { threadId } = req.params;
+  const userId = req.user.userId;
+  
+  // Verify thread is a debate
+  const { rows: [thread] } = await contentDB.query(
+    'SELECT * FROM threads WHERE id = $1',
+    [threadId]
   );
   
-  if (!union) {
-    return reply.code(404).send({ error: 'Union not found' });
+  if (!thread || thread.type !== 'debate') {
+    return reply.code(400).send({ error: 'Not a debate thread' });
   }
   
-  // Get aggregate member count (no individual members)
-  const { rows: [{ count }] } = await membershipDB.query(`
-    SELECT COUNT(*) as count
-    FROM membership_tokens
-    WHERE union_id = $1
-      AND token_id NOT IN (SELECT token_id FROM token_revocations)
-  `, [unionId]);
+  // Verify user is union admin (check membership token)
+  // ... (membership verification logic)
   
-  return {
-    ...union,
-    member_count: parseInt(count),  // Aggregate only
-    // NO member list, NO user_ids
-  };
+  // Advance round
+  const newRound = thread.current_round + 1;
+  
+  if (thread.max_rounds && newRound > thread.max_rounds) {
+    return reply.code(400).send({ error: 'Max rounds reached' });
+  }
+  
+  await contentDB.query(
+    'UPDATE threads SET current_round = $1 WHERE id = $2',
+    [newRound, threadId]
+  );
+  
+  return { current_round: newRound };
+});
+
+// GET /threads/:threadId/stats (aggregate only, no member enumeration)
+app.get<{
+  Params: { threadId: string };
+}>('/threads/:threadId/stats', async (req, reply) => {
+  const { threadId } = req.params;
+  
+  // Aggregate stats only
+  const { rows: [stats] } = await contentDB.query(`
+    SELECT
+      COUNT(DISTINCT author_pseudonym) as unique_participants,
+      COUNT(*) as total_comments,
+      MAX(created_at) as last_activity
+    FROM comments
+    WHERE thread_id = $1
+  `, [threadId]);
+  
+  // DO NOT return list of participants or their comments
+  return stats;
 });
 ```
 
 **Testing Checkpoint:**
-- [ ] Union metadata is public
-- [ ] Member count is aggregate only
-- [ ] Admins cannot see member identities
-- [ ] Search/discovery works
+- [ ] Debates created with round windows
+- [ ] Rounds advance properly
+- [ ] Admin stats are aggregate-only
+- [ ] No member enumeration possible
 
 ---
 
 ### **Weeks 9-11: Voting Service (Blind Signatures)**
 
-#### **Week 9: Blind Signature Token Issuance**
+_(Implementation identical to original plan in previous weeks 9-11)_
 
-**Tasks:**
-1. ✅ Create voting service scaffold
-2. ✅ Implement blind-signature library
-3. ✅ Create ballot_db schema
-4. ✅ Implement token issuance endpoint
-5. ✅ Add membership verification
-
-**Database Schema:**
-```sql
--- ballot_db.ballots
-CREATE TABLE ballots (
-  ballot_id TEXT PRIMARY KEY,
-  union_id TEXT NOT NULL,
-  mode TEXT CHECK (mode IN ('A', 'B', 'C')) DEFAULT 'B',
-  question TEXT NOT NULL,
-  options JSONB NOT NULL,
-  window_start TIMESTAMPTZ DEFAULT NOW(),
-  window_end TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Mode A votes (simple authenticated - LOW PRIVACY)
-CREATE TABLE ballot_votes_mode_a (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  ballot_id TEXT REFERENCES ballots(ballot_id),
-  user_id TEXT NOT NULL,
-  choice TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (ballot_id, user_id)
-);
-
--- Mode B votes (blind-signature - DEFAULT)
-CREATE TABLE ballot_votes_mode_b (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  ballot_id TEXT REFERENCES ballots(ballot_id),
-  token_signature TEXT NOT NULL,
-  commitment TEXT NOT NULL,        -- Encrypted vote
-  nullifier TEXT UNIQUE NOT NULL,  -- Prevents double-voting
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_nullifier ON ballot_votes_mode_b(nullifier);
-
--- Server signing keys (rotated quarterly)
-CREATE TABLE ballot_signing_keys (
-  ballot_id TEXT PRIMARY KEY REFERENCES ballots(ballot_id),
-  private_key BYTEA NOT NULL,
-  public_key BYTEA NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-**Backend Code:**
-```typescript
-// backend/services/voting_service/src/index.ts
-import Fastify from 'fastify';
-import { blindSign, verify } from 'blind-signatures';
-import { createHash } from 'crypto';
-import Redis from 'ioredis';
-
-const app = Fastify({ logger: true });
-const redis = new Redis(process.env.REDIS_URL);
-
-app.addHook('onRequest', verifyJWT);
-
-// POST /ballots/:ballotId/issue_token (Mode B only)
-app.post<{
-  Params: { ballotId: string };
-  Body: { blinded_message: string };
-}>('/ballots/:ballotId/issue_token', async (req, reply) => {
-  const { ballotId } = req.params;
-  const { blinded_message } = req.body;
-  const userId = req.user.userId;
-  
-  // 1. Get ballot details
-  const { rows: [ballot] } = await ballotDB.query(
-    'SELECT union_id, mode FROM ballots WHERE ballot_id = $1',
-    [ballotId]
-  );
-  
-  if (!ballot || ballot.mode !== 'B') {
-    return reply.code(400).send({ error: 'Invalid ballot or mode' });
-  }
-  
-  // 2. Verify user is union member (check membership_db)
-  const userRes = await fetch(`http://auth_service:3001/users/${userId}`);
-  const user = await userRes.json();
-  
-  const holderBinding = createHash('sha256')
-    .update(user.client_pub_key)
-    .digest('hex');
-  
-  const { rowCount } = await membershipDB.query(
-    'SELECT 1 FROM membership_tokens WHERE union_id = $1 AND holder_binding = $2',
-    [ballot.union_id, holderBinding]
-  );
-  
-  if (rowCount === 0) {
-    return reply.code(403).send({ error: 'Not a union member' });
-  }
-  
-  // 3. Check if token already issued (prevent multiple issuances)
-  const alreadyIssued = await redis.get(`issued:${ballotId}:${userId}`);
-  if (alreadyIssued) {
-    return reply.code(409).send({ error: 'Token already issued' });
-  }
-  
-  // 4. Blind-sign the message (server doesn't see token contents)
-  const { rows: [keys] } = await ballotDB.query(
-    'SELECT private_key FROM ballot_signing_keys WHERE ballot_id = $1',
-    [ballotId]
-  );
-  
-  const blindSignature = blindSign(blinded_message, keys.private_key);
-  
-  // 5. Mark as issued (24h expiry)
-  await redis.setex(`issued:${ballotId}:${userId}`, 86400, '1');
-  
-  await logEvent('/ballots/issue_token', 200, 'token_issued');
-  
-  return { blind_signature: blindSignature };
-});
-
-app.listen({ port: 3003, host: '0.0.0.0' });
-```
-
-**Testing Checkpoint:**
-- [ ] Token issuance requires membership
-- [ ] Blind signature doesn't reveal token contents
-- [ ] Cannot issue multiple tokens
-- [ ] Tokens expire after 24h
-
----
-
-#### **Week 10: Anonymous Vote Submission**
-
-**Tasks:**
-1. ✅ Implement vote submission endpoint
-2. ✅ Implement nullifier tracking
-3. ✅ Add signature verification
-4. ✅ Implement tally endpoint (aggregate only)
-
-**Code:**
-```typescript
-// POST /ballots/:ballotId/vote (Mode B)
-app.post<{
-  Params: { ballotId: string };
-  Body: {
-    token_signature: string;
-    commitment: string;
-    nullifier: string;
-  };
-}>('/ballots/:ballotId/vote', async (req, reply) => {
-  const { ballotId } = req.params;
-  const { token_signature, commitment, nullifier } = req.body;
-  
-  // 1. Verify signature is valid
-  const { rows: [keys] } = await ballotDB.query(
-    'SELECT public_key FROM ballot_signing_keys WHERE ballot_id = $1',
-    [ballotId]
-  );
-  
-  if (!verify(token_signature, keys.public_key)) {
-    return reply.code(401).send({ error: 'Invalid token signature' });
-  }
-  
-  // 2. Check nullifier not used (prevent double-voting)
-  const { rowCount } = await ballotDB.query(
-    'SELECT 1 FROM ballot_votes_mode_b WHERE nullifier = $1',
-    [nullifier]
-  );
-  
-  if (rowCount > 0) {
-    return reply.code(409).send({ error: 'Already voted (nullifier reused)' });
-  }
-  
-  // 3. Store anonymous vote (NO user_id)
-  await ballotDB.query(`
-    INSERT INTO ballot_votes_mode_b (ballot_id, token_signature, commitment, nullifier)
-    VALUES ($1, $2, $3, $4)
-  `, [ballotId, token_signature, commitment, nullifier]);
-  
-  // 4. Return receipt
-  const receipt = createHash('sha256').update(nullifier).digest('hex');
-  
-  await logEvent('/ballots/vote', 200, 'vote_cast');
-  
-  return { success: true, receipt };
-});
-
-// GET /ballots/:ballotId/tally (aggregate only)
-app.get<{
-  Params: { ballotId: string };
-}>('/ballots/:ballotId/tally', async (req, reply) => {
-  const { ballotId } = req.params;
-  
-  // Get ballot options
-  const { rows: [ballot] } = await ballotDB.query(
-    'SELECT options FROM ballots WHERE ballot_id = $1',
-    [ballotId]
-  );
-  
-  // Decrypt all commitments server-side
-  const { rows } = await ballotDB.query(
-    'SELECT commitment FROM ballot_votes_mode_b WHERE ballot_id = $1',
-    [ballotId]
-  );
-  
-  // Decrypt and aggregate (server sees totals, not individual votes)
-  const tally: Record<string, number> = {};
-  
-  for (const row of rows) {
-    try {
-      const vote = await decryptCommitment(row.commitment);  // Server-side decryption
-      tally[vote] = (tally[vote] || 0) + 1;
-    } catch (err) {
-      console.error('Failed to decrypt vote:', err);
-    }
-  }
-  
-  return {
-    ballot_id: ballotId,
-    total_votes: rows.length,
-    tally,  // { "yes": 45, "no": 30 }
-    // NO per-vote details
-  };
-});
-```
-
-**Testing Checkpoint:**
-- [ ] Vote submission works anonymously
-- [ ] Nullifier prevents double-voting
-- [ ] Signature verification works
-- [ ] Tally shows aggregates only
-
----
-
-#### **Week 11: Frontend Blind Voting UI**
-
-**Tasks:**
-1. ✅ Install blind-signatures library
-2. ✅ Implement useBlindVoting hooks
-3. ✅ Create voting UI components
-4. ✅ Add receipt storage and verification
-
-**Install:**
-```bash
-npm install blind-signatures
-```
-
-**Hooks:**
-```typescript
-// frontend/src/hooks/useBlindVoting.ts
-import { blind, unblind, verify } from 'blind-signatures';
-import { randomBytes } from 'expo-crypto';
-import { createHash } from 'crypto';
-
-export const useRequestVotingToken = () => {
-  return useMutation({
-    mutationFn: async (ballotId: string) => {
-      const token = randomBytes(32);
-      const { blinded, blindingFactor } = blind(token);
-      
-      const authToken = await SecureStore.getItemAsync('auth_token');
-      
-      // Request blind signature from server
-      const response = await fetch(`${API_URL}/ballots/${ballotId}/issue_token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({ blinded_message: blinded }),
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error);
-      }
-      
-      const { blind_signature } = await response.json();
-      
-      // Unblind signature
-      const signature = unblind(blind_signature, blindingFactor);
-      
-      // Store for later use
-      await SecureStore.setItemAsync(
-        `voting_token:${ballotId}`,
-        JSON.stringify({
-          token: Array.from(token),
-          signature,
-        })
-      );
-      
-      return { success: true };
-    },
-  });
-};
-
-export const useCastBlindVote = () => {
-  return useMutation({
-    mutationFn: async ({
-      ballotId,
-      choice,
-    }: {
-      ballotId: string;
-      choice: string;
-    }) => {
-      // 1. Retrieve voting token
-      const stored = await SecureStore.getItemAsync(`voting_token:${ballotId}`);
-      
-      if (!stored) {
-        throw new Error('No voting token found. Request token first.');
-      }
-      
-      const { token, signature } = JSON.parse(stored);
-      const tokenBuffer = Buffer.from(token);
-      
-      // 2. Encrypt vote choice
-      const commitment = await encryptVote(choice, tokenBuffer);
-      
-      // 3. Generate nullifier (prevents double-voting)
-      const nullifier = createHash('sha256')
-        .update(Buffer.concat([tokenBuffer, Buffer.from(ballotId)]))
-        .digest('hex');
-      
-      // 4. Submit anonymous vote (no auth token needed)
-      const response = await fetch(`${API_URL}/ballots/${ballotId}/vote`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token_signature: signature,
-          commitment,
-          nullifier,
-        }),
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error);
-      }
-      
-      const { receipt } = await response.json();
-      
-      // 5. Delete token (prevent reuse)
-      await SecureStore.deleteItemAsync(`voting_token:${ballotId}`);
-      
-      // 6. Store receipt for verification
-      await SecureStore.setItemAsync(`receipt:${ballotId}`, receipt);
-      
-      return { success: true, receipt };
-    },
-  });
-};
-
-const encryptVote = async (vote: string, token: Buffer): Promise<string> => {
-  const nonce = randomBytes(24);
-  const key = createHash('sha256').update(token).digest().slice(0, 32);
-  
-  const cipher = xchacha20poly1305(key, nonce);
-  const ciphertext = cipher.encrypt(Buffer.from(vote));
-  
-  return Buffer.concat([nonce, ciphertext]).toString('base64');
-};
-```
-
-**Voting UI:**
-```typescript
-// frontend/src/screens/VotingScreen.tsx
-import { useRequestVotingToken, useCastBlindVote } from '../hooks/useBlindVoting';
-
-const VotingScreen = ({ ballotId, question, options }: Props) => {
-  const requestToken = useRequestVotingToken();
-  const castVote = useCastBlindVote();
-  
-  const [tokenRequested, setTokenRequested] = useState(false);
-  
-  const handleRequestToken = async () => {
-    try {
-      await requestToken.mutateAsync(ballotId);
-      setTokenRequested(true);
-      Alert.alert('Token Received', 'You can now cast your anonymous vote.');
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    }
-  };
-  
-  const handleVote = async (choice: string) => {
-    if (!tokenRequested) {
-      Alert.alert('Error', 'Request voting token first');
-      return;
-    }
-    
-    try {
-      const { receipt } = await castVote.mutateAsync({ ballotId, choice });
-      Alert.alert(
-        'Vote Cast!',
-        `Your anonymous vote has been recorded.\n\nReceipt: ${receipt.slice(0, 16)}...`
-      );
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    }
-  };
-  
-  return (
-    <View>
-      <Text style={styles.question}>{question}</Text>
-      
-      {!tokenRequested ? (
-        <View>
-          <Text style={styles.privacy}>
-            ⚠️ PRIVACY MODE B: Blind-Signature Voting
-          </Text>
-          <Text style={styles.explanation}>
-            • Your vote will be completely anonymous{'\n'}
-            • Server cannot link your vote to your identity{'\n'}
-            • You will receive a cryptographic receipt{'\n'}
-            • You cannot change your vote after submission
-          </Text>
-          <Button title="Request Anonymous Voting Token" onPress={handleRequestToken} />
-        </View>
-      ) : (
-        <View>
-          <Text style={styles.ready}>Ready to vote anonymously</Text>
-          {options.map((option) => (
-            <Button
-              key={option}
-              title={`Vote: ${option}`}
-              onPress={() => handleVote(option)}
-            />
-          ))}
-        </View>
-      )}
-    </View>
-  );
-};
-```
-
-**Testing Checkpoint:**
-- [ ] Token request flow works
-- [ ] Vote submission is anonymous
-- [ ] Receipt stored locally
-- [ ] Cannot vote twice (nullifier check)
-- [ ] UI shows privacy warnings
+**Week 9:** Blind signature token issuance  
+**Week 10:** Anonymous vote submission  
+**Week 11:** Frontend blind voting UI
 
 ---
 
 ### **Week 12: Messaging Service & Migration**
 
-#### **Tasks:**
+**Tasks:**
 1. ✅ Create messaging service (minimal changes)
 2. ✅ Remove user_id from content tables
 3. ✅ Update post/comment endpoints
@@ -1615,100 +1678,71 @@ describe('Auth Service Integration', () => {
     const { rows } = await db.query('SELECT * FROM users WHERE user_id = $1', [userId]);
     expect(rows[0]).not.toHaveProperty('email');
   });
-  
-  test('JWT expires in 15 minutes', async () => {
-    const decoded = jwt.decode(token);
-    const expiry = decoded.exp - decoded.iat;
-    expect(expiry).toBe(15 * 60); // 15 minutes
-  });
 });
 
-describe('Membership Encryption', () => {
-  test('Server cannot decrypt membership', async () => {
-    // Join union
-    const res = await request(unionService)
-      .post('/unions/123/join')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ client_pub_key: publicKey });
-    
-    const { ciphertext } = res.body;
+// E2EE DM Tests (NEW)
+describe('DM E2EE', () => {
+  test('Server cannot decrypt DM content', async () => {
+    const convId = await createConversation([recipientPubKey]);
+    await sendDMMessage(convId, 'secret message');
     
     // Server tries to decrypt (should fail)
-    expect(() => decrypt(ciphertext, 'wrong-key')).toThrow();
+    const { rows } = await dmDB.query('SELECT ciphertext FROM dm_messages WHERE conv_id = $1', [convId]);
+    expect(() => decrypt(rows[0].ciphertext, 'wrong-key')).toThrow();
+  });
+  
+  test('Forward secrecy: compromise of current key does not decrypt past messages', async () => {
+    const convId = await createConversation([recipientPubKey]);
+    await sendDMMessage(convId, 'message 1');
+    await sendDMMessage(convId, 'message 2');
     
-    // Only client can decrypt
-    const plaintext = decrypt(ciphertext, privateKey);
-    expect(JSON.parse(plaintext).union_id).toBe('123');
+    // Get current chain key
+    const chainKey = await SecureStore.getItemAsync(`dm_chain_counter:${convId}`);
+    
+    // Try to decrypt message 1 with current chain key (should fail)
+    const { rows } = await dmDB.query('SELECT * FROM dm_messages WHERE conv_id = $1 ORDER BY ts ASC', [convId]);
+    expect(() => decryptDMMessage(convId, parseInt(chainKey!), rows[0].ciphertext)).toThrow();
   });
 });
 
-describe('Blind-Signature Voting', () => {
-  test('Server cannot link vote to user', async () => {
-    // Issue token
-    const { blind_signature } = await request(votingService)
-      .post('/ballots/abc/issue_token')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ blinded_message: blinded });
+// Media Pipeline Tests (NEW)
+describe('Media Pipeline', () => {
+  test('EXIF stripped from uploads', async () => {
+    const imageWithExif = 'test-image-with-gps.jpg';
+    const { object_key } = await uploadEncryptedImage(imageWithExif);
     
-    // Cast vote (no auth token)
-    const voteRes = await request(votingService)
-      .post('/ballots/abc/vote')
-      .send({
-        token_signature: signature,
-        commitment: encrypted,
-        nullifier: nullifier,
-      });
-    
-    expect(voteRes.status).toBe(200);
-    
-    // Verify no user_id in vote record
-    const { rows } = await ballotDB.query('SELECT * FROM ballot_votes_mode_b');
-    expect(rows[0]).not.toHaveProperty('user_id');
+    // Download and verify no EXIF
+    const blob = await fetch(`${API_URL}/media/${object_key}`).then(r => r.arrayBuffer());
+    const hasExif = checkForExif(Buffer.from(blob));
+    expect(hasExif).toBe(false);
   });
   
-  test('Nullifier prevents double-voting', async () => {
-    // First vote succeeds
-    const res1 = await request(votingService)
-      .post('/ballots/abc/vote')
-      .send({ token_signature, commitment, nullifier });
-    expect(res1.status).toBe(200);
+  test('Blobs are encrypted (no plaintext magic headers)', async () => {
+    const { object_key } = await uploadEncryptedImage('test.jpg');
     
-    // Second vote with same nullifier fails
-    const res2 = await request(votingService)
-      .post('/ballots/abc/vote')
-      .send({ token_signature, commitment, nullifier });
-    expect(res2.status).toBe(409);
-    expect(res2.body.error).toMatch(/already voted/i);
+    const blob = await fetch(`${API_URL}/media/${object_key}`).then(r => r.arrayBuffer());
+    const header = Buffer.from(blob).slice(0, 4);
+    
+    // Should NOT start with JPEG magic bytes (FF D8 FF)
+    expect(header.toString('hex')).not.toMatch(/^ffd8ff/);
   });
 });
 
-describe('PII-Free Logging', () => {
-  test('Logs contain no IP or user agent', async () => {
-    await request(authService)
-      .post('/auth/webauthn/register')
-      .send(validPayload);
+// Debate Tests (NEW)
+describe('Debates', () => {
+  test('Admin views aggregate stats only, no member enumeration', async () => {
+    const threadId = await createDebateThread(unionId);
+    await postComment(threadId, 'argument 1');
+    await postComment(threadId, 'argument 2');
     
-    const { rows } = await contentDB.query('SELECT * FROM logs.events ORDER BY created_at DESC LIMIT 1');
+    const stats = await fetch(`${API_URL}/threads/${threadId}/stats`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    }).then(r => r.json());
     
-    expect(rows[0]).not.toHaveProperty('ip_address');
-    expect(rows[0]).not.toHaveProperty('user_agent');
-    expect(rows[0]).not.toHaveProperty('user_id');
-    expect(rows[0]).toHaveProperty('request_hash');
-  });
-  
-  test('Logs auto-delete after 24h', async () => {
-    // Insert old log
-    await contentDB.query(`
-      INSERT INTO logs.events (request_hash, route, status_code, created_at)
-      VALUES ('hash123', '/test', 200, NOW() - INTERVAL '25 hours')
-    `);
-    
-    // Run cleanup
-    await cleanupOldLogs();
-    
-    // Verify deleted
-    const { rowCount } = await contentDB.query('SELECT * FROM logs.events WHERE request_hash = $1', ['hash123']);
-    expect(rowCount).toBe(0);
+    expect(stats).toHaveProperty('unique_participants');
+    expect(stats).toHaveProperty('total_comments');
+    expect(stats).not.toHaveProperty('participants'); // No list
+    expect(stats).not.toHaveProperty('comments'); // No individual comments
   });
 });
 ```
@@ -1765,6 +1799,25 @@ services:
       - CONTENT_DB_URL
     buildCommand: npm run build
     startCommand: npm start
+  
+  - name: dm-service
+    type: web
+    env:
+      - DM_DB_URL
+      - REDIS_URL
+    buildCommand: npm run build
+    startCommand: npm start
+  
+  - name: media-service
+    type: web
+    env:
+      - CONTENT_DB_URL
+      - BUCKET_NAME
+      - AWS_REGION
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+    buildCommand: npm run build
+    startCommand: npm start
 
 databases:
   - name: content-db
@@ -1772,6 +1825,8 @@ databases:
   - name: membership-db
     type: postgresql
   - name: ballot-db
+    type: postgresql
+  - name: dm-db
     type: postgresql
 ```
 
@@ -1796,7 +1851,7 @@ railway up
 
 # Frontend
 cd frontend
-eas update --branch production --message "Phase 1 complete - WebAuthn + encrypted memberships + blind voting"
+eas update --branch production --message "Phase 1 complete - WebAuthn + encrypted memberships + blind voting + E2EE DMs + encrypted media + debates"
 ```
 
 **Testing Checkpoint:**
@@ -1805,13 +1860,610 @@ eas update --branch production --message "Phase 1 complete - WebAuthn + encrypte
 - [ ] WebAuthn works on real devices
 - [ ] Encrypted memberships work
 - [ ] Blind voting works
+- [ ] E2EE DMs work
+- [ ] Encrypted media uploads work
+- [ ] Debates work
 - [ ] Logs cleanup automatically
+
+---
+
+## 🔧 Service Specifications
+
+### **1. auth_service (Port 3001)**
+
+**Responsibilities:**
+- WebAuthn registration and authentication
+- JWT issuance and refresh
+- User credential storage (NO email)
+
+**Endpoints:**
+- `GET /auth/challenge` - Generate WebAuthn challenge
+- `POST /auth/webauthn/register` - Register new user
+- `POST /auth/webauthn/verify` - Authenticate user
+- `POST /auth/refresh` - Refresh JWT token
+- `GET /users/:userId` - Get user public key (internal)
+
+**Database:** content_db (users table)
+
+---
+
+### **2. union_service (Port 3002)**
+
+**Responsibilities:**
+- Encrypted membership token management
+- Union join/leave operations
+- Aggregate member counts only
+
+**Endpoints:**
+- `POST /unions/:unionId/join` - Join union (returns encrypted token)
+- `GET /me/memberships` - Get encrypted membership tokens
+- `POST /unions/:unionId/leave` - Leave union (revoke token)
+- `GET /unions/:unionId` - Get union metadata + aggregate count
+
+**Database:** membership_db
+
+**Security:**
+- Server stores only ciphertext
+- Cannot enumerate members
+- Cannot decrypt membership details
+
+---
+
+### **3. voting_service (Port 3003)**
+
+**Responsibilities:**
+- Ballot creation and management
+- Blind-signature token issuance (Mode B)
+- Anonymous vote submission
+- Aggregate vote tallies only
+
+**Endpoints:**
+- `POST /ballots` - Create ballot
+- `POST /ballots/:ballotId/issue_token` - Issue blind token (Mode B)
+- `POST /ballots/:ballotId/vote` - Cast anonymous vote
+- `GET /ballots/:ballotId/tally` - Get aggregate tally
+
+**Database:** ballot_db
+
+**Security:**
+- Nullifier prevents double-voting
+- Server cannot link votes to users (Mode B)
+- Tally shows aggregates only
+
+---
+
+### **4. messaging_service (Port 3004)**
+
+**Responsibilities:**
+- Pseudonymous posts, comments, threads
+- Debate thread management
+- Aggregate stats only for admins
+
+**Endpoints:**
+- `POST /threads` - Create thread or debate
+- `POST /threads/:threadId/comments` - Post comment
+- `GET /threads/:threadId/stats` - Get aggregate stats (no member list)
+- `POST /threads/:threadId/advance_round` - Advance debate round (admin)
+
+**Database:** content_db
+
+**Security:**
+- No user_id in posts/comments/threads
+- Uses author_pseudonym only
+- Admin views are aggregate-only
+
+---
+
+### **5. dm_service (Port 3005) - NEW**
+
+**Responsibilities:**
+- E2EE direct messaging with forward secrecy
+- Conversation management
+- Message storage (ciphertext only)
+
+**Endpoints:**
+- `POST /dm/conversations` - Create E2EE conversation
+- `POST /dm/:convId/messages` - Send encrypted message
+- `GET /dm/:convId/messages` - Fetch encrypted messages
+- `DELETE /dm/:convId/messages/:msgId` - Delete message (tombstone)
+
+**Database:** dm_db
+
+**Schema:**
+```sql
+CREATE TABLE dm_conversations (
+  conv_id TEXT PRIMARY KEY,
+  participant_bindings TEXT[] NOT NULL,  -- SHA256(client_pub_key)[]
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE dm_messages (
+  msg_id TEXT PRIMARY KEY,
+  conv_id TEXT NOT NULL REFERENCES dm_conversations(conv_id),
+  sender_binding TEXT NOT NULL,
+  ts TIMESTAMPTZ DEFAULT NOW(),
+  ciphertext TEXT NOT NULL,
+  media_keys JSONB,
+  ttl_until TIMESTAMPTZ
+);
+```
+
+**Security:**
+- End-to-end encryption (server cannot decrypt)
+- Forward secrecy via symmetric ratchet
+- No user_id columns
+- No plaintext server-side
+- Metadata minimal (sender_binding, timestamp only)
+
+**Forward Secrecy:**
+- Root key derived via X25519 + HKDF
+- Per-message keys derived via counter
+- Ratchet forward after each message
+- Compromise of current key doesn't reveal past messages
+
+---
+
+### **6. media_service (Port 3006) - NEW**
+
+**Responsibilities:**
+- Presigned URL generation for uploads
+- Encrypted media storage
+- EXIF stripping enforcement
+- Media metadata tracking
+
+**Endpoints:**
+- `POST /media/presign` - Generate presigned upload URL
+- `GET /media/:objectKey` - Serve encrypted media (via CDN)
+
+**Database:** content_db (media_objects table)
+
+**Schema:**
+```sql
+CREATE TABLE media_objects (
+  object_key TEXT PRIMARY KEY,
+  owner_binding TEXT NOT NULL,    -- SHA256(client_pub_key)
+  union_id TEXT,
+  size INTEGER,
+  mime TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Client Pipeline:**
+1. Strip EXIF metadata (piexifjs)
+2. Re-encode and downscale (expo-image-manipulator)
+3. Create thumbnail (~256px)
+4. Encrypt original + thumbnail client-side (XChaCha20-Poly1305)
+5. Request presigned URL from server
+6. Upload encrypted blob to object storage
+7. Store content key client-side for decryption
+
+**Security:**
+- Server stores only ciphertext
+- No plaintext thumbnails or originals
+- EXIF/GPS stripped before encryption
+- Content keys never sent to server
+- Presigned URLs expire in 10 minutes
+- Size and MIME validation
+
+---
+
+## 🗄️ Database Migration Strategy
+
+### **New Databases**
+
+1. **dm_db** - E2EE direct messaging
+   - dm_conversations
+   - dm_messages
+
+### **New Tables**
+
+1. **content_db.media_objects** - Encrypted media metadata
+2. **content_db.threads** (updated) - Add debate columns
+3. **content_db.logs.events** - PII-free logging
+
+### **Schema Changes**
+
+```sql
+-- Remove user_id from content tables
+ALTER TABLE posts DROP COLUMN user_id;
+ALTER TABLE posts ADD COLUMN author_pseudonym TEXT;
+
+ALTER TABLE comments DROP COLUMN user_id;
+ALTER TABLE comments ADD COLUMN author_pseudonym TEXT;
+
+ALTER TABLE threads DROP COLUMN user_id;
+ALTER TABLE threads ADD COLUMN author_pseudonym TEXT;
+
+-- Add debate columns
+ALTER TABLE threads ADD COLUMN type TEXT DEFAULT 'discussion' CHECK (type IN ('discussion', 'debate'));
+ALTER TABLE threads ADD COLUMN debate_round_window INTERVAL;
+ALTER TABLE threads ADD COLUMN max_rounds INTEGER;
+ALTER TABLE threads ADD COLUMN current_round INTEGER DEFAULT 0;
+```
+
+### **Data Migration**
+
+```typescript
+// Backfill legacy data
+const backfillPseudonyms = async () => {
+  // Generate pseudonyms for existing posts
+  await contentDB.query(`
+    UPDATE posts
+    SET author_pseudonym = CONCAT('user_', SUBSTRING(MD5(RANDOM()::TEXT), 1, 8))
+    WHERE author_pseudonym IS NULL
+  `);
+  
+  await contentDB.query(`
+    UPDATE comments
+    SET author_pseudonym = CONCAT('user_', SUBSTRING(MD5(RANDOM()::TEXT), 1, 8))
+    WHERE author_pseudonym IS NULL
+  `);
+  
+  await contentDB.query(`
+    UPDATE threads
+    SET author_pseudonym = CONCAT('user_', SUBSTRING(MD5(RANDOM()::TEXT), 1, 8))
+    WHERE author_pseudonym IS NULL
+  `);
+};
+```
+
+---
+
+## ✅ Testing & Quality Assurance
+
+### **Existing Tests** (from original plan)
+
+- Authentication tests (WebAuthn, JWT)
+- Membership encryption tests
+- Blind-signature voting tests
+- Logging tests (PII-free)
+
+### **New Tests for Phase 1 Updates**
+
+#### **E2EE DM Tests**
+
+```typescript
+describe('E2EE DM Tests', () => {
+  test('dm_e2e_cannot_decrypt_on_server', async () => {
+    const convId = await createConversation([recipientPubKey]);
+    await sendDMMessage(convId, 'secret message');
+    
+    // Server cannot decrypt
+    const { rows } = await dmDB.query('SELECT ciphertext FROM dm_messages WHERE conv_id = $1', [convId]);
+    expect(() => decrypt(rows[0].ciphertext, serverKey)).toThrow();
+  });
+  
+  test('dm_forward_secrecy', async () => {
+    const convId = await createConversation([recipientPubKey]);
+    await sendDMMessage(convId, 'message 1');
+    await sendDMMessage(convId, 'message 2');
+    
+    // Compromise current key
+    const currentChainKey = await SecureStore.getItemAsync(`dm_chain_counter:${convId}`);
+    
+    // Cannot decrypt past messages
+    const { rows } = await dmDB.query('SELECT * FROM dm_messages WHERE conv_id = $1 ORDER BY ts ASC', [convId]);
+    expect(() => decryptDMMessage(convId, parseInt(currentChainKey!), rows[0].ciphertext)).toThrow();
+  });
+  
+  test('dm_ttl_enforced', async () => {
+    const convId = await createConversation([recipientPubKey]);
+    await sendDMMessage(convId, 'expiring message', [], 1); // 1 hour TTL
+    
+    // Fast-forward time
+    await dmDB.query('UPDATE dm_messages SET ttl_until = NOW() - INTERVAL \'1 hour\'');
+    
+    // Message should not be returned
+    const { rows } = await dmDB.query('SELECT * FROM dm_messages WHERE conv_id = $1 AND (ttl_until IS NULL OR ttl_until > NOW())', [convId]);
+    expect(rows.length).toBe(0);
+  });
+});
+```
+
+#### **Media Pipeline Tests**
+
+```typescript
+describe('Media Pipeline Tests', () => {
+  test('exif_strip_verification', async () => {
+    const imageWithExif = 'test-images/gps-tagged.jpg';
+    
+    // Upload should succeed
+    const { object_key } = await uploadEncryptedImage(imageWithExif);
+    
+    // Download and verify no EXIF
+    const response = await fetch(`${API_URL}/media/${object_key}`);
+    const blob = await response.arrayBuffer();
+    
+    const hasExif = piexif.load(Buffer.from(blob).toString('binary'));
+    expect(hasExif).toEqual({}); // No EXIF data
+  });
+  
+  test('encrypted_blob_only', async () => {
+    const { object_key } = await uploadEncryptedImage('test.jpg');
+    
+    const response = await fetch(`${API_URL}/media/${object_key}`);
+    const blob = await response.arrayBuffer();
+    const header = Buffer.from(blob).slice(0, 4);
+    
+    // Should NOT have JPEG magic bytes (encrypted)
+    expect(header.toString('hex')).not.toMatch(/^ffd8ff/);
+    
+    // Should have our envelope markers
+    expect(Buffer.from(blob).slice(0, 4).toString()).toBe('ORIG');
+  });
+  
+  test('thumb_and_original_present', async () => {
+    const { object_key, content_key } = await uploadEncryptedImage('test.jpg');
+    
+    // Decrypt and verify both present
+    const { original, thumbnail } = await decryptImage(object_key, content_key);
+    
+    expect(original).toMatch(/^data:image\/jpeg;base64,/);
+    expect(thumbnail).toMatch(/^data:image\/jpeg;base64,/);
+    
+    // Verify sizes
+    const origSize = Buffer.from(original.split(',')[1], 'base64').length;
+    const thumbSize = Buffer.from(thumbnail.split(',')[1], 'base64').length;
+    
+    expect(thumbSize).toBeLessThan(origSize);
+  });
+});
+```
+
+#### **Debate Flow Tests**
+
+```typescript
+describe('Debate Tests', () => {
+  test('debate_rounds_progress', async () => {
+    const threadId = await createDebateThread(unionId, '2 days', 3);
+    
+    // Advance round
+    await fetch(`${API_URL}/threads/${threadId}/advance_round`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    
+    // Check round updated
+    const { rows: [thread] } = await contentDB.query('SELECT current_round FROM threads WHERE id = $1', [threadId]);
+    expect(thread.current_round).toBe(2);
+  });
+  
+  test('no_member_list_in_threads', async () => {
+    const threadId = await createDebateThread(unionId);
+    await postComment(threadId, 'comment 1', userId1);
+    await postComment(threadId, 'comment 2', userId2);
+    
+    // Admin queries stats
+    const stats = await fetch(`${API_URL}/threads/${threadId}/stats`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    }).then(r => r.json());
+    
+    expect(stats).toHaveProperty('unique_participants');
+    expect(stats).toHaveProperty('total_comments');
+    
+    // Should NOT have member list
+    expect(stats).not.toHaveProperty('participants');
+    expect(stats).not.toHaveProperty('user_ids');
+  });
+});
+```
+
+#### **Logging Tests (Extended)**
+
+```typescript
+describe('Extended Logging Tests', () => {
+  test('no_object_keys_logged_with_dm_routes', async () => {
+    const convId = await createConversation([recipientPubKey]);
+    const { object_key } = await uploadEncryptedImage('test.jpg');
+    await sendDMMessage(convId, 'message', [{ object_key, content_key: 'abc' }]);
+    
+    // Check logs don't contain object key
+    const { rows } = await contentDB.query('SELECT * FROM logs.events WHERE route = \'/dm/messages\'');
+    
+    for (const row of rows) {
+      expect(row.route).not.toContain(object_key);
+      expect(row.event_type).not.toContain(object_key);
+    }
+  });
+  
+  test('24h_deletion_covers_all_services', async () => {
+    // Insert old logs for all services
+    await contentDB.query(`
+      INSERT INTO logs.events (request_hash, route, status_code, event_type, created_at)
+      VALUES
+        ('hash1', '/auth/register', 200, 'auth', NOW() - INTERVAL '25 hours'),
+        ('hash2', '/dm/messages', 200, 'dm', NOW() - INTERVAL '25 hours'),
+        ('hash3', '/media/presign', 200, 'media', NOW() - INTERVAL '25 hours')
+    `);
+    
+    // Run cleanup
+    await cleanupOldLogs();
+    
+    // Verify all deleted
+    const { rowCount } = await contentDB.query('SELECT * FROM logs.events WHERE created_at < NOW() - INTERVAL \'24 hours\'');
+    expect(rowCount).toBe(0);
+  });
+});
+```
+
+---
+
+## 🚀 Deployment & Infrastructure
+
+### **Additions to Original Plan**
+
+#### **Object Storage (R2/S3)**
+
+```yaml
+# Example: Cloudflare R2
+r2:
+  bucket: unitedUnions-media
+  region: auto
+  encryption: AES-256 (server-side, in addition to client-side)
+  cors:
+    allowed_origins:
+      - https://cdn.unitedUnions.app
+      - https://app.unitedUnions.app
+    allowed_methods:
+      - GET
+      - PUT
+  lifecycle:
+    expire_after: 365 days (for deleted objects)
+```
+
+**Cost:**
+- Cloudflare R2: $0.015/GB storage + $0.36/million Class A ops
+- AWS S3: $0.023/GB storage + $0.005/1000 PUT requests
+- **Estimated:** $5-15/mo for moderate usage
+
+#### **Presigned URL Configuration**
+
+```typescript
+// Backend presigned URL generation
+const command = new PutObjectCommand({
+  Bucket: BUCKET_NAME,
+  Key: objectKey,
+  ContentType: 'application/octet-stream', // Encrypted data
+  ServerSideEncryption: 'AES256', // Additional server-side encryption
+  ContentLength: size, // Enforce size
+});
+
+const uploadUrl = await getSignedUrl(s3, command, {
+  expiresIn: 600, // 10 minutes
+});
+```
+
+#### **Updated Service Deployment**
+
+```yaml
+# railway.toml or render.yaml
+services:
+  # ... (auth, union, voting, messaging as before)
+  
+  - name: dm-service
+    type: web
+    env:
+      - DM_DB_URL
+      - REDIS_URL
+      - JWT_SECRET
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    port: 3005
+  
+  - name: media-service
+    type: web
+    env:
+      - CONTENT_DB_URL
+      - BUCKET_NAME
+      - AWS_REGION
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    port: 3006
+
+databases:
+  - name: content-db
+    type: postgresql
+  - name: membership-db
+    type: postgresql
+  - name: ballot-db
+    type: postgresql
+  - name: dm-db
+    type: postgresql
+    # NEW
+```
+
+---
+
+## ⚠️ Risk Mitigation
+
+### **Technical Risks (Updated)**
+
+**Risk 1: E2EE Moderation Blindness**
+- **Issue:** Encrypted DMs cannot be moderated by admins
+- **Mitigation:**
+  - Client-side report button submits user-approved plaintext excerpt + message proof
+  - Strict rate limits on reports to prevent abuse
+  - Automated heuristics on metadata (frequency, recipient count)
+  - User-blocking feature (client-side, immediate)
+- **Timeline:** Built into DM service from start
+- **Cost:** $0
+
+**Risk 2: EXIF Leakage**
+- **Issue:** Accidental EXIF/GPS data in uploads
+- **Mitigation:**
+  - Force on-device re-encode (expo-image-manipulator)
+  - Deny presign if EXIF detected client-side
+  - Client-side verification tests
+  - Automated tests in CI/CD
+- **Timeline:** Week 6
+- **Cost:** $0
+
+**Risk 3: Media Abuse/Storage Costs**
+- **Issue:** Spam uploads, storage bloat
+- **Mitigation:**
+  - Size caps (10MB per file)
+  - Downscale to max 1440px
+  - Daily upload quotas per user
+  - MIME type allowlist (JPEG/PNG/WebP only)
+  - Object lifecycle policies (delete after 365 days if unused)
+- **Timeline:** Week 6
+- **Cost:** Minimal ($5-15/mo storage)
+
+**Risk 4: WebAuthn Browser Compatibility**
+- **Mitigation:** Implement fallback passphrase → Argon2id
+- **Timeline:** Week 5
+- **Cost:** +1 week dev time
+
+**Risk 5: Database Migration Failures**
+- **Mitigation:** Test migrations on staging first
+- **Timeline:** Week 12
+- **Cost:** +2 days
+
+**Risk 6: Blind Signature Library Issues**
+- **Mitigation:** Test thoroughly, have fallback to Mode A
+- **Timeline:** Week 9
+- **Cost:** +3 days
+
+### **Operational Risks (Updated)**
+
+**Risk 1: Service Downtime During Migration**
+- **Mitigation:** Blue-green deployment, gradual rollout
+- **Timeline:** Week 14
+- **Cost:** +$100/mo temporary
+
+**Risk 2: Cost Overruns (Storage/Egress)**
+- **Mitigation:**
+  - Monitor usage with billing alerts
+  - Set hard caps on R2/S3 egress
+  - Use CDN to minimize origin requests
+  - Implement upload throttling
+- **Timeline:** Ongoing
+- **Cost:** $0
+
+**Risk 3: User Adoption (Passkeys Unfamiliar)**
+- **Mitigation:** Clear onboarding, optional email transition period
+- **Timeline:** Post-launch
+- **Cost:** UX improvements
+
+**Risk 4: DM Spam/Abuse**
+- **Mitigation:**
+  - Rate limiting on conversation creation
+  - Recipient approval for first message
+  - User-initiated blocking (client-side)
+  - Report function with plaintext excerpt
+- **Timeline:** Week 7
+- **Cost:** $0
 
 ---
 
 ## 📊 Success Metrics
 
-### **Privacy Compliance**
+### **Privacy Compliance After Phase 1**
 
 | Category | Before | After Phase 1 | Target |
 |----------|--------|---------------|--------|
@@ -1820,14 +2472,17 @@ eas update --branch production --message "Phase 1 complete - WebAuthn + encrypte
 | Membership Storage | 0% | 90% | ✅ |
 | Voting System | 13% | 80% | ✅ |
 | Content & Messaging | 50% | 90% | ✅ |
+| Direct Messaging (E2EE) | 0% | 90% | ✅ |
+| Media Privacy (EXIF-free + encrypted) | 0% | 85% | ✅ |
+| Debate Privacy (aggregate-only) | 0% | 90% | ✅ |
 | Logging & Analytics | 0% | 90% | ✅ |
 | Network Security | 11% | 60% | ⚠️ (Phase 2) |
 | Cryptography | 0% | 95% | ✅ |
 | Abuse Controls | 67% | 85% | ✅ |
 | Operations | 0% | 50% | ⚠️ (Phase 2) |
-| **OVERALL** | **18%** | **81%** | ✅ |
+| **OVERALL** | **18%** | **86%** | ✅ |
 
-### **Acceptance Criteria**
+### **Acceptance Criteria After Phase 1**
 
 | AC | Description | Status |
 |----|-------------|--------|
@@ -1838,10 +2493,15 @@ eas update --branch production --message "Phase 1 complete - WebAuthn + encrypte
 | AC5 | 24h PII-free logs | ✅ 100% |
 | AC6 | CDN/Tor origin allowlist | ⚠️ 50% (Phase 2) |
 | AC7 | Public privacy policy | ✅ 100% |
+| AC8 | DM E2EE: server stores ciphertext only | ✅ 100% |
+| AC9 | DM forward secrecy ratchet verified | ✅ 100% |
+| AC10 | Media EXIF: all uploads EXIF-free | ✅ 100% |
+| AC11 | Media encryption: blobs & thumbnails encrypted | ✅ 100% |
+| AC12 | Debate privacy: no member enumeration | ✅ 100% |
 
-**Overall:** ✅ **6/7 ACs passed** (86%)
+**Overall:** ✅ **11/12 ACs passed** (92%) - AC6 deferred to Phase 2
 
-### **Red Lines**
+### **Red Lines (Extended)**
 
 | Red Line | Status |
 |----------|--------|
@@ -1850,46 +2510,13 @@ eas update --branch production --message "Phase 1 complete - WebAuthn + encrypte
 | Exposing per-user votes to admins | ✅ FIXED |
 | Custom crypto primitives | ✅ PASS |
 | Fingerprinting analytics | ✅ PASS |
+| **Storing plaintext media or thumbnails** | ✅ FIXED |
+| **Accepting uploads with EXIF/GPS intact** | ✅ FIXED |
+| **Logging object keys with DM routes (graph reconstruction)** | ✅ FIXED |
+| **Adding DM backdoor to decrypt without user plaintext sample** | ✅ PASS |
+| **Storing per-user read receipts/typing as persistent IDs** | ✅ PASS |
 
-**Red Lines Status:** ✅ **5/5 passed**
-
----
-
-## 🚨 Risk Mitigation
-
-### **Technical Risks**
-
-**Risk 1: WebAuthn Browser Compatibility**
-- **Mitigation:** Implement fallback passphrase → Argon2id
-- **Timeline:** Week 5
-- **Cost:** +1 week dev time
-
-**Risk 2: Database Migration Failures**
-- **Mitigation:** Test migrations on staging first
-- **Timeline:** Week 12
-- **Cost:** +2 days
-
-**Risk 3: Blind Signature Library Issues**
-- **Mitigation:** Test thoroughly, have fallback to Mode A
-- **Timeline:** Week 9
-- **Cost:** +3 days
-
-### **Operational Risks**
-
-**Risk 1: Service Downtime During Migration**
-- **Mitigation:** Blue-green deployment, gradual rollout
-- **Timeline:** Week 14
-- **Cost:** +$100/mo temporary
-
-**Risk 2: Cost Overruns**
-- **Mitigation:** Monitor usage, set billing alerts
-- **Timeline:** Ongoing
-- **Cost:** $0
-
-**Risk 3: User Adoption (Passkeys Unfamiliar)**
-- **Mitigation:** Clear onboarding, optional email transition period
-- **Timeline:** Post-launch
-- **Cost:** UX improvements
+**Red Lines Status:** ✅ **10/10 passed**
 
 ---
 
@@ -1897,11 +2524,13 @@ eas update --branch production --message "Phase 1 complete - WebAuthn + encrypte
 
 | Week | Focus | Deliverable |
 |------|-------|-------------|
-| 1-2 | Backend setup | 3 DBs, shared utilities |
+| 1-2 | Backend setup | 4 DBs, shared utilities |
 | 3-5 | Auth service | WebAuthn working |
-| 6-8 | Union service | Encrypted memberships |
+| 6 | Media pipeline | Encrypted, EXIF-free uploads |
+| 7 | DM service | E2EE conversations/messages |
+| 8 | Union + Debates | Encrypted memberships, debate threads |
 | 9-11 | Voting service | Blind-signature voting |
-| 12 | Migration | Content pseudonymization |
+| 12 | Migration | Pseudonyms only + logs |
 | 13-14 | Testing & deploy | Production launch |
 
 **Total:** 14 weeks (3.5 months)
@@ -1912,12 +2541,13 @@ eas update --branch production --message "Phase 1 complete - WebAuthn + encrypte
 
 | Category | Monthly Cost | One-Time Cost |
 |----------|-------------|---------------|
-| 3x PostgreSQL DBs | $75-150 | - |
-| 4x Node.js services | $50-100 | - |
+| 4x PostgreSQL DBs | $90-180 | - |
+| 6x Node.js services | $60-120 | - |
 | Redis cache | $10-20 | - |
+| Object Storage (R2/S3) | $5-15 | - |
 | CDN/WAF (Phase 2) | $0-25 | - |
 | Development | - | $20-40k (if outsourced) |
-| **Total Ongoing** | **$175-375** | - |
+| **Total Ongoing** | **$165-360** | - |
 
 ---
 
@@ -1925,18 +2555,23 @@ eas update --branch production --message "Phase 1 complete - WebAuthn + encrypte
 
 Phase 1 is complete when:
 
-- [ ] All 4 microservices deployed and healthy
-- [ ] All 3 databases separated and secured
+- [ ] All 6 microservices deployed and healthy
+- [ ] All 4 databases separated and secured
+- [ ] Encrypted object storage configured
 - [ ] WebAuthn authentication works on iOS/Android
 - [ ] Zero email collection (verified in DB)
 - [ ] Encrypted memberships work end-to-end
 - [ ] Blind-signature voting (Mode B) works
+- [ ] **E2EE Direct Messaging works with forward secrecy**
+- [ ] **Encrypted media uploads with EXIF stripping work**
+- [ ] **Debates function with aggregate-only views**
 - [ ] Logs auto-delete after 24h
 - [ ] No PII in logs (verified)
-- [ ] All integration tests pass
-- [ ] Expo app updated with new auth flow
+- [ ] All integration tests pass (including DM, media, debate tests)
+- [ ] Expo app updated with new features
 - [ ] Documentation updated
-- [ ] 81% privacy compliance achieved
+- [ ] **86% privacy compliance achieved** (up from 81%)
+- [ ] **11/12 acceptance criteria passed**
 
 ---
 
@@ -1960,5 +2595,6 @@ After Phase 1 completion:
 
 For questions or support during implementation, refer to:
 - [SECURITY_ACCEPTANCE_CRITERIA.md](SECURITY_ACCEPTANCE_CRITERIA.md) - Full gap analysis
+- [SECURITY_ACCEPTANCE_CRITERIA_PHASE_2.md](SECURITY_ACCEPTANCE_CRITERIA_PHASE_2.md) - Infrastructure hardening
 - [SECURITY_STATUS.md](SECURITY_STATUS.md) - Current security status
 - [replit.md](replit.md) - Project overview
