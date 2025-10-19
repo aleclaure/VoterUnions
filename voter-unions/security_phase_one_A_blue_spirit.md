@@ -9,12 +9,268 @@
 
 ## 📋 Table of Contents
 
-1. [Overview](#overview)
-2. [Week 3: Backend WebAuthn Registration](#week-3-backend-webauthn-registration)
-3. [Week 4: Backend WebAuthn Authentication](#week-4-backend-webauthn-authentication)
-4. [Week 5: Frontend Integration](#week-5-frontend-integration)
-5. [Testing & Validation](#testing--validation)
-6. [Deployment Checklist](#deployment-checklist)
+1. [Pre-Migration Analysis](#pre-migration-analysis)
+2. [Migration Strategy](#migration-strategy)
+3. [Overview](#overview)
+4. [Week 3: Backend WebAuthn Registration](#week-3-backend-webauthn-registration)
+5. [Week 4: Backend WebAuthn Authentication](#week-4-backend-webauthn-authentication)
+6. [Week 5: Frontend Integration](#week-5-frontend-integration)
+7. [Critical Migration Tasks](#critical-migration-tasks)
+8. [Testing & Validation](#testing--validation)
+9. [Deployment Checklist](#deployment-checklist)
+10. [Rollback Procedures](#rollback-procedures)
+
+---
+
+## 🔍 Pre-Migration Analysis
+
+### **Current Supabase Auth Implementation**
+
+Based on codebase analysis, here's what exists today:
+
+#### **Authentication Files**
+```
+voter-unions/
+├── src/
+│   ├── hooks/
+│   │   └── useAuth.ts                    ❌ DELETE (Supabase auth)
+│   ├── screens/
+│   │   └── AuthScreen.tsx                ❌ DELETE (email/password UI)
+│   ├── services/
+│   │   ├── supabase.ts                   ⚠️  MODIFY (keep for data, remove auth)
+│   │   ├── emailVerification.ts          ❌ DELETE (11 protected actions)
+│   │   └── auditLog.ts                   ⚠️  MODIFY (remove email logging)
+│   ├── context/
+│   │   └── AuthContext.tsx               ⚠️  REPLACE (new WebAuthn context)
+│   └── components/
+│       └── EmailVerificationBanner.tsx   ❌ DELETE
+```
+
+#### **Database Dependencies**
+```sql
+-- Current Supabase tables that reference users
+profiles (id → supabase.auth.users.id)           ⚠️  MIGRATE to new user_id
+union_members (user_id → auth.users.id)          ⚠️  MIGRATE
+posts (user_id → auth.users.id)                  ⚠️  MIGRATE (use pseudonym)
+comments (user_id → auth.users.id)               ⚠️  MIGRATE (use pseudonym)
+channels (created_by → auth.users.id)            ⚠️  MIGRATE
+debates (created_by → auth.users.id)             ⚠️  MIGRATE
+arguments (user_id → auth.users.id)              ⚠️  MIGRATE
+argument_votes (user_id → auth.users.id)         ⚠️  MIGRATE
+post_reactions (user_id → auth.users.id)         ⚠️  MIGRATE
+policy_votes (user_id → auth.users.id)           ⚠️  MIGRATE
+boycott_votes (user_id, device_id)               ⚠️  MIGRATE
+worker_votes (voter_id, device_id)               ⚠️  MIGRATE
+power_pledges (user_id → auth.users.id)          ⚠️  MIGRATE
+active_sessions (user_id → auth.users.id)        ⚠️  MIGRATE
+audit_logs (user_id, username → email)           ⚠️  MIGRATE (PII-free)
+```
+
+#### **Protected Actions (Email Verification)**
+Currently 11 actions require email verification:
+```typescript
+// src/services/emailVerification.ts - PROTECTED_ACTIONS
+CREATE_POST           ❌ Remove guard
+CREATE_COMMENT        ❌ Remove guard
+CREATE_CHANNEL        ❌ Remove guard
+CREATE_DEBATE         ❌ Remove guard
+CREATE_ARGUMENT       ❌ Remove guard
+VOTE                  ❌ Remove guard
+CREATE_UNION          ❌ Remove guard
+CREATE_BOYCOTT        ❌ Remove guard
+CREATE_STRIKE         ❌ Remove guard
+UPDATE_PROFILE        ❌ Remove guard
+CREATE_POWER_PLEDGE   ❌ Remove guard
+```
+
+#### **Token Storage (Already Good!)**
+```typescript
+// src/services/supabase.ts - SecureAuthStorage
+✅ Already uses expo-secure-store on native
+✅ Fallback to AsyncStorage on web
+✅ IndexedDB error handling
+✅ Can reuse this for WebAuthn tokens
+```
+
+#### **Audit Logging (Needs Migration)**
+```typescript
+// src/services/auditLog.ts - log_audit_event
+⚠️  Currently logs: userId, username (email), deviceId
+⚠️  Does NOT log: IP addresses (already good!)
+✅ Needs migration to PII-free 24h retention
+```
+
+---
+
+## 🚨 Migration Strategy
+
+### **High-Risk Cutover Approach**
+
+Since you want the **auth-first** approach, here's the safest execution plan:
+
+---
+
+### **Phase 0: Pre-Migration Prep (Before Week 1)**
+
+#### **Task 0.1: Backup Everything**
+```bash
+# Backup Supabase database
+pg_dump $SUPABASE_DB_URL > backup_$(date +%Y%m%d).sql
+
+# Backup codebase
+git commit -am "Pre-migration snapshot"
+git tag pre-webauthn-migration
+git push --tags
+```
+
+#### **Task 0.2: Create Migration Branch**
+```bash
+git checkout -b feature/webauthn-migration
+```
+
+#### **Task 0.3: Set Up Parallel Infrastructure**
+```bash
+# Create 4 new PostgreSQL databases (Railway/Render)
+# - content_db (for public content)
+# - membership_db (for encrypted tokens) - NOT NEEDED YET
+# - ballot_db (for voting) - NOT NEEDED YET
+# - dm_db (for E2EE messages) - NOT NEEDED YET
+
+# For now, just create content_db
+# We'll migrate Supabase data to content_db
+```
+
+#### **Task 0.4: Document Current User IDs**
+```bash
+# Export all current user IDs for migration mapping
+psql $SUPABASE_DB_URL -c "COPY (SELECT id, email FROM auth.users) TO STDOUT" > user_mapping.csv
+```
+
+---
+
+### **Phase 1: Build Auth Service (Weeks 3-4, No Cutover)**
+
+#### **Parallel Development**
+- ✅ Build auth service on port 3001
+- ✅ Test with mock users
+- ✅ Keep Supabase auth running
+- ✅ No frontend changes yet
+
+**Key Point:** App still works with Supabase during this time.
+
+---
+
+### **Phase 2: Frontend Integration (Week 5, No Cutover)**
+
+#### **Dual-Auth Mode**
+```typescript
+// src/config.ts - Feature flag
+export const USE_WEBAUTHN = process.env.EXPO_PUBLIC_USE_WEBAUTHN === 'true';
+
+// src/services/auth.ts
+if (USE_WEBAUTHN) {
+  return await signInWithPasskey();
+} else {
+  return await signInWithSupabase();
+}
+```
+
+**Testing:**
+- ✅ Test WebAuthn with `USE_WEBAUTHN=true`
+- ✅ Test Supabase with `USE_WEBAUTHN=false`
+- ✅ Verify both paths work
+
+**Key Point:** Still no production cutover.
+
+---
+
+### **Phase 3: Data Migration (End of Week 5)**
+
+#### **Critical: User ID Migration**
+
+**Problem:** Supabase uses UUID v4 for user IDs, new system uses ULID.
+
+**Solution 1: Keep Existing UUIDs (SAFER)**
+```typescript
+// Backend: Modify auth service to accept existing UUID
+// When migrating users, preserve their Supabase user_id
+const userId = existingSupabaseUserId || ulid();
+```
+
+**Solution 2: Create Mapping Table (COMPLEX)**
+```sql
+CREATE TABLE user_id_migration (
+  supabase_id UUID PRIMARY KEY,
+  new_user_id TEXT NOT NULL,
+  migrated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Recommendation:** Use Solution 1 (preserve UUIDs) for existing users.
+
+#### **Migration Script**
+```typescript
+// scripts/migrate-users.ts
+import { supabase } from '../src/services/supabase';
+import { db } from '../backend/services/auth_service/src/db/client';
+
+const migrateUsers = async () => {
+  // 1. Get all Supabase users
+  const { data: users } = await supabase.auth.admin.listUsers();
+  
+  for (const user of users) {
+    // 2. Create migration entry
+    await db.query(`
+      INSERT INTO user_id_migration (supabase_id, new_user_id, status)
+      VALUES ($1, $1, 'pending')
+    `, [user.id]); // Preserve UUID for now
+    
+    console.log(`Queued user ${user.id} for migration`);
+  }
+  
+  console.log(`Total users queued: ${users.length}`);
+};
+```
+
+**⚠️ CRITICAL:** This step requires careful planning. Users will need to:
+1. Register new passkey
+2. System links new passkey to existing user_id
+3. All their content stays linked
+
+---
+
+### **Phase 4: Production Cutover (Week 6)**
+
+#### **D-Day Checklist**
+
+**24 Hours Before:**
+- [ ] Announce maintenance window to users
+- [ ] Set Supabase to read-only mode
+- [ ] Final database backup
+- [ ] Deploy auth service to production
+- [ ] Deploy updated frontend with `USE_WEBAUTHN=true`
+
+**During Maintenance:**
+- [ ] Enable feature flag `USE_WEBAUTHN=true`
+- [ ] Test 5 user signups end-to-end
+- [ ] Test existing user migration
+- [ ] Monitor error rates
+
+**After Cutover:**
+- [ ] Monitor for 1 hour
+- [ ] Check user registration rate
+- [ ] Check error logs
+- [ ] If issues → ROLLBACK (see section below)
+
+---
+
+### **Phase 5: Cleanup (Week 7+)**
+
+After 1 week of stable operation:
+- [ ] Delete email verification code
+- [ ] Delete old auth screens
+- [ ] Remove Supabase Auth entirely
+- [ ] Celebrate 🎉
 
 ---
 
@@ -1855,6 +2111,539 @@ rm frontend/src/hooks/useEmailVerificationGuard.ts
 - **Authentication:** 40% → 90% (WebAuthn vs email/password)
 - **Privacy:** 10% → 80% (zero PII collection)
 - **Cryptography:** 30% → 90% (hardware-backed keys)
+
+---
+
+## 🔧 Critical Migration Tasks
+
+### **Task 1: Remove Email Verification Guards**
+
+**Problem:** Current codebase has 11 protected actions requiring email verification.
+
+**Solution:**
+```typescript
+// BEFORE: src/hooks/usePosts.ts
+const allowed = await guardAction('CREATE_POST');
+if (!allowed) throw new Error('Email verification required');
+
+// AFTER: Remove entirely
+// const allowed = await guardAction('CREATE_POST');
+// if (!allowed) throw new Error('Email verification required');
+```
+
+**Files to Modify:**
+```bash
+src/hooks/usePosts.ts          - Remove CREATE_POST guard
+src/hooks/useComments.ts        - Remove CREATE_COMMENT guard
+src/hooks/useChannels.ts        - Remove CREATE_CHANNEL guard
+src/hooks/useDebates.ts         - Remove CREATE_DEBATE guard
+src/hooks/useArguments.ts       - Remove CREATE_ARGUMENT guard
+src/hooks/useVotes.ts           - Remove VOTE guard
+src/hooks/useUnions.ts          - Remove CREATE_UNION guard
+src/hooks/useBoycotts.ts        - Remove CREATE_BOYCOTT guard
+src/hooks/useWorkerProposals.ts - Remove CREATE_STRIKE guard
+src/hooks/useProfile.ts         - Remove UPDATE_PROFILE guard
+src/hooks/usePowerPledges.ts    - Remove CREATE_POWER_PLEDGE guard
+```
+
+**Search and Replace:**
+```bash
+# Remove all email verification guard calls
+grep -rl "guardAction" src/hooks/ | while read file; do
+  sed -i '/guardAction/d' "$file"
+  sed -i '/Email verification required/d' "$file"
+done
+```
+
+**Deliverable:** ✅ All 11 email verification guards removed
+
+---
+
+### **Task 2: Migrate Audit Logging to PII-Free**
+
+**Problem:** Current audit logs store `username` (email) and need migration to PII-free format.
+
+**Solution:**
+
+**Step 1: Create new audit logging service**
+```typescript
+// backend/services/auth_service/src/lib/audit.ts
+import { Pool } from 'pg';
+
+const logsDb = new Pool({
+  connectionString: process.env.LOGS_DB_URL,
+});
+
+export const logEvent = async (params: {
+  route: string;
+  statusCode: number;
+  requestHash: string; // SHA256 of request details
+}) => {
+  await logsDb.query(`
+    INSERT INTO logs_schema.events (route, status_code, request_hash)
+    VALUES ($1, $2, $3)
+  `, [params.route, params.statusCode, params.requestHash]);
+};
+
+// Auto-delete after 24 hours (handled by database trigger)
+```
+
+**Step 2: Update frontend audit logging**
+```typescript
+// BEFORE: src/services/auditLog.ts
+await auditHelpers.signupSuccess(data.user.id, email, deviceId);
+
+// AFTER: Remove email parameter
+await auditHelpers.signupSuccess(data.user.id, deviceId);
+```
+
+**Files to Modify:**
+```bash
+src/services/auditLog.ts       - Remove username parameter
+src/hooks/useAuth.ts           - Update all audit calls
+src/screens/AuthScreen.tsx     - Remove email from audit calls
+```
+
+**Database Migration:**
+```sql
+-- Create new logs schema
+CREATE SCHEMA IF NOT EXISTS logs_schema;
+
+CREATE TABLE logs_schema.events (
+  id BIGSERIAL PRIMARY KEY,
+  route VARCHAR(255) NOT NULL,
+  status_code INT NOT NULL,
+  request_hash VARCHAR(64) NOT NULL, -- SHA256 hash
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Auto-delete after 24 hours
+CREATE OR REPLACE FUNCTION logs_schema.delete_old_events()
+RETURNS TRIGGER AS $$
+BEGIN
+  DELETE FROM logs_schema.events
+  WHERE created_at < NOW() - INTERVAL '24 hours';
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_delete_old_events
+  AFTER INSERT ON logs_schema.events
+  EXECUTE FUNCTION logs_schema.delete_old_events();
+```
+
+**Deliverable:** ✅ PII-free logging with 24h retention
+
+---
+
+### **Task 3: Database Schema Migration**
+
+**Problem:** Need to migrate from Supabase auth.users to new users table.
+
+**Solution:**
+
+**Step 1: Create migration script**
+```typescript
+// scripts/migrate-database.ts
+import { createClient } from '@supabase/supabase-js';
+import { Pool } from 'pg';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+const newDb = new Pool({
+  connectionString: process.env.CONTENT_DB_URL,
+});
+
+const migrateData = async () => {
+  console.log('Starting database migration...');
+  
+  // 1. Migrate users (preserve UUIDs)
+  console.log('Migrating users...');
+  const { data: authUsers } = await supabase.auth.admin.listUsers();
+  
+  for (const user of authUsers) {
+    await newDb.query(`
+      INSERT INTO users (user_id, created_at)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id) DO NOTHING
+    `, [user.id, user.created_at]);
+  }
+  console.log(`Migrated ${authUsers.length} users`);
+  
+  // 2. Migrate profiles
+  console.log('Migrating profiles...');
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('*');
+  
+  for (const profile of profiles) {
+    await newDb.query(`
+      INSERT INTO content_schema.profiles (
+        id, display_name, username_normalized, bio, avatar_url, created_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (id) DO UPDATE SET
+        display_name = EXCLUDED.display_name,
+        bio = EXCLUDED.bio,
+        avatar_url = EXCLUDED.avatar_url
+    `, [
+      profile.id,
+      profile.display_name,
+      profile.username_normalized,
+      profile.bio,
+      profile.avatar_url,
+      profile.created_at
+    ]);
+  }
+  console.log(`Migrated ${profiles.length} profiles`);
+  
+  // 3. Migrate unions
+  console.log('Migrating unions...');
+  const { data: unions } = await supabase.from('unions').select('*');
+  
+  for (const union of unions) {
+    await newDb.query(`
+      INSERT INTO content_schema.unions (
+        id, name, description, is_public, created_by, created_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (id) DO NOTHING
+    `, [
+      union.id,
+      union.name,
+      union.description,
+      union.is_public,
+      union.created_by,
+      union.created_at
+    ]);
+  }
+  console.log(`Migrated ${unions.length} unions`);
+  
+  // 4. Migrate posts (with pseudonyms)
+  console.log('Migrating posts...');
+  const { data: posts } = await supabase.from('posts').select('*');
+  
+  for (const post of posts) {
+    // Generate pseudonym for each post author
+    const pseudonym = `user_${post.user_id.substring(0, 8)}`;
+    
+    await newDb.query(`
+      INSERT INTO content_schema.posts (
+        id, content, union_id, author_pseudonym, is_public, created_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (id) DO NOTHING
+    `, [
+      post.id,
+      post.content,
+      post.union_id,
+      pseudonym, // Use pseudonym instead of user_id
+      post.is_public,
+      post.created_at
+    ]);
+  }
+  console.log(`Migrated ${posts.length} posts`);
+  
+  // Continue for all other tables...
+  // channels, debates, arguments, votes, etc.
+  
+  console.log('✅ Database migration complete!');
+};
+
+migrateData().catch(console.error);
+```
+
+**Step 2: Run migration**
+```bash
+# Dry run first
+npm run migrate:dry-run
+
+# Actual migration
+npm run migrate:production
+```
+
+**Step 3: Verify migration**
+```bash
+# Check row counts match
+psql $CONTENT_DB_URL -c "SELECT COUNT(*) FROM content_schema.users;"
+psql $CONTENT_DB_URL -c "SELECT COUNT(*) FROM content_schema.profiles;"
+psql $CONTENT_DB_URL -c "SELECT COUNT(*) FROM content_schema.posts;"
+```
+
+**Deliverable:** ✅ All data migrated to new database
+
+---
+
+### **Task 4: Update Frontend to Use New Auth**
+
+**Problem:** Frontend currently uses Supabase auth throughout.
+
+**Solution:**
+
+**Step 1: Create feature flag**
+```typescript
+// src/config.ts
+export const CONFIG = {
+  USE_WEBAUTHN: process.env.EXPO_PUBLIC_USE_WEBAUTHN === 'true',
+  API_URL: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001',
+};
+```
+
+**Step 2: Create auth adapter**
+```typescript
+// src/services/auth/index.ts
+import { CONFIG } from '../config';
+import * as WebAuthnAuth from './webauthn';
+import * as SupabaseAuth from './supabase';
+
+// Adapter pattern - switch based on feature flag
+export const auth = CONFIG.USE_WEBAUTHN ? WebAuthnAuth : SupabaseAuth;
+
+// Usage in components:
+// const { signUp, signIn, signOut } = auth;
+```
+
+**Step 3: Update all components**
+```typescript
+// BEFORE: src/screens/ProfileScreen.tsx
+import { supabase } from '../services/supabase';
+const { data } = await supabase.from('profiles').select('*').eq('id', user.id);
+
+// AFTER: Use API instead
+import { fetchProfile } from '../api/profiles';
+const profile = await fetchProfile(userId);
+```
+
+**Files to Modify:**
+```bash
+src/screens/ProfileScreen.tsx
+src/screens/UnionDetailScreen.tsx
+src/screens/CreateUnionScreen.tsx
+src/hooks/usePosts.ts
+src/hooks/useComments.ts
+src/hooks/useVotes.ts
+# ... all files using Supabase queries
+```
+
+**Deliverable:** ✅ Frontend uses WebAuthn auth + API calls
+
+---
+
+### **Task 5: Files to Delete**
+
+**After successful migration, delete these files:**
+
+```bash
+# Email verification system
+rm src/services/emailVerification.ts
+rm src/components/EmailVerificationBanner.tsx
+
+# Old auth screens
+rm src/screens/AuthScreen.tsx
+rm src/screens/ResetPasswordScreen.tsx
+
+# Old Supabase auth hooks
+rm src/hooks/useEmailVerificationGuard.ts
+
+# Rate limiting (move to backend)
+rm src/services/rateLimiter.ts
+
+# Validation schemas for email/password
+grep -l "emailSchema\|passwordSchema" src/utils/* | xargs rm
+```
+
+**Deliverable:** ✅ All legacy auth code deleted
+
+---
+
+## 🔄 Rollback Procedures
+
+### **Emergency Rollback Plan**
+
+If migration fails, follow these steps immediately:
+
+---
+
+### **Scenario 1: Auth Service Crashes (Week 3-4)**
+
+**Symptoms:**
+- Auth service won't start
+- Database connection errors
+- WebAuthn registration fails
+
+**Rollback:**
+```bash
+# 1. No frontend changes yet, so nothing to rollback
+# 2. Debug auth service locally
+# 3. Fix issues before proceeding
+
+# No user impact - Supabase auth still running
+```
+
+**Risk:** ✅ LOW (no production impact)
+
+---
+
+### **Scenario 2: Frontend Integration Fails (Week 5)**
+
+**Symptoms:**
+- Passkey prompts don't appear
+- App crashes on sign up
+- Token storage fails
+
+**Rollback:**
+```bash
+# 1. Revert frontend to previous commit
+git checkout main
+git pull
+
+# 2. Set feature flag
+export EXPO_PUBLIC_USE_WEBAUTHN=false
+
+# 3. Redeploy frontend
+eas build --platform ios
+eas build --platform android
+
+# Users still use Supabase auth
+```
+
+**Risk:** ⚠️ MEDIUM (some users might have created passkeys)
+
+---
+
+### **Scenario 3: Production Cutover Fails (Week 6)**
+
+**Symptoms:**
+- Mass user login failures
+- Database migration errors
+- Data inconsistencies
+
+**Immediate Actions:**
+
+**Step 1: Disable WebAuthn (5 minutes)**
+```bash
+# Set feature flag to false
+export EXPO_PUBLIC_USE_WEBAUTHN=false
+
+# Redeploy frontend immediately
+eas update --branch production --message "Rollback to Supabase auth"
+
+# Users can now use Supabase auth again
+```
+
+**Step 2: Restore Database (15 minutes)**
+```bash
+# Restore Supabase database from backup
+pg_restore -d $SUPABASE_DB_URL backup_$(date +%Y%m%d).sql
+
+# Verify data integrity
+psql $SUPABASE_DB_URL -c "SELECT COUNT(*) FROM auth.users;"
+psql $SUPABASE_DB_URL -c "SELECT COUNT(*) FROM public.profiles;"
+```
+
+**Step 3: Communicate with Users (30 minutes)**
+```
+Subject: Temporary Authentication Issue Resolved
+
+We experienced a brief authentication issue and have restored service.
+If you created a passkey account, please contact support for migration.
+
+All data is safe and your account is accessible.
+```
+
+**Step 4: Post-Mortem (24 hours)**
+- [ ] Document what went wrong
+- [ ] Identify root cause
+- [ ] Create fix plan
+- [ ] Schedule retry date
+
+**Risk:** 🔴 HIGH (affects all users)
+
+---
+
+### **Data Recovery Procedures**
+
+#### **Recover Lost User Data**
+```typescript
+// scripts/recover-user-data.ts
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+const recoverUserData = async (userId: string) => {
+  // 1. Find user in backup
+  const { data: backupUser } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+  
+  if (!backupUser) {
+    console.log(`No backup found for user ${userId}`);
+    return;
+  }
+  
+  // 2. Restore user profile
+  const { error } = await supabase
+    .from('profiles')
+    .upsert(backupUser);
+  
+  if (error) {
+    console.error(`Failed to restore user ${userId}:`, error);
+  } else {
+    console.log(`✅ Restored user ${userId}`);
+  }
+};
+```
+
+#### **Verify Data Integrity**
+```sql
+-- Check for missing users
+SELECT COUNT(*) FROM profiles
+WHERE id NOT IN (SELECT id FROM auth.users);
+
+-- Check for orphaned content
+SELECT COUNT(*) FROM posts
+WHERE user_id NOT IN (SELECT id FROM auth.users);
+
+-- Check vote counts
+SELECT SUM(yes_votes + no_votes) FROM boycott_proposals;
+SELECT COUNT(*) FROM boycott_votes;
+```
+
+**Deliverable:** ✅ Rollback procedures documented and tested
+
+---
+
+### **Rollback Testing (Before Week 6)**
+
+**Test rollback procedure in staging:**
+
+```bash
+# 1. Deploy to staging with WebAuthn
+export EXPO_PUBLIC_USE_WEBAUTHN=true
+eas build --platform ios --profile staging
+
+# 2. Create test users
+# ... create 5 test accounts ...
+
+# 3. Trigger rollback
+export EXPO_PUBLIC_USE_WEBAUTHN=false
+eas update --branch staging --message "Test rollback"
+
+# 4. Verify test users can still log in
+# ... test with Supabase auth ...
+
+# 5. Document any issues
+```
+
+**Deliverable:** ✅ Rollback tested in staging
 
 ---
 
