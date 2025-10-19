@@ -1,0 +1,99 @@
+Voter Unions – Relevance Map for Old Security Status vs New Privacy-First Plan (TXT Edition)
+Last updated: now
+
+======================================================================
+SECTION 1 — WHAT TO KEEP, ADAPT, OR REMOVE
+	1.	XSS hardening (62 tests, stripHtml, AST enforcement)
+STATUS: KEEP
+ACTION: Keep CI enforcement exactly as-is.
+	2.	Content reporting & moderation (18 types, moderation queue)
+STATUS: KEEP
+ACTION: Keep the model and auditability; enforce access via microservice ACLs instead of DB RLS.
+	3.	Server-side tallies (no client counts)
+STATUS: KEEP
+ACTION: Continue aggregations server-side; compatible with Mode-B voting.
+	4.	Audit logs (auth, moderation, admin)
+STATUS: ADAPT
+ACTION: Retain event coverage but use PII-free logs with 24h retention. Do not store IP/UA/user_id.
+	5.	Session timeout + secure storage
+STATUS: KEEP
+ACTION: Keep 30-min inactivity timeout, SecureStore, and 15-min JWT rotation.
+	6.	GDPR export + hard delete
+STATUS: ADAPT
+ACTION: Reimplement in Node services. Export excludes emails (not collected) and includes membership ciphertext blobs.
+	7.	Rate limiting
+STATUS: ADAPT
+ACTION: Move to server/WAF token bucket. Key primarily by userId (JWT) and per-route anonymous tokens; do not rely on IP.
+	8.	Email verification gates (blocking 16 actions)
+STATUS: REMOVE
+ACTION: Superseded by WebAuthn passkeys. Remove banners and gate checks.
+	9.	Passwords and password reset flows
+STATUS: REMOVE
+ACTION: Replaced by passkeys. Optional passphrase recovery only for low-capability devices.
+	10.	Supabase RLS policies “everywhere”
+STATUS: REMOVE (stack-specific)
+ACTION: Authorization moves to microservices (JWT claims + holder_binding checks). Keep the principle, change the mechanism.
+	11.	Device-based vote uniqueness (device_id hashing, unique index)
+STATUS: REMOVE
+ACTION: Superseded by blind-signature Mode-B with nullifier uniqueness.
+	12.	IP-based geo verification
+STATUS: AVOID / DEFER
+ACTION: If absolutely necessary, use coarse WAF geofencing without persistent storage.
+	13.	MFA
+STATUS: OPTIONAL (STEP-UP)
+ACTION: With passkeys, MFA is step-up for admin/superuser actions (second platform authenticator or recovery phrase).
+	14.	CAPTCHA (signup, abuse-prone actions)
+STATUS: KEEP
+ACTION: Use hCaptcha; verify server-side; avoid user tracking.
+	15.	Security alerts/monitoring (anomaly detection)
+STATUS: KEEP
+ACTION: Keep anomaly detection using PII-free telemetry and per-account rates.
+	16.	Blockchain vote verification
+STATUS: NICE-TO-HAVE
+ACTION: Defer unless public anchoring is a requirement.
+
+======================================================================
+SECTION 2 — NEW / UPDATED REQUIREMENTS FOR POSTS, DMS, DEBATES
+
+A) Text + Photo Posts
+	•	Media pipeline: whitelist (jpg/png/webp/mp4/gif/pdf), max size limits, EXIF stripping on upload, server-side transcode (images/video).
+	•	Storage: private bucket for originals + expiring signed URLs; only publish minimal thumbnails if needed.
+	•	Malware scanning: scan server-side for non-E2E content before publishing.
+	•	Pseudonyms: keep author_pseudonym only; do not store stable device identifiers.
+
+B) Direct Messaging (DMs)
+	•	E2E by default: per-thread keys; server stores ciphertext + routing metadata only.
+	•	Attachments: client-side encrypt before upload; accept type/size limits; no server scanning for E2E payloads.
+	•	Safety controls: per-conversation block/report; spam throttles; safety-number / key-change notices.
+
+C) Text Debates
+	•	Modes: public (server-readable) vs private (E2E). Private mode disables server moderation visibility; show user warning.
+	•	Membership gating: verify via holder_binding (hash of client_pub_key) rather than enumerating members.
+	•	Ephemerality: policy-driven auto-delete options (e.g., 7/30/90 days) with user-visible countdown.
+
+======================================================================
+SECTION 3 — CONCRETE REMOVALS / EDITS TO THE OLD STATUS REPORT
+	•	Remove all Supabase-auth specifics: email verification flows, password reset, and RLS-backed gating of writes.
+	•	Replace “account deletion via Supabase Edge Function” with Node “account” service that cascades across all three DBs; logs anonymized and purged ≤24h.
+	•	Delete device_id vote uniqueness and any device hashing related to votes; replace with Mode-B nullifier uniqueness and blind-signature issuance.
+	•	Remove any IP/UA logging language; reference PII-free request_hash logs with 24h retention.
+	•	For messaging/debates, add explicit E2E option (server unreadable). Make trade-offs clear (reduced moderation visibility).
+	•	Keep “Rate limiting” but clarify enforcement occurs at server/WAF (Redis token bucket), not client-only.
+
+======================================================================
+SECTION 4 — STILL MISSING AFTER PHASE-1 (KEEP ON ROADMAP)
+	•	E2E encryption for DMs and private debates (required now that messaging is in scope).
+	•	Server/WAF rate limiting and bot defense (complete migration from client-only).
+	•	Privacy controls UI (hide union membership, pseudonyms, profile visibility) wired to service-side authorization.
+	•	Media security hardening (scanner/transcoder/EXIF stripping) for photo/video posts and encrypted-upload flow for DMs.
+	•	Admin step-up authentication for destructive or export actions (second passkey or recovery challenge).
+
+======================================================================
+SECTION 5 — TL;DR SNAPSHOT
+	•	KEEP: XSS suite; reporting/moderation; server-side tallies; auditability (PII-free); session mgmt; GDPR export/delete; CAPTCHA; security alerts.
+	•	REMOVE: email/password; email verification gates; Supabase RLS mechanics; device-based vote uniqueness; IP/UA logging.
+	•	ADAPT: move rate limits to server/WAF; rework audits to PII-free 24h; GDPR export via Node services; authorization in microservices using JWT + holder_binding.
+	•	ADD: E2E for DMs/private debates; hardened media pipeline; privacy settings UI; admin step-up auth.
+
+======================================================================
+END OF TXT DOCUMENT

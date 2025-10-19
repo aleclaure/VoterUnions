@@ -9,15 +9,223 @@
 
 ## 📋 Table of Contents
 
-1. [Executive Summary](#executive-summary)
-2. [Architecture Overview](#architecture-overview)
-3. [Week-by-Week Implementation](#week-by-week-implementation)
-4. [Service Specifications](#service-specifications)
-5. [Database Migration Strategy](#database-migration-strategy)
-6. [Testing & Quality Assurance](#testing--quality-assurance)
-7. [Deployment & Infrastructure](#deployment--infrastructure)
-8. [Risk Mitigation](#risk-mitigation)
-9. [Success Metrics](#success-metrics)
+1. [Migration Relevance Map](#migration-relevance-map)
+2. [Executive Summary](#executive-summary)
+3. [Architecture Overview](#architecture-overview)
+4. [Week-by-Week Implementation](#week-by-week-implementation)
+5. [Service Specifications](#service-specifications)
+6. [Database Migration Strategy](#database-migration-strategy)
+7. [Testing & Quality Assurance](#testing--quality-assurance)
+8. [Deployment & Infrastructure](#deployment--infrastructure)
+9. [Risk Mitigation](#risk-mitigation)
+10. [Success Metrics](#success-metrics)
+
+---
+
+## 🗺️ Migration Relevance Map
+
+**Purpose:** This section maps existing security features from the current Supabase-based implementation to the new Phase 1 privacy-first architecture. It clarifies what to **KEEP**, **ADAPT**, or **REMOVE** during migration.
+
+---
+
+### **Section 1: What to KEEP, ADAPT, or REMOVE**
+
+#### **✅ KEEP (No Changes Required)**
+
+| Feature | Status | Action |
+|---------|--------|--------|
+| **XSS Hardening** | ✅ KEEP | Keep CI enforcement exactly as-is (62 tests, stripHtml, AST enforcement) |
+| **Content Reporting & Moderation** | ✅ KEEP | Keep the model and auditability; enforce access via microservice ACLs instead of DB RLS |
+| **Server-Side Tallies** | ✅ KEEP | Continue aggregations server-side; compatible with Mode-B voting |
+| **Session Timeout + Secure Storage** | ✅ KEEP | Keep 30-min inactivity timeout, SecureStore, and 15-min JWT rotation |
+| **CAPTCHA** | ✅ KEEP | Use hCaptcha; verify server-side; avoid user tracking |
+| **Security Alerts/Monitoring** | ✅ KEEP | Keep anomaly detection using PII-free telemetry and per-account rates |
+
+**Rationale:** These features are implementation-agnostic and provide essential security without compromising privacy.
+
+---
+
+#### **⚠️ ADAPT (Modify for Privacy-First Architecture)**
+
+| Feature | Old Implementation | New Implementation | Migration Notes |
+|---------|-------------------|-------------------|-----------------|
+| **Audit Logs** | IP/UA/user_id stored indefinitely | PII-free logs with 24h retention | Remove IP, UA, user_id; use request_hash only |
+| **GDPR Export + Hard Delete** | Supabase Edge Function | Node.js account service | Reimplement in Node; fan out to 4 DBs; export excludes emails (not collected) |
+| **Rate Limiting** | Client-side only | Server/WAF token bucket | Move to Redis; key by userId (JWT) and per-route anonymous tokens; avoid IP-based |
+| **Authorization** | Supabase RLS policies | Microservice ACLs | JWT claims + holder_binding checks in each service |
+
+**Rationale:** These features are valuable but require architectural changes to align with privacy-first principles.
+
+---
+
+#### **❌ REMOVE (Superseded by New Architecture)**
+
+| Feature | Reason for Removal | Replacement |
+|---------|-------------------|-------------|
+| **Email Verification Gates** | Blocking 16 actions; superseded by WebAuthn | None needed - passkeys provide strong authentication |
+| **Passwords & Password Reset Flows** | Email/password auth replaced | WebAuthn passkeys (optional passphrase recovery for low-capability devices) |
+| **Supabase RLS Policies** | Stack-specific; moving to microservices | Authorization in microservices using JWT + holder_binding |
+| **Device-Based Vote Uniqueness** | device_id hashing is linkable | Mode-B blind-signature voting with nullifier uniqueness |
+| **IP-Based Geo Verification** | Privacy violation | Avoid/defer; use coarse WAF geofencing without persistent storage if absolutely necessary |
+
+**Rationale:** These features either collect PII or are incompatible with the privacy-first architecture.
+
+---
+
+#### **🔮 OPTIONAL/DEFER (Not Required for Phase 1)**
+
+| Feature | Status | Phase 1 Action |
+|---------|--------|----------------|
+| **MFA (Multi-Factor Auth)** | Optional step-up | With passkeys, MFA is step-up for admin/superuser actions (second platform authenticator or recovery phrase) |
+| **Blockchain Vote Verification** | Nice-to-have | Defer unless public anchoring is a requirement |
+
+**Rationale:** These features add complexity without significant privacy or security benefits for Phase 1.
+
+---
+
+### **Section 2: New/Updated Requirements**
+
+#### **A) Text + Photo Posts**
+
+| Requirement | Implementation |
+|-------------|----------------|
+| **Media Pipeline** | Whitelist (jpg/png/webp/mp4/gif/pdf), max size limits, EXIF stripping on upload, server-side transcode (images/video) |
+| **Storage** | Private bucket for originals + expiring signed URLs; only publish minimal thumbnails if needed |
+| **Malware Scanning** | Scan server-side for non-E2E content before publishing |
+| **Pseudonyms** | Keep author_pseudonym only; do not store stable device identifiers |
+
+**Code Example:**
+```typescript
+// Client-side EXIF stripping + encryption
+const cleanImage = piexif.remove(imageData);
+const manipulated = await ImageManipulator.manipulateAsync(cleanImage, [{ resize: { width: 1440 } }]);
+const contentKey = randomBytes(32);
+const encrypted = encryptBytes(manipulated, contentKey);
+```
+
+---
+
+#### **B) Direct Messaging (DMs)**
+
+| Requirement | Implementation |
+|-------------|----------------|
+| **E2E by Default** | Per-thread keys; server stores ciphertext + routing metadata only |
+| **Attachments** | Client-side encrypt before upload; accept type/size limits; no server scanning for E2E payloads |
+| **Safety Controls** | Per-conversation block/report; spam throttles; safety-number / key-change notices |
+
+**Code Example:**
+```typescript
+// E2EE message sending
+const messageKey = deriveMessageKey(rootKey, counter);
+const cipher = xchacha20poly1305(messageKey, nonce);
+const ciphertext = cipher.encrypt(Buffer.from(plaintext));
+await fetch('/dm/:convId/messages', { body: { ciphertext } });
+```
+
+---
+
+#### **C) Text Debates**
+
+| Requirement | Implementation |
+|-------------|----------------|
+| **Modes** | Public (server-readable) vs Private (E2E). Private mode disables server moderation visibility; show user warning |
+| **Membership Gating** | Verify via holder_binding (hash of client_pub_key) rather than enumerating members |
+| **Ephemerality** | Policy-driven auto-delete options (e.g., 7/30/90 days) with user-visible countdown |
+
+**Schema:**
+```sql
+ALTER TABLE threads ADD COLUMN type TEXT DEFAULT 'discussion' CHECK (type IN ('discussion', 'debate'));
+ALTER TABLE threads ADD COLUMN mode TEXT DEFAULT 'public' CHECK (mode IN ('public', 'private'));
+ALTER TABLE threads ADD COLUMN debate_round_window INTERVAL;
+ALTER TABLE threads ADD COLUMN max_rounds INTEGER;
+```
+
+---
+
+### **Section 3: Concrete Removals/Edits**
+
+#### **🗑️ Delete from Codebase**
+
+1. **Supabase Auth Specifics**
+   - ❌ Email verification flows (EmailVerificationBanner, useEmailVerificationGuard)
+   - ❌ Password reset flows (ResetPasswordScreen)
+   - ❌ RLS-backed write gating (all `authenticated` policies)
+
+2. **Device-ID Vote Uniqueness**
+   - ❌ `device_id` column from vote tables
+   - ❌ Device hashing utilities for votes
+   - ❌ Unique indexes on `(proposal_id, device_id)`
+
+3. **IP/UA Logging**
+   - ❌ All `ip_address` columns
+   - ❌ All `user_agent` columns
+   - ❌ Audit log triggers that capture IP/UA
+
+4. **Email Collection**
+   - ❌ Email verification enforcement guards
+   - ❌ Email verification banners
+   - ❌ Email verification API endpoints
+
+---
+
+#### **✏️ Edit in Codebase**
+
+1. **Account Deletion**
+   - **OLD:** Supabase Edge Function (`cleanup-deleted-users`)
+   - **NEW:** Node.js `account_service` that cascades across all 4 DBs; logs anonymized and purged ≤24h
+
+2. **Messaging/Debates**
+   - **ADD:** Explicit E2E option (server unreadable)
+   - **ADD:** User warning about trade-offs (reduced moderation visibility)
+
+3. **Rate Limiting**
+   - **OLD:** Client-side only
+   - **NEW:** Clarify enforcement occurs at server/WAF (Redis token bucket)
+
+---
+
+### **Section 4: Still Missing After Phase 1 (Roadmap)**
+
+| Feature | Priority | Timeline | Notes |
+|---------|----------|----------|-------|
+| **E2E for DMs/Private Debates** | 🔴 CRITICAL | Week 7 | Required now that messaging is in scope |
+| **Server/WAF Rate Limiting** | 🔴 CRITICAL | Week 12 | Complete migration from client-only |
+| **Privacy Controls UI** | 🟡 HIGH | Phase 2 (Week 17-18) | Hide union membership, pseudonyms, profile visibility wired to service ACLs |
+| **Media Security Hardening** | 🟡 HIGH | Week 6 + Phase 2 | Scanner/transcoder/EXIF stripping for posts; encrypted-upload flow for DMs |
+| **Admin Step-Up Auth** | 🟡 HIGH | Phase 2 (Week 19-20) | Second passkey or recovery challenge for destructive/export actions |
+
+---
+
+### **Section 5: TL;DR Snapshot**
+
+#### **✅ KEEP**
+- XSS suite (62 tests)
+- Reporting/moderation (18 content types)
+- Server-side tallies
+- Auditability (PII-free)
+- Session management (30-min timeout, SecureStore)
+- GDPR export/delete
+- CAPTCHA
+- Security alerts
+
+#### **❌ REMOVE**
+- Email/password authentication
+- Email verification gates
+- Supabase RLS mechanics
+- Device-based vote uniqueness
+- IP/UA logging
+
+#### **⚠️ ADAPT**
+- Move rate limits to server/WAF
+- Rework audits to PII-free 24h retention
+- GDPR export via Node services
+- Authorization in microservices using JWT + holder_binding
+
+#### **➕ ADD**
+- E2E for DMs/private debates
+- Hardened media pipeline (EXIF stripping, encryption)
+- Privacy settings UI (wired to service ACLs)
+- Admin step-up auth (passkey re-prompt)
 
 ---
 
