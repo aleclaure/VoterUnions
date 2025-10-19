@@ -1661,6 +1661,480 @@ console.log(`📊 Data adapter using: ${getActiveBackend()} backend`);
 
 ---
 
+#### **Step 6: Security Hardening (CRITICAL)**
+
+⚠️ **Security Impact:** The adapter pattern is neutral-to-positive for security, BUT only if you add these guardrails NOW.
+
+**Why this matters:**
+- During migration, Supabase path can bypass new privacy guarantees
+- Could expose email, PII, or allow unprotected writes
+- Drift between two paths creates security gaps
+
+**Solution:** Lock down Supabase to read-only, public-only data with these 9 guardrails.
+
+---
+
+##### **Guardrail 1: Make Supabase Adapter Read-Only**
+
+**Goal:** Prevent any writes through the Supabase path.
+
+**Edit `voter-unions/src/services/data/supabase-data.ts`:**
+
+Remove ALL write operations (create, update, delete functions):
+
+```typescript
+// ❌ DELETE THESE FUNCTIONS:
+// export const updateProfile = async (...) => { ... }
+// export const createPost = async (...) => { ... }
+// export const createUnion = async (...) => { ... }
+
+// ✅ KEEP ONLY READ OPERATIONS:
+export const getProfile = async (userId: string): Promise<Profile | null> => { ... }
+export const getUnion = async (unionId: string): Promise<Union | null> => { ... }
+export const getPosts = async (unionId: string): Promise<Post[]> => { ... }
+```
+
+**Rule:** Supabase adapter = read-only. All writes go through API adapter.
+
+---
+
+##### **Guardrail 2: Column Allow-List (No `select('*')`)**
+
+**Goal:** Prevent accidental PII exposure.
+
+**Problem:** `select('*')` fetches email, IP, device_id, etc.
+
+**Solution:** Explicitly list safe columns OR use a database view.
+
+**Update all Supabase queries:**
+
+```typescript
+// ❌ BEFORE (exposes all columns):
+const { data } = await supabase
+  .from('profiles')
+  .select('*')
+  .eq('id', userId);
+
+// ✅ AFTER (safe columns only):
+const { data } = await supabase
+  .from('profiles')
+  .select('id, display_name, avatar_url, bio, created_at')
+  .eq('id', userId);
+
+// ✅ BETTER (use a public view that excludes PII):
+const { data } = await supabase
+  .from('profiles_public_view')  // View excludes email, last_seen, etc.
+  .select('*')
+  .eq('id', userId);
+```
+
+**Database view (create in Supabase):**
+
+```sql
+-- Create public-safe view
+CREATE VIEW profiles_public_view AS
+SELECT 
+  id,
+  display_name,
+  username_normalized,
+  bio,
+  avatar_url,
+  created_at
+FROM profiles;
+-- Explicitly excludes: email, last_seen, updated_at, etc.
+```
+
+**Action items:**
+- [ ] Replace all `select('*')` with explicit columns
+- [ ] OR create `*_public_view` tables in Supabase
+- [ ] Verify no PII columns are fetched
+
+---
+
+##### **Guardrail 3: Token Separation**
+
+**Goal:** Never forward Supabase JWT to new API.
+
+**Implementation:**
+
+```typescript
+// src/services/data/api-data.ts
+
+const apiCall = async (endpoint: string, options?: RequestInit) => {
+  // ✅ CORRECT: Use WebAuthn token from new auth service
+  const token = await getAuthToken(); // From expo-secure-store
+  
+  // ❌ NEVER DO THIS: Don't use Supabase session
+  // const session = await supabase.auth.getSession();
+  // const token = session.data.session?.access_token;
+  
+  const response = await fetch(`${CONFIG.API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${token}`, // WebAuthn JWT only
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+  });
+  
+  return await response.json();
+};
+```
+
+**Rule:** 
+- New API = WebAuthn JWT only
+- Supabase reads = anon key only (no user session)
+
+---
+
+##### **Guardrail 4: Feature Flag Safety**
+
+**Goal:** Force production to use new backend.
+
+**Edit `voter-unions/src/config.ts`:**
+
+Add runtime enforcement:
+
+```typescript
+export const CONFIG = {
+  // ... existing flags ...
+  
+  USE_NEW_BACKEND: parseBoolean(
+    process.env.EXPO_PUBLIC_USE_NEW_BACKEND,
+    false // Default: false for development
+  ),
+} as const;
+
+// 🔒 PRODUCTION SAFETY: Force new backend in production
+if (!__DEV__ && CONFIG.USE_NEW_BACKEND !== true) {
+  throw new Error(
+    'CRITICAL: Production MUST use new backend. Set EXPO_PUBLIC_USE_NEW_BACKEND=true'
+  );
+}
+
+// Log warning if using Supabase in development
+if (__DEV__ && !CONFIG.USE_NEW_BACKEND) {
+  console.warn('⚠️  Using Supabase backend (development only)');
+}
+```
+
+**Result:** Production builds crash if flag isn't set to `true` (fail-safe).
+
+---
+
+##### **Guardrail 5: Lint Rule to Ban Direct Supabase Calls**
+
+**Goal:** Prevent bypassing the adapter.
+
+**Create `voter-unions/.eslintrc.js` or update existing:**
+
+```javascript
+module.exports = {
+  // ... existing config ...
+  
+  rules: {
+    // ... existing rules ...
+    
+    // Ban direct Supabase imports outside adapter
+    'no-restricted-imports': ['error', {
+      patterns: [{
+        group: ['../services/supabase', '*/supabase'],
+        message: 'Import from @/services/data/adapter instead. Direct Supabase calls are banned outside supabase-data.ts'
+      }]
+    }],
+  },
+};
+```
+
+**Create `.github/workflows/security-check.yml` (CI enforcement):**
+
+```yaml
+name: Security Check
+
+on: [push, pull_request]
+
+jobs:
+  check-direct-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Check for direct Supabase calls
+        run: |
+          # Find any supabase.from() calls outside allowed files
+          if grep -r "supabase\.from(" src/ \
+             --exclude-dir=services/data \
+             --include="*.ts" \
+             --include="*.tsx"; then
+            echo "❌ ERROR: Direct Supabase calls found. Use data adapter instead."
+            exit 1
+          fi
+          echo "✅ No direct Supabase calls found"
+```
+
+**Action items:**
+- [ ] Add ESLint rule
+- [ ] Add CI check (optional but recommended)
+- [ ] Refactor any existing direct `supabase.from()` calls to use adapter
+
+---
+
+##### **Guardrail 6: Runtime Guard (Belt & Suspenders)**
+
+**Goal:** Double-check adapter is used correctly at runtime.
+
+**Edit `voter-unions/src/services/data/adapter.ts`:**
+
+Add runtime validation:
+
+```typescript
+import { CONFIG } from '../../config';
+import * as SupabaseData from './supabase-data';
+import * as ApiData from './api-data';
+
+// 🔒 PRODUCTION SAFETY: Ensure production uses new backend
+if (!__DEV__ && CONFIG.USE_NEW_BACKEND !== true) {
+  throw new Error('Production must use new backend');
+}
+
+// Define sensitive operations that are API-only
+const SENSITIVE_OPS = [
+  'joinUnion',
+  'leaveUnion',
+  'createPost',
+  'createComment',
+  'castVote',
+  'issueVoteToken',
+  'castBlindVote',
+  'updateProfile',
+  'deleteAccount',
+];
+
+// Helper to throw error if sensitive op called on Supabase path
+const throwInLegacyMode = (opName: string) => {
+  throw new Error(
+    `SECURITY: ${opName} is API-only. Cannot use Supabase path for sensitive operations.`
+  );
+};
+
+// Switch between backends
+export const data = CONFIG.USE_NEW_BACKEND
+  ? ApiData
+  : {
+      // Read operations from Supabase (safe, public-only)
+      ...SupabaseData,
+      
+      // Block sensitive operations in Supabase mode
+      joinUnion: () => throwInLegacyMode('joinUnion'),
+      createPost: () => throwInLegacyMode('createPost'),
+      createComment: () => throwInLegacyMode('createComment'),
+      castVote: () => throwInLegacyMode('castVote'),
+      updateProfile: () => throwInLegacyMode('updateProfile'),
+      // Add more as needed...
+    };
+```
+
+**Result:** App crashes if sensitive operation attempted on Supabase path.
+
+---
+
+##### **Guardrail 7: Rate Limit Consistency**
+
+**Goal:** Apply rate limiting on server, not client.
+
+**Backend implementation (Week 3):**
+
+```typescript
+// backend/services/auth_service/src/middleware/rate-limit.ts
+import rateLimit from 'express-rate-limit';
+
+export const apiRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per window
+  message: 'Too many requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply to all API routes
+app.use('/api/', apiRateLimit);
+```
+
+**Frontend:**
+- Remove client-side rate limiting (move to backend)
+- Supabase reads = cacheable (no rate limit needed)
+
+**Action items:**
+- [ ] Remove `src/services/rateLimiter.ts` (move logic to backend)
+- [ ] Add rate limiting to API service (Week 3)
+
+---
+
+##### **Guardrail 8: Telemetry & PII Check**
+
+**Goal:** Log route + status only. No user_id, email, or IP.
+
+**Edit `voter-unions/src/services/data/adapter.ts`:**
+
+Add PII-free logging:
+
+```typescript
+// Banned keys that indicate PII
+const PII_KEYS = [
+  'email',
+  'password',
+  'ip',
+  'ip_address',
+  'user_agent',
+  'device_id', // Device ID is considered PII
+  'phone',
+  'ssn',
+];
+
+// Check if object contains PII (shallow check)
+const assertNoPII = (obj: any, context: string) => {
+  if (!obj || typeof obj !== 'object') return;
+  
+  const foundPII = Object.keys(obj).filter(key => 
+    PII_KEYS.some(banned => key.toLowerCase().includes(banned))
+  );
+  
+  if (foundPII.length > 0) {
+    console.error(`⚠️  PII DETECTED in ${context}:`, foundPII);
+    // In production, you might want to throw or report to monitoring
+    if (!__DEV__) {
+      throw new Error(`PII leak detected: ${foundPII.join(', ')}`);
+    }
+  }
+};
+
+// Wrap data adapter with PII check
+export const data = new Proxy(
+  CONFIG.USE_NEW_BACKEND ? ApiData : SupabaseData,
+  {
+    get(target, prop) {
+      const original = target[prop];
+      if (typeof original !== 'function') return original;
+      
+      // Wrap function to check for PII
+      return async (...args: any[]) => {
+        const result = await original(...args);
+        
+        // Check result for PII before returning
+        assertNoPII(result, `data.${String(prop)}`);
+        
+        // Log operation (PII-free)
+        console.log(`📊 Data operation: ${String(prop)}`);
+        
+        return result;
+      };
+    },
+  }
+);
+```
+
+**Action items:**
+- [ ] Add PII assertion to adapter
+- [ ] Test with known PII data (email, phone)
+- [ ] Verify logs are PII-free
+
+---
+
+##### **Guardrail 9: Test That Sensitive Flows Use API**
+
+**Goal:** Ensure sensitive operations never hit Supabase.
+
+**Create `voter-unions/src/services/data/__tests__/adapter.test.ts`:**
+
+```typescript
+import { data } from '../adapter';
+import * as ApiData from '../api-data';
+import * as SupabaseData from '../supabase-data';
+
+// Mock both backends
+jest.mock('../api-data');
+jest.mock('../supabase-data');
+
+describe('Data Adapter Security', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  
+  it('should use API for sensitive operations', async () => {
+    // Mock CONFIG.USE_NEW_BACKEND = true
+    process.env.EXPO_PUBLIC_USE_NEW_BACKEND = 'true';
+    
+    const spy = jest.spyOn(ApiData, 'joinUnion');
+    
+    await data.joinUnion('union-123');
+    
+    expect(spy).toHaveBeenCalledWith('union-123');
+    expect(SupabaseData.joinUnion).not.toHaveBeenCalled();
+  });
+  
+  it('should block sensitive operations on Supabase path', async () => {
+    // Mock CONFIG.USE_NEW_BACKEND = false
+    process.env.EXPO_PUBLIC_USE_NEW_BACKEND = 'false';
+    
+    await expect(data.joinUnion('union-123')).rejects.toThrow(
+      'SECURITY: joinUnion is API-only'
+    );
+  });
+  
+  it('should allow public reads on Supabase path', async () => {
+    process.env.EXPO_PUBLIC_USE_NEW_BACKEND = 'false';
+    
+    const spy = jest.spyOn(SupabaseData, 'getProfile');
+    
+    await data.getProfile('user-123');
+    
+    expect(spy).toHaveBeenCalledWith('user-123');
+  });
+  
+  it('should not expose PII in Supabase reads', async () => {
+    process.env.EXPO_PUBLIC_USE_NEW_BACKEND = 'false';
+    
+    // Mock response with PII
+    jest.spyOn(SupabaseData, 'getProfile').mockResolvedValue({
+      id: 'user-123',
+      display_name: 'Test User',
+      email: 'test@example.com', // PII!
+    } as any);
+    
+    await expect(data.getProfile('user-123')).rejects.toThrow(
+      'PII leak detected: email'
+    );
+  });
+});
+```
+
+**Action items:**
+- [ ] Create adapter tests
+- [ ] Test all sensitive operations route to API
+- [ ] Test PII detection works
+- [ ] Add to CI pipeline
+
+---
+
+#### **Security Guardrails Checklist**
+
+- [ ] Guardrail 1: Supabase adapter is read-only (no write functions)
+- [ ] Guardrail 2: Column allow-list implemented (no `select('*')`)
+- [ ] Guardrail 3: Token separation (WebAuthn JWT only for API)
+- [ ] Guardrail 4: Production enforcement (`USE_NEW_BACKEND=true` required)
+- [ ] Guardrail 5: ESLint rule bans direct Supabase imports
+- [ ] Guardrail 6: Runtime guard blocks sensitive ops on Supabase
+- [ ] Guardrail 7: Server-side rate limiting (remove client-side)
+- [ ] Guardrail 8: PII assertion in adapter (logs PII-free)
+- [ ] Guardrail 9: Tests verify sensitive flows use API only
+
+**When all checked:** Adapter is production-ready and secure ✅
+
+---
+
+**Deliverable:** ✅ Adapter security hardened with 9 guardrails
+
+---
+
 ### **Task 0.3: Create Migration Utilities**
 
 **Goal:** Build utilities for UUID generation, rollout logic, and migration helpers.
@@ -2008,6 +2482,8 @@ console.log('100% rollout:', status100.inRollout); // Should be true
 
 ### **Week 0 Deliverables Checklist**
 
+#### **Infrastructure (15 items)**
+
 - [ ] `src/config.ts` created with feature flags
 - [ ] `src/services/emailVerification.ts` updated with flag check
 - [ ] `.env.example` created with all variables
@@ -2024,7 +2500,35 @@ console.log('100% rollout:', status100.inRollout); // Should be true
 - [ ] All tests passing
 - [ ] App still works with Supabase (nothing broken!)
 
-**When all items checked:** You're ready for Week 3! 🎉
+#### **Security Guardrails (9 items)** 🔒
+
+- [ ] **Guardrail 1:** Supabase adapter is read-only (removed all write functions)
+- [ ] **Guardrail 2:** Column allow-list implemented (no `select('*')`)
+- [ ] **Guardrail 3:** Token separation (WebAuthn JWT only for API)
+- [ ] **Guardrail 4:** Production enforcement added to `config.ts`
+- [ ] **Guardrail 5:** ESLint rule bans direct Supabase imports
+- [ ] **Guardrail 6:** Runtime guard blocks sensitive ops on Supabase path
+- [ ] **Guardrail 7:** Client-side rate limiter noted for removal (Week 3)
+- [ ] **Guardrail 8:** PII assertion added to adapter
+- [ ] **Guardrail 9:** Adapter security tests created and passing
+
+#### **Optional (Recommended)**
+
+- [ ] Create `*_public_view` database views in Supabase
+- [ ] Add GitHub Actions CI check for direct Supabase calls
+- [ ] Set up monitoring for PII leaks in logs
+
+---
+
+**Total Items:** 24 required + 3 optional
+
+**When all required items checked:** You're ready for Week 3! 🎉
+
+**Security Status:** 
+- ✅ Infrastructure in place
+- ✅ 9 security guardrails enforced
+- ✅ Adapter locked down (read-only Supabase, API-only writes)
+- ✅ Production fail-safe (won't deploy with wrong config)
 
 ---
 

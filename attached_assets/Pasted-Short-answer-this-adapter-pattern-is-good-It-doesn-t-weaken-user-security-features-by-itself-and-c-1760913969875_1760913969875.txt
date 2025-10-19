@@ -1,0 +1,85 @@
+Short answer: this adapter pattern is good. It doesn’t weaken user-security features by itself and can improve them (single choke-point for auth, privacy filtering, logging). The only risk is drift while both paths (Supabase + new API) coexist. Lock it down with a few guardrails.
+
+Security impact (quick take)
+	•	Neutral → positive: Centralizes auth headers, PII stripping, and retry/rate-limit logic in one file (adapter.ts). Easier to audit.
+	•	Main risk: During migration, any call that still goes through the Supabase path can bypass your new privacy guarantees (no email collection, encrypted memberships, unlinkable voting) if it fetches wider columns or allows writes.
+	•	So: keep Supabase path read-only and public-only; all sensitive reads/writes go through the new API.
+
+Guardrails to add now (do these and you’re solid)
+	1.	Make Supabase adapter read-only
+	•	Export only get* functions from supabase-data.ts. No inserts/updates/deletes there.
+	2.	Column allow-list (no select('*'))
+
+// supabase-data.ts (safe)
+const { data } = await supabase
+  .from('profiles_public_view')       // or a view that excludes email/PII
+  .select('id, display_name, avatar_url')
+  .eq('id', userId)
+  .single();
+
+Prefer views that physically exclude email/PII.
+
+	3.	Token separation
+	•	New API uses your short-lived Auth JWT only.
+	•	Never forward Supabase session/JWT to the new API.
+	•	If you still need Supabase for public reads, use the anon key only.
+	4.	Feature-flag safety
+	•	Default USE_NEW_BACKEND = true in production builds.
+	•	Add a kill switch env var to disable the Supabase path at runtime in prod.
+	5.	Lint rule to ban direct calls
+	•	ESLint custom rule (or simple grep CI check) to disallow supabase.from( outside supabase-data.ts.
+	•	CI fails if found.
+	6.	Runtime guard (belt & suspenders)
+
+// adapter.ts
+if (__DEV__ === false && CONFIG.USE_NEW_BACKEND !== true) {
+  throw new Error('Prod must use new backend');
+}
+
+
+	7.	Rate-limit consistency
+	•	Apply server-side rate limiting on the API.
+	•	For any remaining Supabase reads, keep them cacheable (no need for rate limiting there).
+	8.	Telemetry & PII check at the adapter
+	•	Log route + status only (no user_id/email/IP).
+	•	Optionally assert outbound payloads don’t contain banned keys:
+
+const BAN = ['email','ip','user_agent'];
+function assertNoPII(obj:any){ /* shallow check & warn */ }
+
+
+	9.	Test that sensitive flows never hit Supabase path
+	•	Unit tests for data.joinUnion, data.castVote, data.getMemberships etc. that spy on adapter and ensure API branch is called.
+
+What features are affected?
+	•	Auth / WebAuthn, encrypted memberships, blind voting: Unaffected if those functions route only to the API branch. Keep them API-only.
+	•	Email-free privacy posture: Safe, provided public reads via Supabase don’t expose email or identifiers (use views + column allow-list).
+	•	PII-free logging: Improved—log once in adapter.ts.
+	•	Rate limiting: Could be weaker if any write remains on Supabase (client-side only). Ensure all writes are API-only.
+
+Tiny refactor to enforce it
+
+// src/services/data/adapter.ts
+export type DataPort = {
+  getProfile(userId: string): Promise<PublicProfile>;
+  // Sensitive ops: API-only in implementation
+  joinUnion(unionId: string): Promise<void>;
+  issueVoteToken(ballotId: string): Promise<void>;
+  castBlindVote(input: CastVoteInput): Promise<Receipt>;
+};
+
+import * as ApiData from './api-data';
+import * as SupaData from './supabase-data'; // read-only, public-only
+
+export const data: DataPort = CONFIG.USE_NEW_BACKEND
+  ? ApiData
+  : { ...SupaData, joinUnion: throwInLegacy, issueVoteToken: throwInLegacy, castBlindVote: throwInLegacy };
+
+function throwInLegacy() {
+  throw new Error('This operation is API-only in legacy mode');
+}
+
+Bottom line
+	•	Your adapter screenshots are compatible with the Phase-1 security plan.
+	•	Security remains strong if you: (a) restrict Supabase to public read-only, (b) allow-list columns or use views, and (c) ban direct Supabase writes.
+	•	Flip the flag to API in prod, keep the legacy path only for controlled, non-sensitive reads during migration.
