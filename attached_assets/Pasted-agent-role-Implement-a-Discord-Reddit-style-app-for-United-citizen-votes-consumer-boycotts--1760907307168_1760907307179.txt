@@ -1,0 +1,231 @@
+agent_role: >
+  Implement a Discord/Reddit-style app for United citizen votes, consumer boycotts,
+  and worker strikes with strict privacy-by-design. Your top priority is to minimize
+  data collection and ensure users can retrieve ONLY their own membership tokens and
+  votes—no one else’s. All features must obey the policies below.
+
+objectives:
+  - Enable creation and discovery of "unions": voter unions, consumer boycott groups, worker strike groups.
+  - Allow pseudonymous join/leave, and let members view ONLY:
+      * their own memberships (per union)
+      * their own votes
+      * public/aggregate tallies when allowed by union settings
+  - Provide voting flows with three selectable privacy levels (A/B/C below), defaulting to Option B (blind-signature).
+  - Ship a usable Discord/Reddit-like UX: channels, threads, union pages, “Join”/“Vote” actions.
+  - Operate with strict data minimization: collect the absolute minimum PII (preferably none).
+
+non_goals:
+  - Real-world identity collection or verification storage on our servers.
+  - Centralized lists mapping real identity → unions or votes.
+  - Forensic logging suitable for deanonymization.
+
+threat_model:
+  adversaries:
+    - Local authoritarian regimes (subpoenas/seizure/traffic blocking).
+    - Hostile actors attempting deanonymization, Sybil attacks, scraping, harassment.
+    - Honest-but-curious infra providers (CDN/host).
+  limits:
+    - We reduce risk but cannot guarantee immunity (device compromise, lawful orders).
+
+guiding_principles:
+  - Data minimization, pseudonymity by default, user-controlled secrets.
+  - Separation of duties (auth vs membership vs ballots vs content).
+  - End-to-end verifiability where feasible, with anti-coercion UX.
+  - Auditability/transparency: clear docs, reproducible builds, public privacy policy.
+
+architecture_constraints:
+  frontend:
+    - Web (React) + Mobile (React Native). No analytics SDKs that send user identifiers.
+  backend:
+    - Stateless microservices (Node/TypeScript preferred) with strict typed contracts.
+    - Reverse proxy/CDN in front; origin IP allowlist only. Provide Tor .onion mirror.
+  data:
+    - Separate databases: content_db (posts, threads) vs membership_db (encrypted tokens) vs ballot_db (encrypted ballots/commitments).
+    - Column-level encryption for sensitive fields. No cross-db joins that reveal identity links.
+  crypto:
+    - Auth: WebAuthn passkeys (platform + security key). Fallback: passphrase → client-side key derivation (Argon2id; high work factor).
+    - Sig/Key types: Ed25519 for signatures, X25519 for key agreement (or widely-audited equivalents available in target platform).
+    - Do NOT implement custom crypto; use audited libs only.
+  availability:
+    - Read replicas allowed for public content only; never replicate secret keys to logging/metrics systems.
+
+core_components:
+  - auth_service: Creates pseudonymous accounts, manages WebAuthn credentials, issues short-lived auth tokens.
+  - union_service: Stores union metadata; maintains encrypted membership tokens (opaque blobs, no plaintext member lists).
+  - voting_service: Creates ballots; enforces one-vote-per-member; supports A/B/C vote modes; stores commitments/ciphertexts.
+  - messaging_service: Channels, threads, comments; optionally ephemeral storage.
+  - key_service: Server keys in KMS/HSM; client secrets never stored server-side.
+  - recovery_service (optional): Social recovery / Shamir splits for encrypted account key backups. No PII stored—only encrypted shares.
+
+data_schemas:
+  user_record:
+    - user_id: random ULID
+    - display_name: optional string
+    - webauthn_public_key: present if enrolled
+    - client_pub_key: public key derived client-side (used to encrypt user-only blobs)
+    - flags: { verified_worker?: boolean }  # boolean only; no documents retained
+  membership_token (stored in membership_db):
+    - token_id: random/opaque
+    - union_id: string
+    - holder_binding: cryptographic commitment to user’s client_pub_key (opaque to server)
+    - ciphertext: membership_payload encrypted to client_pub_key
+    - ttl: short or revocable
+  ballot_record (ballot_db):
+    - ballot_id, union_id, mode: {A|B|C}
+    - submission:
+        A: { user_id, choice, proof_of_auth } # only for low-risk polls
+        B: { blind_signed_token_id, cipher_or_commitment, nullifier } # prevents double vote, breaks linkability
+        C: { encrypted_ballot, zk_proofs, receipt_handle }
+    - tally: stored as aggregate + public verification artifacts
+  content_post:
+    - post_id, union_id
+    - body, media_refs
+    - author_pseudonym (never real ID), created_at
+  logs (restricted):
+    - request_hash, timestamp, endpoint, status_code  # NO IP, NO UA, NO IDs beyond salted hash
+
+api_contracts:
+  auth:
+    - POST /auth/webauthn/register   -> challenge/options (no email required)
+    - POST /auth/webauthn/verify     -> issues short-lived JWT (≤15 min)
+    - POST /auth/derive-key          -> SRP/PAKE or challenge to bind client_pub_key
+  unions:
+    - POST /unions                   -> create union (admin key required)
+    - GET  /unions/{id}              -> public metadata & aggregate counts only
+    - POST /unions/{id}/join         -> returns encrypted membership_token (ciphertext only)
+    - POST /unions/{id}/leave        -> revokes token (adds to revocation list)
+    - GET  /me/memberships           -> returns ONLY ciphertext blobs bound to requester’s key
+  ballots:
+    - POST /unions/{id}/ballots      -> create ballot {mode:A|B|C, window, options}
+    - POST /ballots/{ballot_id}/issue_token  # Mode B only; blind-sign issuance
+    - POST /ballots/{ballot_id}/vote         # Accepts A/B/C payloads; enforce anti-replay
+    - GET  /ballots/{ballot_id}/tally        # Returns aggregate + proofs; never per-user rows
+  content:
+    - GET  /unions/{id}/threads
+    - POST /unions/{id}/threads
+    - POST /threads/{id}/comments
+  retrieval_guarantee:
+    - GET /me/memberships  -> only tokens encrypted to requester’s client_pub_key
+    - GET /me/votes        -> returns ONLY user’s own encrypted receipts/commitments
+
+security_invariants (MUST NOT break):
+  - Servers must never store plaintext mappings from user_id → union membership or user_id → vote choice in modes B/C.
+  - The ONLY place where user_id links to a vote is Mode A (low-risk), and unions must explicitly opt-in.
+  - Retrieval endpoints MUST require proof of key possession (WebAuthn or signing challenge) and return only ciphertext bound to that key.
+  - Origin servers accept traffic ONLY from CDN/Tor gateways (firewall allowlist).
+  - No third-party trackers; no PII (email/phone/IP/UA) in logs or analytics.
+
+voting_modes:
+  A_simple_authenticated:
+    use_when: "low-risk polls / boycotts"
+    storage: "user_id → choice"
+    warnings: "clearly label as not private"
+  B_blind_signature_default:
+    issuer: "membership-aware issuer blind-signs short-lived tokens"
+    vote_payload: "{ token_id, commitment/cipher, nullifier }"
+    guarantees: "prevents linkability; enforces one vote"
+  C_end_to_end_verifiable:
+    approach: "Helios-like / homomorphic or mixnet + ZK proofs"
+    receipts: "inclusion receipts allowed; design UI to reduce coercion"
+    use_when: "high-stakes worker strikes or critical votes"
+
+data_minimization_policy:
+  pii:
+    default: "collect none"
+    exceptions: "only when strictly required for specific unions; encrypt at rest; separate keys and databases"
+  logs:
+    retention_hours: 24   # between 24 and 72, choose minimal viable
+    fields_allowed: [request_hash, route, status_code, timestamp]
+    forbidden_fields: [ip, user_agent, referer, email, phone, geo, raw identifiers]
+  analytics:
+    - allow only cardinality-safe aggregates (counts per union/time window)
+    - no user-level events; no cross-session linking
+  backups:
+    - separate content vs identity blobs
+    - encrypt with different keys; no combined dumps
+
+abuse_and_sybil_controls:
+  - rate_limit_per_ip_and_tor_exit: "bucketed, but never stored long-term"
+  - proof_of_work_on_signup: "adjustable difficulty"
+  - invite_chains/trust_anchors for sensitive unions
+  - moderation tools: blocklists, shadow-mute, per-union code of conduct
+  - automated bot heuristics that operate on content signals only (no identity enrichment)
+
+ops_hosting_legal:
+  deployment:
+    - CDN/WAF fronting + origin allowlist
+    - Tor onion mirror for key endpoints and read-only content
+    - Multi-region hosting; split auth/voting/content across providers/jurisdictions
+  keys:
+    - KMS/HSM with rotation policy (≤90 days); no keys in repo or env files
+  incident_response:
+    - runbook: key rotation, revoke issuer, disable token issuance, cut over to read-only
+    - encrypted, geo-separated backups; restore drills quarterly
+  compliance_docs:
+    - publish threat model, privacy policy, transparency report cadence (e.g., semiannual)
+
+tooling_requirements:
+  languages: [TypeScript (Node 20+), React 18+, React Native (Expo)]
+  libraries_allowed:
+    - webauthn: "FIDO2-compliant, maintained"
+    - crypto: "libsodium or platform-native WebCrypto; no custom primitives"
+    - db: "Postgres 15+ with pgcrypto or DynamoDB + client-side encryption"
+    - testing: "Jest + supertest; ZK/crypto tests via library harness"
+  libraries_forbidden:
+    - analytics SDKs that export device identifiers
+    - adtech/trackers
+    - deprecated crypto (RSA-PKCS1 v1.5, MD5, SHA1, etc.)
+
+configuration_env:
+  - JWT_TTL_MINUTES
+  - ORIGIN_ALLOWED_CIDRS
+  - CDN_IP_RANGES
+  - KMS_KEY_ALIASES: [membership_key, ballot_key, content_key]
+  - LOG_RETENTION_HOURS
+  - ENABLE_TOR_GATEWAY: true|false
+  - PRIVACY_MODE_DEFAULT: B
+
+acceptance_criteria:
+  - [AC1] A new user can sign up with WebAuthn, derive a client_pub_key, and join a union without providing email/phone.
+  - [AC2] “Get my memberships” returns only encrypted blobs decryptable by that user.
+  - [AC3] Mode B voting works end-to-end: token issuance (blind), anonymous vote cast, server prevents double-vote via nullifier, tally aggregates.
+  - [AC4] Admins can see aggregate counts only; cannot enumerate member identities or individual votes in B/C.
+  - [AC5] Logs contain no PII and auto-delete within LOG_RETENTION_HOURS.
+  - [AC6] Origin refuses traffic not coming from CDN/Tor gateways (verified in integration tests).
+  - [AC7] Privacy policy and threat model are generated and published with the build.
+
+test_plan:
+  unit:
+    - crypto_bindings_spec: verifies WebAuthn flows and client-side key derivation.
+    - token_issuance_spec: blind-sign flow cannot be linked to user_id.
+    - double_vote_prevention_spec: nullifier reuse rejected.
+  integration:
+    - membership_retrieval_e2e: ciphertext-only path; server cannot decrypt.
+    - origin_firewall_e2e: direct origin request is blocked; via CDN allowed.
+    - log_scrub_e2e: ensure no IP/UA persisted; redaction enforced.
+  property_based:
+    - fuzz_votes: random sequences cannot yield per-user tallies in B/C.
+  red_team_checks:
+    - attempt_linkage: try to join and correlate tokens to accounts—must fail.
+    - subpoena_sim: export DB dumps; verify no plaintext membership lists exist.
+    - recovery_attack: social recovery cannot grant access without quorum.
+
+definition_of_done:
+  - All ACs pass in CI with green tests and coverage ≥ 85% for security-critical modules.
+  - Static analysis (SAST) and dependency scans (OSS audit) pass with no critical vulns.
+  - Privacy posture verified by automated “PII grep” job across codebase and configs.
+  - Runbook + transparency report templates included in /docs.
+  - Feature flags in place to disable Mode A globally if needed.
+
+red_lines (hard fails):
+  - Storing email/phone/IP/UA tied to user_id.
+  - Adding analytics/telemetry that can fingerprint users.
+  - Exporting combined dumps that contain both membership tokens and any user identifiers.
+  - Writing custom cryptographic primitives.
+  - Exposing per-user vote histories to admins (any mode other than the user’s own retrieval).
+
+developer_notes_for_agent:
+  - Prefer Option B (blind-signature) as default; expose A and C via explicit union settings with clear UX warnings.
+  - Treat all “retrieval” endpoints as ciphertext carriers; clients decrypt locally.
+  - Keep the code modular: auth_service, union_service, voting_service, messaging_service, shared_crypto.
+  - Document every endpoint with JSON Schemas and include example payloads in /docs/api.
