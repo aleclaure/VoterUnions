@@ -1,0 +1,36 @@
+New/updated requirements for text & photo posts, DMs, and debates
+
+Posts (text + images)
+	•	Media pipeline: content-type whitelist (jpg/png/webp/mp4/gif/pdf), max size, image EXIF stripping on upload, server-side transcode (images to standard formats; videos to HLS/MP4), and perceptual hashing to detect exact/near duplicates and block obvious spam.
+	•	Storage: object storage behind CDN; private bucket + expiring signed URLs for originals; public thumbnails only if needed.
+	•	Malware scanning: scan server-side before publishing (non-E2E content only).
+	•	Pseudonyms: continue storing author_pseudonym only; never persist stable device IDs.
+
+Direct Messaging (DMs)
+	•	E2E by default: Double-ratchet or at minimum XChaCha20-Poly1305 per thread with client-stored keys. Server stores only ciphertext + minimal routing metadata.
+	•	Attachments: client-side encrypt before upload; server cannot scan E2E attachments—mitigate with size/type limits and warn users.
+	•	Safety: per-conversation block/report, spam throttles, optional safety-key transparency (show safety number / key change notices).
+
+Text Debates
+	•	Modes: public (server-readable) vs private (E2E) debates. Private debates disable server moderation visibility—warn users about trade-offs.
+	•	Membership gating: for union-only debates, verify membership via holder_binding (hash of client_pub_key) rather than user lists.
+	•	Ephemerality: allow creator/union policy for auto-delete (e.g., 7/30/90 days) with client-visible countdown.
+
+Concrete removals/edits to the old Status Report
+	•	Remove/replace every Supabase-specific mechanism (RLS, Edge Functions for auth flows, email verification gates). Reference the auth/union/voting/messaging microservices instead.
+	•	Delete all device-ID vote controls and any IP/UA logging language. Replace with Mode-B nullifier + PII-free logs.
+	•	Change “Account deletion via Supabase Edge Function” to “Deletion via Node ‘account’ service” that fans out to all 3 DBs; logs anonymized and purged ≤24h.
+	•	Anywhere it says “server can view messages/debates,” add the E2E option caveat for DMs/private debates.
+	•	Keep “Rate limiting” but clarify it’s server-enforced (Redis/WAF), not client-only.
+
+What’s still missing after Phase-1 (should stay on your roadmap)
+	•	E2E for DMs/private debates (Phase-2/3 feature; you called this out—now it’s higher priority with messaging).
+	•	Server/WAF rate limiting & bot defense (your doc noted client-side; keep the server-side plan from the new parameters).
+	•	Privacy controls UI (hide union membership, pseudonyms, profile visibility) wired to service-side checks.
+	•	Media security (scanning/transcoding/EXIF stripping) for photo posts and encrypted-upload flow for DMs.
+	•	Admin step-up auth (passkey re-prompt or recovery phrase) for destructive/admin exports.
+
+TL;DR
+	•	Relevant: XSS suite, moderation/reporting, server-side tallies, auditability (without PII), session management, GDPR export/delete, CAPTCHA, security alerts.
+	•	Superseded: email/password flows, email verification gates, Supabase RLS-specific mechanics, device-based vote uniqueness, IP/UA logging.
+	•	Add/Adapt: E2E for DMs/private debates, media pipeline hardening for images, server-side rate-limits/WAF, privacy settings UI backed by service ACLs.
