@@ -12,7 +12,7 @@ import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
-import type { AuthenticationResponseJSON } from '@simplewebauthn/server/script/deps.js';
+import type { AuthenticationResponseJSON } from '@simplewebauthn/types';
 import { pool, redis } from '../db/index.js';
 import { generateAccessToken, generateRefreshToken, getRefreshTokenExpiry, verifyToken } from '../utils/jwt.js';
 import { AuthInitSchema, AuthVerifySchema, RefreshTokenSchema } from '../utils/validation.js';
@@ -105,9 +105,9 @@ export async function authRoutes(fastify: FastifyInstance) {
         expectedChallenge,
         expectedOrigin: RP_ORIGIN,
         expectedRPID: RP_ID,
-        authenticator: {
-          credentialID: Buffer.from(storedCredential.credential_id, 'base64url'),
-          credentialPublicKey: Buffer.from(storedCredential.public_key, 'base64url'),
+        credential: {
+          id: storedCredential.credential_id,
+          publicKey: storedCredential.public_key,
           counter: storedCredential.counter,
         },
       });
@@ -215,7 +215,7 @@ export async function authRoutes(fastify: FastifyInstance) {
    * 
    * Invalidate refresh token
    */
-  fastify.post('/auth/logout', async (request, reply) => {
+  fastify.post('/auth/logout', async (request) => {
     const body = RefreshTokenSchema.parse(request.body);
     const { refreshToken } = body;
     

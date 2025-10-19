@@ -7,7 +7,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
-import { pool, redis, closeConnections, checkHealth } from './db/index.js';
+import { closeConnections, checkHealth } from './db/index.js';
 import { registerRoutes } from './routes/register.js';
 import { authRoutes } from './routes/auth.js';
 

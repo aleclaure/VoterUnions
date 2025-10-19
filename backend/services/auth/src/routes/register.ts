@@ -10,7 +10,7 @@ import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
-import type { RegistrationResponseJSON } from '@simplewebauthn/server/script/deps.js';
+import type { RegistrationResponseJSON } from '@simplewebauthn/types';
 import { pool, redis } from '../db/index.js';
 import { generateAccessToken, generateRefreshToken, getRefreshTokenExpiry } from '../utils/jwt.js';
 import { RegisterInitSchema, RegisterVerifySchema } from '../utils/validation.js';
@@ -26,18 +26,19 @@ export async function registerRoutes(fastify: FastifyInstance) {
    * 
    * Generate a WebAuthn registration challenge
    */
-  fastify.post('/auth/register/init', async (request, reply) => {
-    const body = RegisterInitSchema.parse(request.body);
+  fastify.post('/auth/register/init', async (request) => {
+    RegisterInitSchema.parse(request.body);
     
     // Generate new user ID
     const userId = randomUUID();
     
     // Generate registration options
+    const userIdBuffer = Buffer.from(userId.replace(/-/g, ''), 'hex');
     const options = await generateRegistrationOptions({
       rpName: RP_NAME,
       rpID: RP_ID,
-      userID: userId,
-      userName: userId, // Username is just the UUID (no email!)
+      userID: userIdBuffer,
+      userName: userId,
       attestationType: 'none',
       authenticatorSelection: {
         residentKey: 'preferred',
@@ -89,7 +90,10 @@ export async function registerRoutes(fastify: FastifyInstance) {
         });
       }
       
-      const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
+      const { credential: verifiedCredential } = verification.registrationInfo;
+      const credentialID = verifiedCredential.id;
+      const credentialPublicKey = verifiedCredential.publicKey;
+      const counter = verifiedCredential.counter;
       
       // Start database transaction
       const client = await pool.connect();

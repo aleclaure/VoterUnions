@@ -13,18 +13,18 @@ const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '30d';
  * Generate access token (short-lived)
  */
 export function generateAccessToken(userId: string): string {
-  return jwt.sign({ userId }, JWT_SECRET, {
+  return jwt.sign({ userId } as jwt.JwtPayload, JWT_SECRET, {
     expiresIn: ACCESS_EXPIRY,
-  });
+  } as jwt.SignOptions);
 }
 
 /**
  * Generate refresh token (long-lived)
  */
 export function generateRefreshToken(userId: string): string {
-  return jwt.sign({ userId }, JWT_SECRET, {
+  return jwt.sign({ userId } as jwt.JwtPayload, JWT_SECRET, {
     expiresIn: REFRESH_EXPIRY,
-  });
+  } as jwt.SignOptions);
 }
 
 /**
