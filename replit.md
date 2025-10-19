@@ -75,16 +75,84 @@ For a complete security assessment, see **[SECURITY_STATUS.md](voter-unions/SECU
 - ✅ GDPR compliance: 8/10 (data export + hard delete)
 - ✅ Authentication: 7/10 (email verification + rate limiting, missing MFA)
 
+## Blue Spirit Phase 1 Migration (In Progress)
+
+**Status:** ⏳ Week 0 Preparation (In Progress)  
+**Started:** 2025-10-19  
+**Target:** WebAuthn-only authentication with privacy-first architecture
+
+### Migration Overview
+
+The application is undergoing a phased migration from Supabase email/password authentication to a WebAuthn-based privacy-first architecture. This migration will:
+
+1. **Remove email collection** - Users authenticate via biometrics/hardware keys only
+2. **Implement zero-knowledge architecture** - Server cannot decrypt user data
+3. **Add blind-signature voting** - Unlinkable votes for privacy
+4. **Enable E2EE messaging** - End-to-end encrypted direct messages
+5. **Implement encrypted memberships** - Privacy-preserving union membership
+
+### Week 0 Status: Pre-Migration Preparation
+
+**Completed (2025-10-19):**
+- ✅ Feature flag configuration system (`src/config.ts`)
+  - `REQUIRE_EMAIL_VERIFICATION` - Toggle email verification guards
+  - `USE_WEBAUTHN` - Switch authentication method
+  - `USE_NEW_BACKEND` - Switch data backend (Supabase vs API)
+  - `WEBAUTHN_ROLLOUT_PERCENT` - Gradual rollout control (0-100%)
+- ✅ Data adapter layer (`src/services/data/`)
+  - `types.ts` - Shared TypeScript types
+  - `supabase-data.ts` - Read-only Supabase adapter
+  - `api-data.ts` - New API stub (Week 3)
+  - `adapter.ts` - Main adapter interface
+- ✅ Security guardrails (6/9 implemented)
+  - Guardrail 1: Read-only Supabase adapter ✅
+  - Guardrail 2: Column allow-list (no PII exposure) ✅
+  - Guardrail 3: Token separation ⏳ (Week 3)
+  - Guardrail 4: Production enforcement ✅
+  - Guardrail 5: ESLint rule (ban direct Supabase calls) ✅
+  - Guardrail 6: Runtime guard (block sensitive ops) ✅
+  - Guardrail 7: Server-side rate limiting ⏳ (Week 3)
+  - Guardrail 8: PII detection ✅
+  - Guardrail 9: Security tests ✅
+- ✅ Migration utilities (`src/utils/migration/`)
+  - `uuid.ts` - UUID generation (preserves Supabase compatibility)
+  - `rollout.ts` - Gradual rollout logic
+- ✅ Comprehensive tests
+  - Config tests (`src/__tests__/config.test.ts`)
+  - UUID tests (`src/utils/migration/__tests__/uuid.test.ts`)
+  - Rollout tests (`src/utils/migration/__tests__/rollout.test.ts`)
+  - Adapter security tests (`src/services/data/__tests__/adapter.test.ts`)
+
+**Pending:**
+- [ ] Complete testing and verification
+- [ ] Update documentation
+- [ ] Proceed to Week 3 (Backend WebAuthn Registration)
+
+### Migration Timeline
+
+- **Week 0** (Current): Pre-migration preparation ⏳
+- **Week 3**: Backend WebAuthn registration
+- **Week 4**: Backend WebAuthn authentication
+- **Week 5**: Frontend integration
+- **Week 6**: Testing & gradual rollout (10% → 100%)
+- **Week 7**: Cleanup & full deployment
+
+**Documentation:**
+- See `security_phase_one_A_blue_spirit.md` for complete migration guide
+- See `MIGRATION_CHECKLIST.md` for detailed task list
+- See `SECURITY_GUARDRAILS.md` for security implementation status
+
 ## External Dependencies
 - **Expo SDK 52 (React Native)**: Core mobile application development.
 - **React Navigation**: In-app navigation.
 - **React Query (TanStack)**: Server state management and offline capabilities.
-- **Supabase**:
-    - **Supabase Auth**: User authentication.
-    - **PostgreSQL**: Relational database.
-    - **Supabase Realtime**: Real-time feature updates.
-    - **Supabase Storage**: Media storage.
+- **Supabase** (Current - Will be replaced in Phase 1):
+    - **Supabase Auth**: User authentication → Migrating to WebAuthn
+    - **PostgreSQL**: Relational database → Keeping for data layer
+    - **Supabase Realtime**: Real-time feature updates → Keeping
+    - **Supabase Storage**: Media storage → Keeping
 - **expo-secure-store**: Secure storage for sensitive data.
+- **expo-crypto**: Cryptographic operations (UUID, SHA-256 hashing).
 - **TypeScript**: Type safety.
 - **expo-application**: Generates stable device identifiers.
 - **Testing & Security**:

@@ -1,9 +1,14 @@
 import { supabase } from './supabase';
 import { User } from '@supabase/supabase-js';
+import { CONFIG } from '../config';
 
 /**
  * Email Verification Service
  * Enforces email verification for protected actions
+ * 
+ * Feature Flag: CONFIG.REQUIRE_EMAIL_VERIFICATION
+ * - When true: Email verification is enforced (production default)
+ * - When false: Email verification is disabled (development/migration mode)
  */
 
 export interface VerificationStatus {
@@ -14,6 +19,10 @@ export interface VerificationStatus {
 
 /**
  * Check if user's email is verified
+ * 
+ * Feature Flag Check:
+ * If REQUIRE_EMAIL_VERIFICATION is false, this always returns isVerified: true
+ * This allows disabling email verification during development/migration.
  */
 export const checkEmailVerification = async (user: User | null): Promise<VerificationStatus> => {
   if (!user) {
@@ -21,6 +30,16 @@ export const checkEmailVerification = async (user: User | null): Promise<Verific
       isVerified: false,
       needsVerification: false,
       message: 'User not authenticated',
+    };
+  }
+
+  // 🎛️ FEATURE FLAG: Check if email verification is required
+  if (!CONFIG.REQUIRE_EMAIL_VERIFICATION) {
+    // Email verification disabled (development/migration mode)
+    return {
+      isVerified: true,
+      needsVerification: false,
+      message: 'Email verification disabled by feature flag',
     };
   }
 
