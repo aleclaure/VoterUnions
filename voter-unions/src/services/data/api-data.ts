@@ -22,7 +22,7 @@ import type { Profile, Union, Post, Comment, Channel, DataPort } from './types';
  * 
  * TODO (Week 3): Implement actual API calls with WebAuthn JWT
  */
-const apiCall = async (endpoint: string, options?: RequestInit): Promise<any> => {
+const apiCall = async (endpoint: string, options?: Record<string, unknown>): Promise<any> => {
   throw new Error(
     `🚧 API Adapter Not Implemented Yet\n` +
     `Endpoint: ${endpoint}\n` +
