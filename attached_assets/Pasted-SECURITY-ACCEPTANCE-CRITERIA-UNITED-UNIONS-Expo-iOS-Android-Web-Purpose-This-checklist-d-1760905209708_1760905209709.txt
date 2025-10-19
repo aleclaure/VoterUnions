@@ -1,0 +1,265 @@
+SECURITY ACCEPTANCE CRITERIA – UNITED UNIONS (Expo: iOS / Android / Web)
+
+Purpose
+- This checklist defines the minimum security and privacy requirements for the United Unions app (Expo + React Native + Web).
+- The app enables voter unions, consumer boycotts, and worker strikes while minimizing data collection and maximizing anonymity.
+
+----------------------------------------------------------------------
+1) IDENTITY & KEY MANAGEMENT
+----------------------------------------------------------------------
+Accounts
+- iOS: WebAuthn / passkeys
+- Android: WebAuthn / passkeys
+- Web: WebAuthn / passkeys
+- Acceptance: All accounts use passkeys; no passwords, emails, or phone numbers required.
+
+Private key storage
+- iOS: Secure Enclave via RN Keychain (non-exportable, ThisDeviceOnly)
+- Android: StrongBox/Keystore via RN Keychain (non-exportable)
+- Web: Platform authenticator credentials; app crypto keys via WebCrypto
+- Acceptance: Private keys never leave the device; server never holds private keys.
+
+Local cryptographic operations
+- iOS: On-device sign/decrypt
+- Android: On-device sign/decrypt
+- Web: On-device sign/decrypt (WebCrypto)
+- Acceptance: All signing/decryption happens locally.
+
+Key rotation
+- iOS: Supported (UI + backend flow)
+- Android: Supported
+- Web: Supported
+- Acceptance: Users can rotate keys; old voting/membership tokens revoked.
+
+Recovery
+- iOS: Optional social recovery or user-controlled encrypted backup (no server custody)
+- Android: Optional social recovery or user-controlled encrypted backup
+- Web: Passkey + optional encrypted export (user-controlled download)
+- Acceptance: Recovery never stores plaintext keys server-side.
+
+----------------------------------------------------------------------
+2) DATA MINIMIZATION & STORAGE
+----------------------------------------------------------------------
+PII collection
+- iOS/Android/Web: None by default
+- Acceptance: No emails, phone numbers, or device IDs collected.
+
+Membership records
+- iOS: Client-side encrypted blobs before upload
+- Android: Same as iOS
+- Web: Same (ciphertext stored; IndexedDB only for local cache)
+- Acceptance: Server stores ciphertext only; unreadable without user key.
+
+Votes
+- iOS: Blind-signed ballots; server stores ciphertext + used-token hashes
+- Android: Same
+- Web: Same
+- Acceptance: No server mapping of user → vote.
+
+Logs
+- iOS/Android/Web: ≤72h retention, encrypted, no plaintext IP/UA (hash/salt only if truly needed)
+- Acceptance: Short retention; minimal metadata.
+
+Analytics
+- iOS/Android/Web: Aggregate counts only
+- Acceptance: No per-user analytics.
+
+Local storage
+- iOS: Encrypted storage / SQLCipher; never AsyncStorage for secrets
+- Android: Same
+- Web: IndexedDB + client-side encryption; no LocalStorage for secrets
+- Acceptance: No sensitive data in plaintext local stores.
+
+----------------------------------------------------------------------
+3) NETWORK & TRANSPORT SECURITY
+----------------------------------------------------------------------
+HTTPS only
+- iOS: ATS enforced
+- Android: usesCleartextTraffic="false"
+- Web: HTTPS only
+- Acceptance: No cleartext traffic.
+
+Certificate pinning
+- iOS: Required via RN pinning module; rotate per release
+- Android: Required via RN pinning module; rotate per release
+- Web: Not possible; use HSTS preload + CSP + SRI
+- Acceptance: Native apps pin; web uses HSTS (preload), Subresource Integrity, strict CSP.
+
+Token lifetime
+- iOS/Android: Access ≤15 min; refresh ≤24h
+- Web: Same; prefer HttpOnly, Secure, SameSite cookies
+- Acceptance: Short-lived tokens; refresh rotation; HttpOnly cookies on web.
+
+Replay protection
+- iOS/Android/Web: Nonce + timestamp
+- Acceptance: Server rejects replays and skewed timestamps.
+
+Rate limiting
+- iOS/Android/Web: Per endpoint
+- Acceptance: Abuse-resistant rate limits and backoff.
+
+Origin hiding
+- iOS/Android/Web (backend): CDN/WAF in front; origin allowlist to CDN IPs only
+- Acceptance: No direct origin exposure.
+
+Censorship resistance
+- iOS: .onion mirror + “Open in Tor Browser” action
+- Android: Same
+- Web: .onion link + interstitial instructions (open in Tor Browser only)
+- Acceptance: Onion mirror maintained; clear UX for high-risk users.
+
+----------------------------------------------------------------------
+4) APP/WEB INTEGRITY & RUNTIME HARDENING
+----------------------------------------------------------------------
+Build mode
+- iOS: Hermes; no dev menu/debug symbols in release
+- Android: Hermes; no dev menu/debug symbols in release
+- Web: Production build; no dev tooling exposed
+- Acceptance: No debug artifacts in production builds.
+
+OTA updates
+- iOS: Signed EAS Update or OTA disabled
+- Android: Signed EAS Update or OTA disabled
+- Web: No remote code eval; immutable asset hashing
+- Acceptance: Only signed updates; no dynamic code loading (e.g., eval).
+
+Dependency hygiene
+- iOS/Android/Web: Lockfile committed; CI SCA; fail build on high severity
+- Acceptance: Weekly scans; critical vulns block release.
+
+Compromise checks
+- iOS: Jailbreak/emulator detection; block sensitive actions
+- Android: Root/emulator detection; block sensitive actions
+- Web: Browser security headers & runtime checks
+- Acceptance: Sensitive actions blocked on compromised native devices; web enforces CSP/COOP/COEP.
+
+Attestation
+- iOS: App Attest / DeviceCheck required for vote casting
+- Android: Play Integrity required for vote casting
+- Web: Optional WebAuthn attestation allowlist (AAGUID) when feasible
+- Acceptance: Integrity signal required for native voting; web uses WebAuthn attestation if practical.
+
+Obfuscation/tamper
+- iOS: Minify/obfuscate; runtime signature/self-check
+- Android: Same
+- Web: SRI + content hashing; CSP script-src 'self' 'strict-dynamic'
+- Acceptance: Detect repacks (native); prevent script injection (web).
+
+----------------------------------------------------------------------
+5) VOTING & UNION LOGIC
+----------------------------------------------------------------------
+Eligibility
+- iOS/Android/Web: Blind-signature token issuance to members only
+- Acceptance: Only valid members receive voting tokens.
+
+Double voting
+- iOS/Android/Web: Used-token IDs hashed and tracked
+- Acceptance: Duplicate tokens rejected.
+
+Anonymity
+- iOS/Android/Web: No user→vote mapping stored
+- Acceptance: Servers cannot link identity to ballot.
+
+Verifiability
+- iOS/Android/Web: Client receives hash receipt (no contents)
+- Acceptance: Users can verify inclusion without revealing choice.
+
+Results
+- iOS/Android/Web: Aggregates only
+- Acceptance: No per-vote metadata exposed.
+
+----------------------------------------------------------------------
+6) SUPPLY-CHAIN & RELEASE CONTROLS
+----------------------------------------------------------------------
+Audits
+- iOS/Android/Web: Weekly dependency and license audits
+- Acceptance: Documented and tracked; blockers fail CI.
+
+Reproducibility
+- iOS: CI verifies App Store build hashes
+- Android: CI verifies Play Store build hashes
+- Web: CI verifies artifact hashes
+- Acceptance: Release artifacts match CI builds.
+
+SBOM
+- iOS/Android/Web: Generated each release
+- Acceptance: SBOM archived per version.
+
+Manual review
+- iOS/Android/Web: Crypto/auth/networking dependencies
+- Acceptance: Human sign-off before release.
+
+----------------------------------------------------------------------
+7) INCIDENT RESPONSE & KEY ROTATION
+----------------------------------------------------------------------
+Kill switches
+- iOS/Android/Web: Server-side flags disable vote/join instantly
+- Acceptance: Critical flows can be disabled without client update.
+
+Key rotation
+- iOS/Android/Web: Quarterly tested; HSM/KMS with split custody
+- Acceptance: Rotation runbook exercised quarterly.
+
+Backups
+- iOS/Android/Web: Encrypted, geo-redundant; quarterly restore test
+- Acceptance: Proven restore; keys separate from data.
+
+Breach response
+- iOS/Android/Web: Containment ≤24h; communications ≤72h if any PII impacted
+- Acceptance: Timely containment and disclosure.
+
+----------------------------------------------------------------------
+8) COMPLIANCE & TRANSPARENCY
+----------------------------------------------------------------------
+Privacy policy
+- iOS/Android/Web: “No personal data collected” with technical detail
+- Acceptance: Public, specific, and truthful.
+
+Open crypto code
+- iOS/Android/Web: Public, auditable
+- Acceptance: Vote/crypto code open for review.
+
+Transparency report
+- iOS/Android/Web: Annual requests & actions
+- Acceptance: Published yearly.
+
+Independent audit
+- iOS/Android/Web: Pre-launch and major releases
+- Acceptance: Third-party security review completed.
+
+----------------------------------------------------------------------
+9) USER EDUCATION & UX SAFETY
+----------------------------------------------------------------------
+Onboarding
+- iOS/Android/Web: Explain passkeys, no PII, client-side encryption
+- Acceptance: Clear, non-technical language.
+
+Tor access
+- iOS: “Open in Tor Browser” action to .onion mirror
+- Android: Same
+- Web: Interstitial explaining Tor requirement
+- Acceptance: High-risk users guided to onion mirror.
+
+Consent UX
+- iOS/Android/Web: Explicit confirm for “Join union” and “Cast vote”
+- Acceptance: Clear consent and privacy notes.
+
+----------------------------------------------------------------------
+PASS / FAIL CRITERIA
+----------------------------------------------------------------------
+- No plaintext personal data: No collection or transmission of emails, phones, or device IDs; logs minimal and short-lived.
+- Device-bound secrets: Keys live only in Secure Enclave/StrongBox (native) or platform WebAuthn credentials (web); never on server.
+- Encrypted & pinned transport: All traffic HTTPS; native apps use cert pinning; web uses HSTS + CSP + SRI.
+- Server breach impact: Database dump yields no usable identities or vote linkages (ciphertexts only).
+- Private verifiability: Users can privately verify their own participation via receipts/commitments.
+- Auditable crypto & policy: Crypto and policies are public/auditable; SBOM + reproducible builds in place.
+- Censorship/Seizure resilience: CDN origin hiding; onion mirror maintained; kill-switches and rotation tested.
+
+----------------------------------------------------------------------
+NOTES & COMPATIBILITY ADJUSTMENTS
+----------------------------------------------------------------------
+- Certificate pinning: Only on native. Web cannot pin; use HSTS preload + CSP + SRI instead.
+- Root/jailbreak checks: Native only. On the web, rely on strong security headers and no dynamic code execution.
+- Local storage: Avoid AsyncStorage for secrets; use encrypted storage (native) and IndexedDB + WebCrypto (web).
+- Cookies (web): Use HttpOnly + Secure + SameSite=Lax or Strict; avoid LocalStorage for tokens.
+- Tor access: Standard browsers cannot open .onion; provide a clear handoff to Tor Browser (Android) / Onion Browser (iOS).
