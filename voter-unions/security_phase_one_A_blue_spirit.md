@@ -274,6 +274,758 @@ After 1 week of stable operation:
 
 ---
 
+## 🛡️ Risk Mitigation Strategies
+
+### **Overview: Four Critical Risks**
+
+Based on codebase analysis, here are the high-risk areas and their solutions:
+
+| Risk | Severity | Solution | Final Risk |
+|------|----------|----------|------------|
+| User ID Migration | 🔴 CRITICAL | Use UUID (not ULID) | ✅ ELIMINATED |
+| Email Verification | 🔴 HIGH | Feature flag approach | 🟡 LOW |
+| Supabase Usage | 🔴 HIGH | Adapter pattern | 🟡 MEDIUM |
+| All-or-Nothing | 🔴 CRITICAL | Gradual rollout | 🟡 MEDIUM |
+
+**Result:** Overall migration risk reduced from 🔴 CRITICAL → 🟡 MANAGEABLE
+
+---
+
+### **Risk 1: User ID Migration - SOLVED** ✅
+
+#### **The Problem**
+- Supabase uses UUID v4 for user IDs
+- Phase 1 spec calls for ULID
+- Changing ID format breaks all foreign keys
+- Requires complex migration scripts
+- High risk of data loss
+
+#### **The Solution: Use UUID in New System**
+
+**Don't migrate IDs. Just use UUIDs in the new auth service too.**
+
+```typescript
+// backend/services/auth_service/src/routes/register.ts
+
+// ❌ BEFORE (risky - breaks everything):
+import { ulid } from 'ulid';
+const userId = ulid(); // New format, requires migration
+
+// ✅ AFTER (safe - compatible with existing):
+import { v4 as uuidv4 } from 'uuid';
+const userId = uuidv4(); // Same format as Supabase!
+```
+
+#### **Database Schema Update**
+
+```typescript
+// backend/services/auth_service/src/db/schema.ts
+
+// ❌ BEFORE:
+user_id TEXT PRIMARY KEY DEFAULT ulid()
+
+// ✅ AFTER:
+user_id UUID PRIMARY KEY DEFAULT gen_random_uuid()
+```
+
+#### **Why This Works**
+
+**For Existing Users:**
+- ✅ Keep their Supabase UUID as-is
+- ✅ No database changes needed
+- ✅ All foreign keys stay valid
+- ✅ Content remains linked to same ID
+
+**For New Users:**
+- ✅ Get UUID v4 (same format)
+- ✅ Consistent ID format across system
+- ✅ No special handling needed
+
+**For Migration:**
+- ✅ Import users 1:1 from Supabase
+- ✅ No mapping table needed
+- ✅ Zero migration scripts
+- ✅ Can even keep both systems running in parallel
+
+#### **Migration Code**
+
+```typescript
+// scripts/migrate-users.ts
+import { supabase } from '../src/services/supabase';
+import { db } from '../backend/services/auth_service/src/db/client';
+
+const migrateUsers = async () => {
+  const { data: authUsers } = await supabase.auth.admin.listUsers();
+  
+  for (const user of authUsers) {
+    // Preserve Supabase UUID directly
+    await db.query(`
+      INSERT INTO users (user_id, created_at)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id) DO NOTHING
+    `, [user.id, user.created_at]); // Use existing ID!
+  }
+  
+  console.log(`✅ Migrated ${authUsers.length} users with preserved IDs`);
+};
+```
+
+#### **Implementation Checklist**
+
+- [ ] Update auth service schema to use UUID
+- [ ] Change `ulid()` to `uuidv4()` in registration
+- [ ] Test new user registration generates UUID
+- [ ] Test existing user import preserves IDs
+- [ ] Verify all foreign keys work
+
+**Result:** 🔴 CRITICAL risk → ✅ ELIMINATED
+
+---
+
+### **Risk 2: Email Verification Guards - Feature Flag** ✅
+
+#### **The Problem**
+- 11 protected actions across codebase require email verification
+- Easy to miss one when deleting
+- Can't test both states easily
+- Risky to delete all at once
+
+**Files affected:**
+```
+src/hooks/usePosts.ts
+src/hooks/useComments.ts
+src/hooks/useChannels.ts
+src/hooks/useDebates.ts
+src/hooks/useArguments.ts
+src/hooks/useVotes.ts
+src/hooks/useUnions.ts
+src/hooks/useBoycotts.ts
+src/hooks/useWorkerProposals.ts
+src/hooks/useProfile.ts
+src/hooks/usePowerPledges.ts
+```
+
+#### **The Solution: Feature Flag to Disable All Guards**
+
+**Step 1: Add feature flag to config**
+
+```typescript
+// src/config.ts
+export const CONFIG = {
+  // Feature flags
+  USE_WEBAUTHN: process.env.EXPO_PUBLIC_USE_WEBAUTHN === 'true',
+  REQUIRE_EMAIL_VERIFICATION: process.env.EXPO_PUBLIC_REQUIRE_EMAIL_VERIFICATION === 'true',
+  
+  // API endpoints
+  API_URL: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001',
+};
+```
+
+**Step 2: Update email verification service**
+
+```typescript
+// src/services/emailVerification.ts
+import { CONFIG } from '../config';
+
+export const guardAction = async (action: keyof typeof PROTECTED_ACTIONS) => {
+  // 🔧 Feature flag - disable all guards when migrating to WebAuthn
+  if (!CONFIG.REQUIRE_EMAIL_VERIFICATION) {
+    console.log(`✅ Email verification disabled, allowing ${action}`);
+    return true; // Allow all actions
+  }
+  
+  // Original email verification logic (still works if flag is true)
+  const verification = await checkEmailVerification(user);
+  
+  if (!verification.isVerified) {
+    Alert.alert(
+      'Email Verification Required',
+      `You need to verify your email to ${PROTECTED_ACTIONS[action]}`
+    );
+    return false;
+  }
+  
+  return true;
+};
+```
+
+**Step 3: Set environment variable**
+
+```bash
+# .env
+EXPO_PUBLIC_REQUIRE_EMAIL_VERIFICATION=false  # Disable guards
+```
+
+#### **Migration Timeline**
+
+```
+Week 5: Set flag to false
+├─ Guards still in code but disabled
+├─ Test all 11 actions work
+└─ Verify no email prompts appear
+
+Week 6: Production with flag = false
+├─ Monitor for issues
+└─ Keep code in place as safety
+
+Week 7: After 1 week stable
+├─ Delete emailVerification.ts
+├─ Remove all guardAction() calls
+└─ Remove EmailVerificationBanner
+```
+
+#### **Benefits**
+
+✅ **Single point of control** - One flag disables all 11 guards  
+✅ **Easy testing** - Toggle flag to test both states  
+✅ **Simple rollback** - Just flip flag back to true  
+✅ **Gradual cleanup** - Remove code later at your leisure  
+✅ **No code changes** - Don't need to modify 11 files immediately
+
+#### **Implementation Checklist**
+
+- [ ] Add `REQUIRE_EMAIL_VERIFICATION` to config
+- [ ] Update `guardAction()` to check flag first
+- [ ] Set flag to `false` in environment
+- [ ] Test all 11 actions work without verification
+- [ ] Test flag can be toggled back to `true`
+- [ ] Schedule code cleanup for Week 7
+
+**Result:** 🔴 HIGH risk → 🟡 LOW risk
+
+---
+
+### **Risk 3: Widespread Supabase Usage - Adapter Pattern** ✅
+
+#### **The Problem**
+- 50+ files have `supabase.from('table')` calls
+- Can't replace all at once
+- Hard to test both backends
+- Risky to break existing functionality
+
+**Example files:**
+```
+src/screens/ProfileScreen.tsx       - supabase.from('profiles')
+src/screens/UnionDetailScreen.tsx   - supabase.from('unions')
+src/hooks/usePosts.ts                - supabase.from('posts')
+src/hooks/useComments.ts             - supabase.from('comments')
+... 50+ more files
+```
+
+#### **The Solution: Data Access Adapter Layer**
+
+**Step 1: Create adapter interface**
+
+```typescript
+// src/services/data/adapter.ts
+import { CONFIG } from '../config';
+import * as SupabaseData from './supabase-data';
+import * as ApiData from './api-data';
+
+// Single point of control - switch backends with feature flag
+export const data = CONFIG.USE_NEW_BACKEND ? ApiData : SupabaseData;
+
+// Export types
+export type Profile = {
+  id: string;
+  display_name: string;
+  username_normalized: string;
+  bio: string | null;
+  avatar_url: string | null;
+  created_at: string;
+};
+
+export type Union = {
+  id: string;
+  name: string;
+  description: string;
+  is_public: boolean;
+  created_by: string;
+  created_at: string;
+};
+
+// ... more types
+```
+
+**Step 2: Implement Supabase adapter (existing backend)**
+
+```typescript
+// src/services/data/supabase-data.ts
+import { supabase } from '../supabase';
+import type { Profile, Union } from './adapter';
+
+export const getProfile = async (userId: string): Promise<Profile | null> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+  
+  if (error) throw error;
+  return data;
+};
+
+export const getUnion = async (unionId: string): Promise<Union | null> => {
+  const { data, error } = await supabase
+    .from('unions')
+    .select('*')
+    .eq('id', unionId)
+    .single();
+  
+  if (error) throw error;
+  return data;
+};
+
+export const createPost = async (params: {
+  unionId: string;
+  content: string;
+  userId: string;
+}) => {
+  const { data, error } = await supabase
+    .from('posts')
+    .insert({
+      union_id: params.unionId,
+      content: params.content,
+      user_id: params.userId,
+    })
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+};
+
+// ... more functions
+```
+
+**Step 3: Implement API adapter (new backend)**
+
+```typescript
+// src/services/data/api-data.ts
+import { CONFIG } from '../config';
+import { getAuthToken } from '../auth/storage';
+import type { Profile, Union } from './adapter';
+
+const apiCall = async (endpoint: string, options?: RequestInit) => {
+  const token = await getAuthToken();
+  
+  const response = await fetch(`${CONFIG.API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`API error: ${response.statusText}`);
+  }
+  
+  return await response.json();
+};
+
+export const getProfile = async (userId: string): Promise<Profile | null> => {
+  return await apiCall(`/profiles/${userId}`);
+};
+
+export const getUnion = async (unionId: string): Promise<Union | null> => {
+  return await apiCall(`/unions/${unionId}`);
+};
+
+export const createPost = async (params: {
+  unionId: string;
+  content: string;
+  userId: string;
+}) => {
+  return await apiCall('/posts', {
+    method: 'POST',
+    body: JSON.stringify({
+      union_id: params.unionId,
+      content: params.content,
+      user_id: params.userId,
+    }),
+  });
+};
+
+// ... more functions
+```
+
+**Step 4: Update components to use adapter**
+
+```typescript
+// src/screens/ProfileScreen.tsx
+
+// ❌ BEFORE (direct Supabase):
+import { supabase } from '../services/supabase';
+
+const ProfileScreen = () => {
+  const loadProfile = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    setProfile(data);
+  };
+};
+
+// ✅ AFTER (using adapter):
+import { data } from '../services/data/adapter';
+
+const ProfileScreen = () => {
+  const loadProfile = async () => {
+    const profile = await data.getProfile(user.id);
+    setProfile(profile);
+  };
+};
+```
+
+#### **Migration Strategy**
+
+**Week 4: Create adapter layer**
+```bash
+# Create adapter files
+mkdir -p src/services/data
+touch src/services/data/adapter.ts
+touch src/services/data/supabase-data.ts
+touch src/services/data/api-data.ts
+```
+
+**Week 5: Migrate top 10 most-used queries**
+```typescript
+// Priority order (highest usage first):
+1. getProfile()
+2. getUnion() 
+3. createPost()
+4. createComment()
+5. getPosts()
+6. getComments()
+7. voteOnArgument()
+8. createUnion()
+9. joinUnion()
+10. getUnionMembers()
+```
+
+**Week 6: Test with feature flag**
+```bash
+# Test Supabase backend
+EXPO_PUBLIC_USE_NEW_BACKEND=false npm start
+
+# Test API backend
+EXPO_PUBLIC_USE_NEW_BACKEND=true npm start
+```
+
+**Week 7: Migrate remaining files**
+- Find remaining Supabase calls: `grep -r "supabase.from" src/`
+- Migrate to adapter one by one
+- Test each migration
+
+#### **Benefits**
+
+✅ **Gradual migration** - Don't need to change 50+ files at once  
+✅ **Works with both backends** - Can run Supabase OR API  
+✅ **Easy testing** - Feature flag toggles backend  
+✅ **Type safety** - Shared TypeScript types  
+✅ **Rollback friendly** - Just flip flag back
+
+#### **Implementation Checklist**
+
+- [ ] Create adapter layer (3 files)
+- [ ] Implement top 10 functions in both adapters
+- [ ] Update 10 most-used screens/hooks
+- [ ] Test with `USE_NEW_BACKEND=false` (Supabase)
+- [ ] Test with `USE_NEW_BACKEND=true` (API)
+- [ ] Migrate remaining files gradually
+- [ ] Remove direct Supabase calls
+
+**Result:** 🔴 HIGH risk → 🟡 MEDIUM risk
+
+---
+
+### **Risk 4: All-or-Nothing Cutover - Gradual Rollout** ✅
+
+#### **The Problem**
+- Can't test with subset of users
+- One bad deploy affects everyone
+- No way to pause migration
+- Hard to isolate issues
+
+#### **The Solution: Server-Side Gradual Rollout**
+
+**Option A: Percentage-Based Rollout** (Recommended)
+
+**Step 1: Create rollout utility**
+
+```typescript
+// backend/shared/lib/rollout.ts
+import { createHash } from 'crypto';
+
+export const isUserInRollout = (userId: string, percentage: number): boolean => {
+  // Deterministic hash - same user always gets same result
+  const hash = createHash('sha256')
+    .update(userId)
+    .digest('hex');
+  
+  // Convert first 8 chars to number 0-99
+  const hashNumber = parseInt(hash.substring(0, 8), 16);
+  const userPercentage = hashNumber % 100;
+  
+  return userPercentage < percentage;
+};
+
+// Example:
+// isUserInRollout('user-123', 10) => true/false (deterministic)
+// isUserInRollout('user-123', 10) => same result every time
+```
+
+**Step 2: Implement in auth service**
+
+```typescript
+// backend/services/auth_service/src/routes/auth.ts
+import { isUserInRollout } from '../../../shared/lib/rollout';
+
+// Environment variable controls rollout percentage
+const WEBAUTHN_ROLLOUT_PERCENT = parseInt(process.env.WEBAUTHN_ROLLOUT_PERCENT || '0');
+
+app.post('/auth/check', async (req, res) => {
+  const { userId } = req.body;
+  
+  // Check if user is in WebAuthn rollout
+  const useWebAuthn = isUserInRollout(userId, WEBAUTHN_ROLLOUT_PERCENT);
+  
+  res.json({
+    authMethod: useWebAuthn ? 'webauthn' : 'supabase',
+    rolloutPercentage: WEBAUTHN_ROLLOUT_PERCENT,
+  });
+});
+```
+
+**Step 3: Update frontend to check rollout**
+
+```typescript
+// src/services/auth/index.ts
+import { CONFIG } from '../config';
+
+export const determineAuthMethod = async (userId: string) => {
+  // Check with backend which auth method to use
+  const response = await fetch(`${CONFIG.API_URL}/auth/check`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId }),
+  });
+  
+  const { authMethod } = await response.json();
+  return authMethod; // 'webauthn' or 'supabase'
+};
+
+export const signIn = async (userId?: string) => {
+  if (!userId) {
+    // New user - use current default
+    return CONFIG.USE_WEBAUTHN ? signInWithPasskey() : signInWithSupabase();
+  }
+  
+  // Existing user - check rollout
+  const method = await determineAuthMethod(userId);
+  
+  if (method === 'webauthn') {
+    return signInWithPasskey();
+  } else {
+    return signInWithSupabase();
+  }
+};
+```
+
+#### **Rollout Schedule**
+
+```
+Day 1:  10% of users (100 users if you have 1000)
+├─ Set WEBAUTHN_ROLLOUT_PERCENT=10
+├─ Monitor for 48 hours
+├─ Check error rates, user feedback
+└─ If issues → set to 0 (instant rollback)
+
+Day 3:  25% of users (if Day 1 successful)
+├─ Set WEBAUTHN_ROLLOUT_PERCENT=25
+├─ Monitor for 48 hours
+└─ Watch for patterns
+
+Day 5:  50% of users (if Day 3 successful)
+├─ Set WEBAUTHN_ROLLOUT_PERCENT=50
+├─ Monitor for 24 hours
+└─ Majority of users now on WebAuthn
+
+Day 6:  75% of users (if Day 5 successful)
+├─ Set WEBAUTHN_ROLLOUT_PERCENT=75
+├─ Monitor for 24 hours
+└─ Almost complete
+
+Day 7:  100% of users (full cutover)
+├─ Set WEBAUTHN_ROLLOUT_PERCENT=100
+├─ Monitor for 1 week
+└─ Disable Supabase auth after stable
+```
+
+#### **Monitoring Dashboard**
+
+```typescript
+// backend/services/auth_service/src/routes/admin.ts
+
+app.get('/admin/rollout-status', async (req, res) => {
+  const stats = await db.query(`
+    SELECT 
+      COUNT(*) FILTER (WHERE auth_method = 'webauthn') as webauthn_users,
+      COUNT(*) FILTER (WHERE auth_method = 'supabase') as supabase_users,
+      COUNT(*) as total_users
+    FROM users
+  `);
+  
+  res.json({
+    rolloutPercentage: WEBAUTHN_ROLLOUT_PERCENT,
+    webauthnUsers: stats.rows[0].webauthn_users,
+    supabaseUsers: stats.rows[0].supabase_users,
+    totalUsers: stats.rows[0].total_users,
+  });
+});
+```
+
+#### **Option B: Beta Opt-In Program**
+
+**For early testing with willing users:**
+
+```typescript
+// Add beta_features table
+CREATE TABLE beta_features (
+  user_id UUID PRIMARY KEY,
+  webauthn_enabled BOOLEAN DEFAULT FALSE,
+  enrolled_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+// Let users opt-in
+const enableWebAuthnBeta = async (userId: string) => {
+  await db.query(`
+    INSERT INTO beta_features (user_id, webauthn_enabled)
+    VALUES ($1, true)
+    ON CONFLICT (user_id) DO UPDATE
+    SET webauthn_enabled = true
+  `, [userId]);
+};
+```
+
+**Frontend opt-in UI:**
+
+```typescript
+// src/screens/SettingsScreen.tsx
+
+const SettingsScreen = () => {
+  const [betaEnabled, setBetaEnabled] = useState(false);
+  
+  const handleEnableBeta = async () => {
+    Alert.alert(
+      'Try Biometric Sign-In',
+      'Enable our new passkey-based authentication. You can always switch back.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Enable',
+          onPress: async () => {
+            await enableWebAuthnBeta(user.id);
+            setBetaEnabled(true);
+            Alert.alert('Success', 'Biometric sign-in enabled! Please set up your passkey.');
+          },
+        },
+      ]
+    );
+  };
+  
+  return (
+    <View>
+      <Text>Beta Features</Text>
+      <Button
+        title={betaEnabled ? 'Using Passkeys ✅' : 'Try Passkey Sign-In'}
+        onPress={handleEnableBeta}
+        disabled={betaEnabled}
+      />
+    </View>
+  );
+};
+```
+
+#### **Benefits**
+
+✅ **Test with small group first** - 10% rollout catches issues early  
+✅ **Monitor error rates** - See problems before affecting everyone  
+✅ **Instant rollback** - Set percentage to 0, issue resolved  
+✅ **User-driven opt-in** - Let enthusiastic users beta test  
+✅ **Gradual confidence** - Each step proves stability  
+✅ **Pause anytime** - Freeze rollout if issues appear
+
+#### **Implementation Checklist**
+
+- [ ] Create rollout utility (`isUserInRollout`)
+- [ ] Add `WEBAUTHN_ROLLOUT_PERCENT` env var
+- [ ] Implement `/auth/check` endpoint
+- [ ] Update frontend to check rollout
+- [ ] Create monitoring dashboard
+- [ ] Start at 10% rollout
+- [ ] Monitor for 48h before increasing
+- [ ] Follow rollout schedule to 100%
+
+**Result:** 🔴 CRITICAL risk → 🟡 MEDIUM risk
+
+---
+
+### **Combined Risk Reduction Summary**
+
+| Risk | Original | Solution | Final | Saved By |
+|------|----------|----------|-------|----------|
+| User ID Migration | 🔴 CRITICAL | Use UUID | ✅ NONE | Same ID format |
+| Email Verification | 🔴 HIGH | Feature flag | 🟡 LOW | Single toggle |
+| Supabase Usage | 🔴 HIGH | Adapter | 🟡 MEDIUM | Gradual migration |
+| All-or-Nothing | 🔴 CRITICAL | Gradual rollout | 🟡 MEDIUM | 10% → 100% |
+
+**Overall Migration Risk:**  
+🔴 CRITICAL → 🟡 MANAGEABLE ✅
+
+---
+
+### **Updated Migration Timeline**
+
+```
+Week 3-4: Build Auth Service
+├─ Use UUID (not ULID) ✅
+├─ Test locally
+└─ No production impact
+
+Week 5: Create Safety Mechanisms
+├─ Add feature flags (email verification, backend switch) ✅
+├─ Create adapter layer ✅
+├─ Build rollout system ✅
+└─ Test both paths work
+
+Week 6: Start Gradual Rollout
+├─ Day 1: 10% rollout ✅
+├─ Day 3: 25% rollout
+├─ Day 5: 50% rollout
+├─ Day 6: 75% rollout
+└─ Day 7: 100% rollout
+
+Week 7: Monitor & Cleanup
+├─ Monitor for issues
+├─ Delete old code
+└─ Celebrate! 🎉
+```
+
+**Key Changes to Original Plan:**
+1. ✅ Use UUID instead of ULID (eliminates ID migration)
+2. ✅ Add feature flags for easy rollback
+3. ✅ Build adapter layer for gradual Supabase migration
+4. ✅ Implement gradual rollout (not all-at-once)
+
+**These 4 changes reduce risk from CRITICAL to MANAGEABLE!**
+
+---
+
 ## 🎯 Overview
 
 ### **What We're Building**
