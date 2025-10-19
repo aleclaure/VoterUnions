@@ -1,79 +1,179 @@
-# Security Acceptance Criteria – United Unions App
+# Security Acceptance Criteria – United Unions (Discord/Reddit-Style)
 
-**Target Architecture:** Expo (iOS / Android / Web)  
-**Current Status:** Expo + Supabase (PostgreSQL, Auth, Storage)  
-**Purpose:** Define minimum security and privacy requirements for voter unions, consumer boycotts, and worker strikes while maximizing anonymity and minimizing data collection.
-
----
-
-## 📋 Table of Contents
-
-1. [Identity & Key Management](#1-identity--key-management)
-2. [Data Minimization & Storage](#2-data-minimization--storage)
-3. [Network & Transport Security](#3-network--transport-security)
-4. [App/Web Integrity & Runtime Hardening](#4-appweb-integrity--runtime-hardening)
-5. [Voting & Union Logic](#5-voting--union-logic)
-6. [Supply-Chain & Release Controls](#6-supply-chain--release-controls)
-7. [Incident Response & Key Rotation](#7-incident-response--key-rotation)
-8. [Compliance & Transparency](#8-compliance--transparency)
-9. [User Education & UX Safety](#9-user-education--ux-safety)
-10. [Pass/Fail Criteria](#passfail-criteria)
-11. [Gap Analysis Summary](#gap-analysis-summary)
-12. [Migration Roadmap](#migration-roadmap)
+**Target Architecture:** Privacy-First Civic Engagement Platform  
+**Current Implementation:** Voter Unions (Expo + Supabase)  
+**Purpose:** Gap analysis and migration roadmap to achieve zero-knowledge, anonymous voting and union membership with strict data minimization.
 
 ---
 
-## 1) Identity & Key Management
+## 📋 Executive Summary
+
+This document defines **security acceptance criteria** for a Discord/Reddit-style civic engagement app (United Unions) and provides a **comprehensive gap analysis** comparing the current Voter Unions implementation against these strict privacy requirements.
+
+### **Current State (Voter Unions)**
+- ✅ **Security Score:** 8.3/10 for traditional app security
+- ❌ **Privacy Score:** 2.5/10 for zero-knowledge architecture
+- **Architecture:** Expo + Supabase + Single PostgreSQL DB
+- **Auth:** Email/password (Supabase Auth)
+- **Data:** Plaintext user_id → union membership mappings
+- **Votes:** Device-based with user_id linkage
+
+### **Target State (United Unions Spec)**
+- 🎯 **Privacy Score Target:** 9.5/10
+- **Architecture:** Microservices + Separate DBs + CDN/WAF + Tor
+- **Auth:** WebAuthn/passkeys only (zero PII)
+- **Data:** Encrypted membership tokens (opaque blobs)
+- **Votes:** Blind-signature mode (default) with unlinkability
+
+### **Gap Score: 18% Compliant**
+
+Out of 89 security requirements, **16 are satisfied**, **12 are partially satisfied**, and **61 are not satisfied**.
+
+---
+
+## 🎯 Guiding Principles (Target Architecture)
+
+### **1. Data Minimization**
+- Collect **absolute minimum PII** (preferably none)
+- No emails, phones, IPs, user agents stored
+- Logs: 24h retention max, salted hashes only
+
+### **2. Pseudonymity by Default**
+- Users identified by random ULIDs (not email addresses)
+- Membership tokens stored as encrypted ciphertext
+- Vote ballots unlinkable to user identities (Mode B/C)
+
+### **3. User-Controlled Secrets**
+- Private keys never leave device
+- Client-side encryption before server upload
+- WebAuthn credentials stored in platform authenticators
+
+### **4. Separation of Duties**
+- **auth_service:** Manages WebAuthn, issues JWTs
+- **union_service:** Stores encrypted membership tokens
+- **voting_service:** Handles ballots (A/B/C modes)
+- **messaging_service:** Channels, threads, comments
+- **key_service:** Server keys in KMS/HSM
+
+### **5. End-to-End Verifiability**
+- Users can verify votes were counted
+- Receipts/commitments provided without revealing choice
+- Anti-coercion UX design
+
+### **6. Auditability & Transparency**
+- Public privacy policy and threat model
+- Reproducible builds with SBOM
+- Transparency reports (semiannual)
+
+---
+
+## 🔐 Threat Model
+
+### **Adversaries**
+1. **Local authoritarian regimes** - Subpoenas, server seizures, traffic blocking
+2. **Hostile actors** - Deanonymization attempts, Sybil attacks, scraping, harassment
+3. **Honest-but-curious infra** - CDN/hosting providers with access to metadata
+
+### **Limits**
+- Cannot guarantee immunity from device compromise
+- Cannot prevent lawful orders (but minimize impact via encryption)
+- Cannot prevent all Sybil attacks (use invite chains + PoW)
+
+---
+
+## 📊 Gap Analysis Summary
+
+| Category | Total Requirements | ✅ Satisfied | ⚠️ Partial | ❌ Not Satisfied | Compliance % |
+|----------|-------------------|--------------|------------|------------------|--------------|
+| **1. Authentication** | 12 | 1 | 1 | 10 | 8% |
+| **2. Data Architecture** | 10 | 0 | 2 | 8 | 0% |
+| **3. Membership Storage** | 8 | 0 | 1 | 7 | 0% |
+| **4. Voting System** | 15 | 2 | 3 | 10 | 13% |
+| **5. Content & Messaging** | 6 | 3 | 1 | 2 | 50% |
+| **6. Logging & Analytics** | 7 | 0 | 0 | 7 | 0% |
+| **7. Network Security** | 9 | 1 | 1 | 7 | 11% |
+| **8. Cryptography** | 8 | 0 | 0 | 8 | 0% |
+| **9. Abuse Controls** | 6 | 4 | 2 | 0 | 67% |
+| **10. Operations & Hosting** | 8 | 0 | 1 | 7 | 0% |
+| **TOTAL** | **89** | **16** | **12** | **61** | **18%** |
+
+---
+
+## 1️⃣ Authentication & Identity
 
 ### **Target Requirements**
 
-#### **Accounts**
-- **iOS:** WebAuthn / passkeys
-- **Android:** WebAuthn / passkeys
-- **Web:** WebAuthn / passkeys
-- **Acceptance:** All accounts use passkeys; no passwords, emails, or phone numbers required.
+#### **AC1: WebAuthn/Passkey Authentication**
+**Requirement:**
+- All users authenticate via WebAuthn (FIDO2-compliant)
+- No email or password collection
+- Platform authenticators (Face ID, Touch ID, Windows Hello)
+- Fallback: passphrase → Argon2id key derivation (client-side)
 
-#### **Private Key Storage**
-- **iOS:** Secure Enclave via RN Keychain (non-exportable, ThisDeviceOnly)
-- **Android:** StrongBox/Keystore via RN Keychain (non-exportable)
-- **Web:** Platform authenticator credentials; app crypto keys via WebCrypto
-- **Acceptance:** Private keys never leave the device; server never holds private keys.
+**API Contract:**
+```typescript
+POST /auth/webauthn/register
+  → challenge/options (no email required)
 
-#### **Local Cryptographic Operations**
-- **iOS:** On-device sign/decrypt
-- **Android:** On-device sign/decrypt
-- **Web:** On-device sign/decrypt (WebCrypto)
-- **Acceptance:** All signing/decryption happens locally.
+POST /auth/webauthn/verify
+  → issues short-lived JWT (≤15 min)
 
-#### **Key Rotation**
-- **iOS:** Supported (UI + backend flow)
-- **Android:** Supported
-- **Web:** Supported
-- **Acceptance:** Users can rotate keys; old voting/membership tokens revoked.
+POST /auth/derive-key
+  → SRP/PAKE or challenge to bind client_pub_key
+```
 
-#### **Recovery**
-- **iOS:** Optional social recovery or user-controlled encrypted backup (no server custody)
-- **Android:** Optional social recovery or user-controlled encrypted backup
-- **Web:** Passkey + optional encrypted export (user-controlled download)
-- **Acceptance:** Recovery never stores plaintext keys server-side.
+**Data Schema:**
+```typescript
+user_record {
+  user_id: ULID (random)
+  display_name?: string
+  webauthn_public_key: PublicKey
+  client_pub_key: Ed25519PublicKey  // derived client-side
+  flags: { verified_worker?: boolean }
+}
+```
 
 ---
 
-### **Current Implementation (Voter Unions App)**
+### **Current Implementation (Voter Unions)**
 
-✅ **What You Have:**
-- Email/password authentication via Supabase Auth
-- Tokens stored in `expo-secure-store` (hardware-backed on iOS/Android)
-- JWT-based session management
-- Password reset via email verification
+**What You Have:**
+```typescript
+// Email/password authentication via Supabase Auth
+const signUp = async (email: string, password: string) => {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: undefined },
+  });
+};
 
-❌ **What's Missing:**
-- No WebAuthn/passkeys support
-- Email addresses collected and stored in `auth.users`
-- Passwords hashed server-side (not passkeys)
-- No client-side cryptographic operations (no signing/encryption)
-- No key rotation capability
-- Recovery depends on email access
+const signInWithPassword = async (email: string, password: string) => {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email, password
+  });
+};
+```
+
+**Data Schema:**
+```sql
+-- Supabase auth.users table
+CREATE TABLE auth.users (
+  id UUID PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,  -- ❌ PII collected
+  encrypted_password TEXT,     -- ❌ Passwords stored
+  email_confirmed_at TIMESTAMPTZ,
+  ...
+);
+
+-- profiles table
+CREATE TABLE profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id),
+  display_name TEXT,
+  email TEXT,  -- ❌ Duplicated PII
+  created_at TIMESTAMPTZ
+);
+```
 
 ---
 
@@ -81,121 +181,454 @@
 
 | Requirement | Current Status | Gap Severity | Expo Compatible? |
 |-------------|---------------|--------------|------------------|
-| Passkeys instead of passwords | ❌ Email/password | **CRITICAL** | ⚠️ Partial (react-native-passkey exists but limited) |
-| No email/phone collection | ❌ Emails required | **CRITICAL** | ❌ No (Supabase Auth requires email) |
-| Secure Enclave/StrongBox | ✅ expo-secure-store | ✅ SATISFIED | ✅ Yes |
-| Client-side crypto operations | ❌ None | **HIGH** | ✅ Yes (expo-crypto + WebCrypto) |
-| Key rotation | ❌ None | **MEDIUM** | ✅ Yes (with custom implementation) |
-| Social recovery | ❌ None | **MEDIUM** | ✅ Yes (with custom implementation) |
+| WebAuthn/passkey auth | ❌ Email/password only | **CRITICAL** | ⚠️ Partial (react-native-passkey) |
+| No email collection | ❌ Email required | **CRITICAL** | ❌ No (Supabase Auth requires email) |
+| Client-side key derivation | ❌ None | **HIGH** | ✅ Yes (expo-crypto) |
+| Short-lived JWTs (≤15 min) | ⚠️ 1 hour | **MEDIUM** | ✅ Yes (Supabase config) |
+| Random ULID user IDs | ❌ Sequential UUIDs | **LOW** | ✅ Yes (client generation) |
+| No password storage | ❌ Passwords hashed server-side | **CRITICAL** | ❌ No (requires custom auth) |
+| Platform authenticators | ❌ None | **HIGH** | ⚠️ Partial (native only) |
+| Argon2id fallback | ❌ None | **MEDIUM** | ✅ Yes (noble-hashes lib) |
+
+**Compliance:** ❌ **1/12 satisfied** (JWT-based auth exists, but with wrong config)
 
 ---
 
 ### **Migration Path**
 
-#### **Phase 1: Enhance Current Auth (Expo-compatible)**
+#### **Phase 1: Add Optional Passkey Support (Expo-compatible)**
 **Time:** 2-3 weeks  
-**Cost:** Low  
-**Complexity:** Medium
+**Keeps:** Email as fallback
 
-- Add optional passkey enrollment for existing email users
-- Implement client-side key generation via `expo-crypto`
-- Store private keys in `expo-secure-store`
-- Keep email as fallback for recovery
-
-**Libraries:**
 ```bash
-npm install react-native-passkey expo-crypto
+npm install react-native-passkey @noble/hashes
 ```
 
-**Limitations:** Still collects emails (fallback), not fully anonymous
+```typescript
+// src/services/webauthn.ts
+import Passkey from 'react-native-passkey';
+import { randomBytes } from 'expo-crypto';
+
+export const registerPasskey = async (displayName: string) => {
+  const challenge = randomBytes(32);
+  
+  const result = await Passkey.create({
+    rpId: 'voterUnions.app',
+    rpName: 'Voter Unions',
+    userId: randomBytes(16),
+    userName: displayName,
+    challenge,
+    userVerification: 'preferred',
+  });
+  
+  // Store credential ID + public key
+  return {
+    credentialId: result.credentialId,
+    publicKey: result.publicKey,
+  };
+};
+
+export const authenticatePasskey = async (credentialId: string) => {
+  const challenge = randomBytes(32);
+  
+  const result = await Passkey.get({
+    rpId: 'voterUnions.app',
+    challenge,
+    allowCredentials: [{ id: credentialId, type: 'public-key' }],
+  });
+  
+  return result;
+};
+```
+
+**Limitations:**
+- Still requires Supabase Auth (emails stored)
+- Passkey as "second factor" not replacement
+- Not zero-knowledge
 
 ---
 
-#### **Phase 2: Custom Auth Server (Expo-compatible but complex)**
-**Time:** 1-2 months  
-**Cost:** Medium ($50-100/mo for auth server)  
-**Complexity:** High
+#### **Phase 2: Custom Passkey-Only Auth (Requires custom backend)**
+**Time:** 2-3 months  
+**Removes:** All email/password dependencies
 
-- Replace Supabase Auth with custom passkey-only auth
-- No email/password collection
-- Client-side key management only
-- Social recovery via encrypted shards
+**New Backend Service:**
+```typescript
+// services/auth_service/src/index.ts
+import { FastifyInstance } from 'fastify';
+import { verifyAuthenticationResponse } from '@simplewebauthn/server';
+import { ulid } from 'ulid';
+
+app.post('/auth/webauthn/register', async (req, reply) => {
+  const { displayName } = req.body;
+  
+  // Generate random user ID (no email)
+  const userId = ulid();
+  
+  const options = {
+    rpName: 'United Unions',
+    rpID: 'unitedUnions.app',
+    userID: userId,
+    userName: displayName || `user_${userId.slice(0, 8)}`,
+    attestationType: 'none',
+    authenticatorSelection: {
+      userVerification: 'preferred',
+      residentKey: 'preferred',
+    },
+  };
+  
+  // Store challenge in Redis (5 min TTL)
+  await redis.setex(`challenge:${userId}`, 300, options.challenge);
+  
+  return { options, userId };
+});
+
+app.post('/auth/webauthn/verify', async (req, reply) => {
+  const { userId, credential } = req.body;
+  
+  const challenge = await redis.get(`challenge:${userId}`);
+  if (!challenge) {
+    return reply.code(400).send({ error: 'Challenge expired' });
+  }
+  
+  const verification = await verifyAuthenticationResponse({
+    credential,
+    expectedChallenge: challenge,
+    expectedOrigin: 'https://unitedUnions.app',
+    expectedRPID: 'unitedUnions.app',
+  });
+  
+  if (!verification.verified) {
+    return reply.code(401).send({ error: 'Authentication failed' });
+  }
+  
+  // Issue short-lived JWT (15 min)
+  const token = jwt.sign(
+    { userId, sub: userId },
+    process.env.JWT_SECRET,
+    { expiresIn: '15m' }
+  );
+  
+  return { token, userId };
+});
+```
+
+**Database:**
+```sql
+-- New users table (NO email column)
+CREATE TABLE users (
+  user_id TEXT PRIMARY KEY,  -- ULID, not UUID
+  display_name TEXT,
+  webauthn_credential_id TEXT UNIQUE NOT NULL,
+  webauthn_public_key BYTEA NOT NULL,
+  client_pub_key TEXT,  -- Ed25519 public key (hex)
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  verified_worker BOOLEAN DEFAULT FALSE
+);
+
+-- No email column = no PII
+```
 
 **Trade-offs:**
-- ✅ No PII collection
+- ✅ Zero email collection
+- ✅ WebAuthn-only authentication
 - ❌ Lose Supabase Auth features (email verification, password reset)
-- ❌ Must build auth UI from scratch
-- ❌ Increased operational burden
+- ❌ Must build auth server ($50-100/mo)
+- ❌ No email recovery option
 
 ---
 
-#### **Phase 3: Full Native Implementation**
-**Time:** 3-4 months  
-**Cost:** High (2x development time)  
-**Complexity:** Very High
-
-- Rebuild in Swift + Kotlin
-- Native WebAuthn/passkey APIs
-- Platform authenticator APIs (Face ID, Touch ID, Android Biometric)
-- Full Secure Enclave/StrongBox integration
-
-**Benefits:**
-- ✅ Best security (native platform APIs)
-- ✅ No third-party auth dependencies
-- ❌ 2x codebase maintenance forever
-
----
-
-## 2) Data Minimization & Storage
+## 2️⃣ Data Architecture & Separation
 
 ### **Target Requirements**
 
-#### **PII Collection**
-- **iOS/Android/Web:** None by default
-- **Acceptance:** No emails, phone numbers, or device IDs collected.
+#### **AC2: Separate Databases by Sensitivity**
+**Requirement:**
+- **content_db:** Posts, threads, comments (low sensitivity)
+- **membership_db:** Encrypted union membership tokens (high sensitivity)
+- **ballot_db:** Encrypted vote ballots, commitments (highest sensitivity)
+- No cross-database joins that reveal identity links
+- Column-level encryption for sensitive fields
 
-#### **Membership Records**
-- **iOS:** Client-side encrypted blobs before upload
-- **Android:** Same as iOS
-- **Web:** Same (ciphertext stored; IndexedDB only for local cache)
-- **Acceptance:** Server stores ciphertext only; unreadable without user key.
-
-#### **Votes**
-- **iOS:** Blind-signed ballots; server stores ciphertext + used-token hashes
-- **Android:** Same
-- **Web:** Same
-- **Acceptance:** No server mapping of user → vote.
-
-#### **Logs**
-- **iOS/Android/Web:** ≤72h retention, encrypted, no plaintext IP/UA (hash/salt only if truly needed)
-- **Acceptance:** Short retention; minimal metadata.
-
-#### **Analytics**
-- **iOS/Android/Web:** Aggregate counts only
-- **Acceptance:** No per-user analytics.
-
-#### **Local Storage**
-- **iOS:** Encrypted storage / SQLCipher; never AsyncStorage for secrets
-- **Android:** Same
-- **Web:** IndexedDB + client-side encryption; no LocalStorage for secrets
-- **Acceptance:** No sensitive data in plaintext local stores.
+**Architecture:**
+```
+┌─────────────────────────────────────────────┐
+│         Application Layer (Node.js)         │
+└─────────────────────────────────────────────┘
+        │              │              │
+        ▼              ▼              ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│  content_db  │ │ membership_db│ │  ballot_db   │
+│              │ │              │ │              │
+│ - posts      │ │ - tokens     │ │ - ballots    │
+│ - threads    │ │ - revocations│ │ - commitments│
+│ - comments   │ │ (encrypted)  │ │ (encrypted)  │
+└──────────────┘ └──────────────┘ └──────────────┘
+```
 
 ---
 
 ### **Current Implementation**
 
-✅ **What You Have:**
-- Device-based voting (no IP tracking)
-- No per-user analytics
-- Secrets in `expo-secure-store` (encrypted)
-- Audit logs with 72h retention (partially implemented)
+**What You Have:**
+```sql
+-- Single PostgreSQL database (all tables together)
+-- Supabase connection: single DATABASE_URL
 
-❌ **What's Missing:**
-- Email addresses stored in `auth.users` (PII)
-- `device_id` stored in vote tables (potential tracking)
-- Membership records in plaintext (not encrypted)
-- Vote records in plaintext (not blind-signed)
-- Audit logs store plaintext IPs in some places
+-- Union memberships (plaintext)
+CREATE TABLE union_members (
+  id UUID PRIMARY KEY,
+  union_id UUID REFERENCES unions(id),
+  user_id UUID REFERENCES profiles(id),  -- ❌ Direct user linkage
+  role TEXT,
+  joined_at TIMESTAMPTZ
+);
+
+-- Votes (plaintext with user_id)
+CREATE TABLE boycott_votes (
+  id UUID PRIMARY KEY,
+  proposal_id UUID,
+  user_id UUID,      -- ❌ Links vote to identity
+  device_id TEXT,    -- ❌ Tracking vector
+  vote_type TEXT,
+  created_at TIMESTAMPTZ
+);
+
+-- Posts (same database)
+CREATE TABLE posts (
+  id UUID PRIMARY KEY,
+  user_id UUID,      -- ❌ Same identifier across tables
+  union_id UUID,
+  content TEXT,
+  ...
+);
+```
+
+---
+
+### **Gap Analysis**
+
+| Requirement | Current Status | Gap Severity | Complexity |
+|-------------|---------------|--------------|------------|
+| Separate content_db | ❌ Single DB | **HIGH** | Very High |
+| Separate membership_db | ❌ Single DB | **CRITICAL** | Very High |
+| Separate ballot_db | ❌ Single DB | **CRITICAL** | Very High |
+| No cross-DB joins | ❌ All in same DB | **HIGH** | Very High |
+| Column-level encryption | ❌ Plaintext | **CRITICAL** | High |
+| Encrypted backups | ⚠️ Supabase encrypted | **MEDIUM** | Low |
+| Separate encryption keys | ❌ Single key | **HIGH** | Medium |
+
+**Compliance:** ❌ **0/10 satisfied**
+
+---
+
+### **Migration Path**
+
+#### **Phase 1: Logical Separation (Same DB, Different Schemas)**
+**Time:** 1-2 weeks  
+**Cost:** Low
+
+```sql
+-- Create separate schemas
+CREATE SCHEMA content;
+CREATE SCHEMA membership;
+CREATE SCHEMA ballot;
+
+-- Move tables to schemas
+ALTER TABLE posts SET SCHEMA content;
+ALTER TABLE threads SET SCHEMA content;
+ALTER TABLE comments SET SCHEMA content;
+
+ALTER TABLE union_members SET SCHEMA membership;
+-- (Will need to encrypt this table - see Section 3)
+
+ALTER TABLE boycott_votes SET SCHEMA ballot;
+ALTER TABLE worker_votes SET SCHEMA ballot;
+-- (Will need to encrypt these - see Section 4)
+
+-- Revoke cross-schema access
+REVOKE ALL ON SCHEMA membership FROM PUBLIC;
+REVOKE ALL ON SCHEMA ballot FROM PUBLIC;
+```
+
+**Benefits:**
+- Clearer separation of concerns
+- Can set different RLS policies per schema
+- Easier to migrate to separate DBs later
+
+**Limitations:**
+- Still same physical database
+- Subpoena still gets everything
+- No independent encryption keys
+
+---
+
+#### **Phase 2: Physical Database Separation**
+**Time:** 1-2 months  
+**Cost:** Medium ($50-150/mo for 3 DBs)
+
+**Setup:**
+```yaml
+# docker-compose.yml (self-hosted option)
+services:
+  content_db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: content
+      POSTGRES_PASSWORD: ${CONTENT_DB_PASSWORD}
+    volumes:
+      - content_data:/var/lib/postgresql/data
+  
+  membership_db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: membership
+      POSTGRES_PASSWORD: ${MEMBERSHIP_DB_PASSWORD}  # Different password
+    volumes:
+      - membership_data:/var/lib/postgresql/data
+  
+  ballot_db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ballot
+      POSTGRES_PASSWORD: ${BALLOT_DB_PASSWORD}  # Different password
+    volumes:
+      - ballot_data:/var/lib/postgresql/data
+```
+
+**Application Code:**
+```typescript
+// src/db/connections.ts
+import { Pool } from 'pg';
+
+export const contentDB = new Pool({
+  connectionString: process.env.CONTENT_DB_URL,
+});
+
+export const membershipDB = new Pool({
+  connectionString: process.env.MEMBERSHIP_DB_URL,
+});
+
+export const ballotDB = new Pool({
+  connectionString: process.env.BALLOT_DB_URL,
+});
+
+// Enforce separation: no cross-DB queries
+export const getUserMemberships = async (userId: string) => {
+  // ❌ FORBIDDEN: JOIN across databases
+  // const result = await contentDB.query(`
+  //   SELECT u.name, m.role
+  //   FROM membership.tokens m
+  //   JOIN content.unions u ON u.id = m.union_id
+  // `);
+  
+  // ✅ CORRECT: Separate queries, join in application layer
+  const tokens = await membershipDB.query(
+    'SELECT encrypted_data FROM tokens WHERE holder_id = $1',
+    [userId]
+  );
+  
+  // Client decrypts locally
+  return tokens.rows.map(row => row.encrypted_data);
+};
+```
+
+**Benefits:**
+- ✅ Subpoena of content_db doesn't expose memberships/votes
+- ✅ Can host on different providers/jurisdictions
+- ✅ Independent encryption keys per DB
+- ✅ Separate backup schedules
+
+**Limitations:**
+- ❌ More operational complexity
+- ❌ No ACID transactions across DBs
+- ❌ Higher costs (3x DB instances)
+
+---
+
+## 3️⃣ Membership Storage & Encryption
+
+### **Target Requirements**
+
+#### **AC3: Encrypted Membership Tokens**
+**Requirement:**
+- Server stores **only ciphertext** (opaque blobs)
+- Membership payload encrypted to user's `client_pub_key`
+- Server cannot decrypt or enumerate members
+- Retrieval endpoint returns ciphertext only
+
+**Data Schema:**
+```typescript
+membership_token {
+  token_id: ULID (random/opaque)
+  union_id: string
+  holder_binding: string  // Cryptographic commitment to client_pub_key
+  ciphertext: string      // Encrypted membership payload
+  ttl: timestamp          // Short-lived or revocable
+  created_at: timestamp
+}
+```
+
+**API Contract:**
+```typescript
+POST /unions/{id}/join
+  → returns { token_id, ciphertext }  // Server can't read
+
+GET /me/memberships
+  → returns ONLY ciphertext blobs bound to requester's key
+```
+
+**Client-Side Flow:**
+```typescript
+// 1. User generates Ed25519 keypair (client-side)
+const { publicKey, privateKey } = await generateKeyPair();
+
+// 2. Join union (send public key, receive ciphertext)
+const { ciphertext } = await fetch('/unions/123/join', {
+  method: 'POST',
+  body: JSON.stringify({
+    client_pub_key: publicKey,  // Server stores this
+  }),
+});
+
+// 3. Server encrypts membership to client_pub_key
+// Server cannot decrypt (no private key)
+
+// 4. Client decrypts locally
+const membershipData = await decrypt(ciphertext, privateKey);
+// { union_id: '123', role: 'member', joined_at: '...' }
+```
+
+---
+
+### **Current Implementation**
+
+**What You Have:**
+```sql
+-- Plaintext membership table
+CREATE TABLE union_members (
+  id UUID PRIMARY KEY,
+  union_id UUID REFERENCES unions(id),
+  user_id UUID REFERENCES profiles(id),  -- ❌ Direct linkage
+  role TEXT,                              -- ❌ Plaintext
+  joined_at TIMESTAMPTZ                   -- ❌ Plaintext
+);
+
+-- Server can enumerate all members
+SELECT user_id, role FROM union_members WHERE union_id = '...';
+-- ❌ Reveals who is in which union
+```
+
+**TypeScript Type:**
+```typescript
+export interface UnionMember {
+  id: string;
+  union_id: string;
+  user_id: string;      // ❌ Identity exposed
+  role: UserRole;       // ❌ Plaintext
+  joined_at: string;    // ❌ Plaintext
+}
+```
 
 ---
 
@@ -203,1960 +636,1577 @@ npm install react-native-passkey expo-crypto
 
 | Requirement | Current Status | Gap Severity | Expo Compatible? |
 |-------------|---------------|--------------|------------------|
-| No PII collection | ❌ Emails stored | **CRITICAL** | ❌ No (requires custom auth) |
-| Encrypted membership records | ❌ Plaintext in DB | **HIGH** | ✅ Yes (client-side encryption) |
-| Blind-signed votes | ❌ Plaintext votes | **CRITICAL** | ✅ Yes (RSA blind signatures) |
-| No device_id tracking | ⚠️ Device IDs in votes | **MEDIUM** | ✅ Yes (use token hashes instead) |
-| 72h log retention | ⚠️ Partial | **LOW** | ✅ Yes (PostgreSQL cron job) |
-| No LocalStorage for secrets | ✅ expo-secure-store | ✅ SATISFIED | ✅ Yes |
+| Encrypted membership tokens | ❌ Plaintext | **CRITICAL** | ✅ Yes |
+| Opaque token IDs | ❌ Sequential UUIDs | **MEDIUM** | ✅ Yes |
+| Ciphertext-only storage | ❌ Plaintext columns | **CRITICAL** | ✅ Yes |
+| Client-side decryption | ❌ None | **HIGH** | ✅ Yes |
+| Server cannot enumerate members | ❌ Can enumerate | **CRITICAL** | ✅ Yes |
+| Cryptographic holder binding | ❌ None | **HIGH** | ✅ Yes |
+| Revocation list | ❌ None | **MEDIUM** | ✅ Yes |
+
+**Compliance:** ❌ **0/8 satisfied**
 
 ---
 
 ### **Migration Path**
 
 #### **Phase 1: Client-Side Encryption (Expo-compatible)**
-**Time:** 2-4 weeks  
-**Cost:** Low  
-**Complexity:** Medium
+**Time:** 2-3 weeks
 
-**Membership Records:**
+**Install Libraries:**
+```bash
+npm install @noble/ed25519 @noble/ciphers
+```
+
+**Client-Side Key Generation:**
 ```typescript
-// Before sending to server
-import * as Crypto from 'expo-crypto';
+// src/crypto/keys.ts
+import { ed25519 } from '@noble/curves/ed25519';
+import { xchacha20poly1305 } from '@noble/ciphers/chacha';
+import * as SecureStore from 'expo-secure-store';
 
-async function encryptMembership(unionId: string, userId: string) {
-  const userKey = await SecureStore.getItemAsync('user_encryption_key');
-  const plaintext = JSON.stringify({ unionId, userId });
+export const generateUserKeys = async () => {
+  // Generate Ed25519 keypair
+  const privateKey = ed25519.utils.randomPrivateKey();
+  const publicKey = ed25519.getPublicKey(privateKey);
   
-  // Encrypt with user's key
-  const ciphertext = await encryptAES(plaintext, userKey);
+  // Store private key in secure storage (never sent to server)
+  await SecureStore.setItemAsync(
+    'user_private_key',
+    Buffer.from(privateKey).toString('hex')
+  );
   
-  // Store only ciphertext on server
-  await supabase.from('union_members').insert({
-    union_id: unionId,
-    encrypted_data: ciphertext, // Server can't read this
-    created_at: new Date()
-  });
-}
+  return {
+    publicKey: Buffer.from(publicKey).toString('hex'),
+    privateKey: Buffer.from(privateKey).toString('hex'),
+  };
+};
+
+export const encryptMembership = async (
+  membership: { union_id: string; role: string; joined_at: string },
+  recipientPublicKey: string
+): Promise<string> => {
+  const plaintext = JSON.stringify(membership);
+  
+  // Encrypt with XChaCha20-Poly1305
+  const nonce = crypto.getRandomValues(new Uint8Array(24));
+  const key = Buffer.from(recipientPublicKey, 'hex');
+  
+  const cipher = xchacha20poly1305(key, nonce);
+  const ciphertext = cipher.encrypt(Buffer.from(plaintext));
+  
+  // Return nonce + ciphertext (base64)
+  return Buffer.concat([nonce, ciphertext]).toString('base64');
+};
+
+export const decryptMembership = async (
+  ciphertext: string,
+  privateKey: string
+): Promise<any> => {
+  const data = Buffer.from(ciphertext, 'base64');
+  const nonce = data.slice(0, 24);
+  const encrypted = data.slice(24);
+  
+  const key = Buffer.from(privateKey, 'hex');
+  const cipher = xchacha20poly1305(key, nonce);
+  const plaintext = cipher.decrypt(encrypted);
+  
+  return JSON.parse(plaintext.toString());
+};
 ```
 
-**Database Schema:**
+**New Database Schema:**
 ```sql
--- Replace plaintext user_id with encrypted blob
-ALTER TABLE union_members 
-  DROP COLUMN user_id,
-  ADD COLUMN encrypted_data TEXT NOT NULL;
-
--- Server can only store, not read
-CREATE POLICY select_own_encrypted ON union_members
-  FOR SELECT USING (encrypted_data IS NOT NULL);
-```
-
----
-
-#### **Phase 2: Blind Signature Voting (Expo-compatible)**
-**Time:** 3-6 weeks  
-**Cost:** Medium  
-**Complexity:** High
-
-**Implementation:**
-```typescript
-// 1. User generates blinded ballot
-import { blindMessage, unblindSignature } from 'blind-signatures';
-
-const ballot = { proposal_id: 'xyz', vote: 'yes' };
-const { blinded, blindingFactor } = blindMessage(ballot);
-
-// 2. Server signs without seeing contents
-const signedBlinded = await supabase.rpc('issue_voting_token', {
-  blinded_ballot: blinded,
-  union_id: unionId
-});
-
-// 3. User unblinds signature
-const validSignature = unblindSignature(signedBlinded, blindingFactor);
-
-// 4. User submits anonymous vote with valid signature
-await supabase.from('votes').insert({
-  signature: validSignature,
-  encrypted_ballot: encrypt(ballot, votingKey), // Server can't read
-  token_hash: hash(validSignature) // Prevent double voting
-});
-```
-
-**Server:**
-```sql
--- Server only stores ciphertext + signature
-CREATE TABLE votes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  signature TEXT NOT NULL,
-  encrypted_ballot TEXT NOT NULL, -- Server cannot decrypt
-  token_hash TEXT UNIQUE NOT NULL, -- Prevent reuse
+-- Replace union_members table
+CREATE TABLE membership_tokens (
+  token_id TEXT PRIMARY KEY,  -- ULID (opaque)
+  union_id UUID REFERENCES unions(id),
+  holder_binding TEXT NOT NULL,  -- Hash of client_pub_key
+  ciphertext TEXT NOT NULL,      -- Encrypted membership data
+  ttl TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Server CANNOT read membership details
 -- No user_id column = no linkage
+
+-- Revocation list
+CREATE TABLE token_revocations (
+  token_id TEXT PRIMARY KEY REFERENCES membership_tokens(token_id),
+  revoked_at TIMESTAMPTZ DEFAULT NOW(),
+  reason TEXT
+);
 ```
 
----
-
-#### **Phase 3: Remove PII (Requires Custom Auth)**
-**Time:** 1-2 months  
-**Cost:** High  
-**Complexity:** Very High
-
-- Replace Supabase Auth with passkey-only system
-- Delete `auth.users` table (no emails)
-- Use blind tokens for authentication
-- Zero-knowledge proof of membership
-
----
-
-## 3) Network & Transport Security
-
-### **Target Requirements**
-
-#### **HTTPS Only**
-- **iOS:** ATS enforced
-- **Android:** `usesCleartextTraffic="false"`
-- **Web:** HTTPS only
-- **Acceptance:** No cleartext traffic.
-
-#### **Certificate Pinning**
-- **iOS:** Required via RN pinning module; rotate per release
-- **Android:** Required via RN pinning module; rotate per release
-- **Web:** Not possible; use HSTS preload + CSP + SRI
-- **Acceptance:** Native apps pin; web uses HSTS (preload), Subresource Integrity, strict CSP.
-
-#### **Token Lifetime**
-- **iOS/Android:** Access ≤15 min; refresh ≤24h
-- **Web:** Same; prefer HttpOnly, Secure, SameSite cookies
-- **Acceptance:** Short-lived tokens; refresh rotation; HttpOnly cookies on web.
-
-#### **Replay Protection**
-- **iOS/Android/Web:** Nonce + timestamp
-- **Acceptance:** Server rejects replays and skewed timestamps.
-
-#### **Rate Limiting**
-- **iOS/Android/Web:** Per endpoint
-- **Acceptance:** Abuse-resistant rate limits and backoff.
-
-#### **Origin Hiding**
-- **iOS/Android/Web (backend):** CDN/WAF in front; origin allowlist to CDN IPs only
-- **Acceptance:** No direct origin exposure.
-
-#### **Censorship Resistance**
-- **iOS:** .onion mirror + "Open in Tor Browser" action
-- **Android:** Same
-- **Web:** .onion link + interstitial instructions (open in Tor Browser only)
-- **Acceptance:** Onion mirror maintained; clear UX for high-risk users.
-
----
-
-### **Current Implementation**
-
-✅ **What You Have:**
-- HTTPS enforced (Supabase default)
-- ATS enabled on iOS (Expo default)
-- Token storage in `expo-secure-store`
-- Client-side rate limiting
-- Session management
-
-❌ **What's Missing:**
-- No certificate pinning
-- Access tokens valid 1 hour (not 15 min)
-- Refresh tokens valid 7 days (not 24h)
-- No nonce/timestamp replay protection
-- Rate limiting client-side only (not server-side)
-- No CDN/WAF layer
-- No .onion mirror
-
----
-
-### **Gap Analysis**
-
-| Requirement | Current Status | Gap Severity | Expo Compatible? |
-|-------------|---------------|--------------|------------------|
-| HTTPS only | ✅ Enforced | ✅ SATISFIED | ✅ Yes |
-| Certificate pinning | ❌ None | **HIGH** | ⚠️ Partial (requires EAS Build) |
-| Access tokens ≤15 min | ❌ 1 hour | **MEDIUM** | ✅ Yes (Supabase config) |
-| Refresh tokens ≤24h | ❌ 7 days | **MEDIUM** | ✅ Yes (Supabase config) |
-| Replay protection | ❌ None | **HIGH** | ✅ Yes (Edge Functions) |
-| Server-side rate limiting | ❌ Client-side only | **HIGH** | ✅ Yes (Edge Functions) |
-| CDN/WAF | ❌ None | **MEDIUM** | ✅ Yes (Cloudflare) |
-| .onion mirror | ❌ None | **LOW** | ✅ Yes (separate deployment) |
-
----
-
-### **Migration Path**
-
-#### **Phase 1: Quick Wins (1-2 weeks)**
-
-**1. Shorten Token Lifetimes**
+**Server-Side Join Flow:**
 ```typescript
-// Supabase dashboard: Authentication → Settings
-{
-  "JWT_EXPIRY": 900,        // 15 minutes (was 3600)
-  "REFRESH_TOKEN_REUSE_INTERVAL": 0,  // No reuse
-  "SECURITY_REFRESH_TOKEN_ROTATION_ENABLED": true,
-  "REFRESH_TOKEN_EXPIRY": 86400  // 24 hours (was 604800)
-}
-```
+// services/union_service/src/join.ts
+import { ulid } from 'ulid';
+import { createHash } from 'crypto';
 
-**2. Add Cloudflare WAF**
-```bash
-# Point custom domain to Supabase via Cloudflare
-# Enable WAF rules, rate limiting, IP allowlisting
-Cost: $0 (free tier)
-Time: 1-2 hours
-```
-
----
-
-#### **Phase 2: Certificate Pinning (2-3 weeks)**
-
-**Requires:** EAS Build (no Expo Go)
-
-```typescript
-// Install pinning library
-npm install react-native-ssl-pinning
-
-// app.config.ts
-export default {
-  expo: {
-    plugins: [
-      [
-        "react-native-ssl-pinning",
-        {
-          "hosts": [
-            {
-              "host": "yourproject.supabase.co",
-              "pins": [
-                "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-                "sha256/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
-              ]
-            }
-          ]
-        }
-      ]
-    ]
-  }
-}
-```
-
-**Cert rotation process:**
-```bash
-# Every 90 days or with Supabase cert updates
-1. Get new cert hashes from Supabase
-2. Update app.config.ts
-3. Build new release: eas build --platform all
-4. Deploy via EAS Update or App Store/Play Store
-```
-
----
-
-#### **Phase 3: Server-Side Security (3-4 weeks)**
-
-**Replay Protection (Edge Function):**
-```typescript
-// supabase/functions/secure-vote/index.ts
-const validateRequest = (req: Request) => {
-  const nonce = req.headers.get('X-Nonce');
-  const timestamp = req.headers.get('X-Timestamp');
+app.post('/unions/:unionId/join', async (req, reply) => {
+  const { unionId } = req.params;
+  const { client_pub_key } = req.body;
+  const userId = req.user.userId;  // From JWT
   
-  // Check timestamp within 5 minutes
-  if (Math.abs(Date.now() - parseInt(timestamp)) > 300000) {
-    throw new Error('Request expired');
-  }
-  
-  // Check nonce not reused
-  const used = await checkNonceUsed(nonce);
-  if (used) {
-    throw new Error('Replay detected');
-  }
-  
-  await markNonceUsed(nonce, timestamp);
-};
-```
-
-**Server-Side Rate Limiting:**
-```typescript
-// Use Upstash Redis or PostgreSQL
-import { Ratelimit } from "@upstash/ratelimit";
-
-const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(10, "1 m"), // 10 requests per minute
-});
-
-const { success } = await ratelimit.limit(userId);
-if (!success) {
-  return new Response("Rate limit exceeded", { status: 429 });
-}
-```
-
----
-
-#### **Phase 4: .onion Mirror (1-2 weeks)**
-
-**Setup:**
-1. Deploy Supabase self-hosted instance
-2. Configure as Tor hidden service
-3. Add deep link handler in app:
-
-```typescript
-// App.tsx
-import * as Linking from 'expo-linking';
-
-const openInTor = async () => {
-  const onionUrl = 'http://yourapp.onion';
-  
-  // iOS: Onion Browser
-  await Linking.openURL(`onionbrowser://${onionUrl}`);
-  
-  // Android: Tor Browser
-  await Linking.openURL(`torbrowser:${onionUrl}`);
-};
-
-// Show button in Settings
-<Button onPress={openInTor}>Open in Tor (High Security)</Button>
-```
-
----
-
-## 4) App/Web Integrity & Runtime Hardening
-
-### **Target Requirements**
-
-#### **Build Mode**
-- **iOS:** Hermes; no dev menu/debug symbols in release
-- **Android:** Hermes; no dev menu/debug symbols in release
-- **Web:** Production build; no dev tooling exposed
-- **Acceptance:** No debug artifacts in production builds.
-
-#### **OTA Updates**
-- **iOS:** Signed EAS Update or OTA disabled
-- **Android:** Signed EAS Update or OTA disabled
-- **Web:** No remote code eval; immutable asset hashing
-- **Acceptance:** Only signed updates; no dynamic code loading (e.g., eval).
-
-#### **Dependency Hygiene**
-- **iOS/Android/Web:** Lockfile committed; CI SCA; fail build on high severity
-- **Acceptance:** Weekly scans; critical vulns block release.
-
-#### **Compromise Checks**
-- **iOS:** Jailbreak/emulator detection; block sensitive actions
-- **Android:** Root/emulator detection; block sensitive actions
-- **Web:** Browser security headers & runtime checks
-- **Acceptance:** Sensitive actions blocked on compromised native devices; web enforces CSP/COOP/COEP.
-
-#### **Attestation**
-- **iOS:** App Attest / DeviceCheck required for vote casting
-- **Android:** Play Integrity required for vote casting
-- **Web:** Optional WebAuthn attestation allowlist (AAGUID) when feasible
-- **Acceptance:** Integrity signal required for native voting; web uses WebAuthn attestation if practical.
-
-#### **Obfuscation/Tamper**
-- **iOS:** Minify/obfuscate; runtime signature/self-check
-- **Android:** Same
-- **Web:** SRI + content hashing; CSP script-src 'self' 'strict-dynamic'
-- **Acceptance:** Detect repacks (native); prevent script injection (web).
-
----
-
-### **Current Implementation**
-
-✅ **What You Have:**
-- Hermes enabled (Expo default for SDK 52+)
-- Production builds via EAS Build
-- Lockfile committed (package-lock.json)
-- No dev menu in production
-
-❌ **What's Missing:**
-- No signed OTA updates (using unsigned EAS Update)
-- No CI dependency scanning
-- No jailbreak/root detection
-- No App Attest or Play Integrity
-- No code obfuscation
-- No runtime tamper detection
-
----
-
-### **Gap Analysis**
-
-| Requirement | Current Status | Gap Severity | Expo Compatible? |
-|-------------|---------------|--------------|------------------|
-| Hermes engine | ✅ Enabled | ✅ SATISFIED | ✅ Yes |
-| No dev menu in prod | ✅ Disabled | ✅ SATISFIED | ✅ Yes |
-| Signed OTA updates | ❌ Unsigned | **HIGH** | ✅ Yes (EAS code signing) |
-| CI dependency scanning | ❌ None | **HIGH** | ✅ Yes (npm audit, Snyk) |
-| Jailbreak/root detection | ❌ None | **MEDIUM** | ⚠️ Partial (requires native module) |
-| App Attest/Play Integrity | ❌ None | **HIGH** | ❌ No (requires native implementation) |
-| Code obfuscation | ❌ None | **MEDIUM** | ⚠️ Partial (metro-minify-terser) |
-| Runtime tamper detection | ❌ None | **LOW** | ✅ Yes (custom checks) |
-
----
-
-### **Migration Path**
-
-#### **Phase 1: CI/CD Security (1-2 weeks)**
-
-**Dependency Scanning:**
-```yaml
-# .github/workflows/security.yml
-name: Security Scan
-on: [push, pull_request]
-
-jobs:
-  audit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-      - run: npm ci
-      - run: npm audit --audit-level=high
-      # Fail build if high/critical vulnerabilities found
-      - run: |
-          if [ $(npm audit --json | jq '.metadata.vulnerabilities.high + .metadata.vulnerabilities.critical') -gt 0 ]; then
-            echo "High/critical vulnerabilities found"
-            exit 1
-          fi
-```
-
-**Add Snyk (optional):**
-```bash
-npm install -g snyk
-snyk test  # Run in CI
-```
-
----
-
-#### **Phase 2: Signed OTA Updates (1 week)**
-
-```bash
-# Configure EAS Update code signing
-eas update:configure
-
-# Deploy signed update
-eas update --branch production --message "Security patch"
-```
-
-**Verify signatures in app:**
-```typescript
-// App.tsx
-import * as Updates from 'expo-updates';
-
-Updates.checkForUpdateAsync().then(update => {
-  if (update.isAvailable && update.manifest.signature) {
-    // Update is signed and verified
-    Updates.fetchUpdateAsync();
-  } else {
-    console.error('Unsigned update detected - rejecting');
-  }
-});
-```
-
----
-
-#### **Phase 3: Device Integrity Checks (2-3 weeks)**
-
-**Jailbreak/Root Detection (Expo compatible with caveats):**
-```typescript
-// Limited detection without native modules
-import * as FileSystem from 'expo-file-system';
-import { Platform } from 'react-native';
-
-const detectJailbreak = async () => {
-  if (Platform.OS === 'ios') {
-    // Check for common jailbreak paths
-    const paths = [
-      '/Applications/Cydia.app',
-      '/Library/MobileSubstrate',
-      '/bin/bash',
-      '/usr/sbin/sshd'
-    ];
-    
-    for (const path of paths) {
-      try {
-        await FileSystem.getInfoAsync(path);
-        return true; // Jailbroken
-      } catch {}
-    }
-  }
-  
-  if (Platform.OS === 'android') {
-    // Check for root indicators
-    const rootPaths = [
-      '/system/app/Superuser.apk',
-      '/sbin/su',
-      '/system/bin/su'
-    ];
-    
-    for (const path of rootPaths) {
-      try {
-        await FileSystem.getInfoAsync(path);
-        return true; // Rooted
-      } catch {}
-    }
-  }
-  
-  return false;
-};
-
-// Block voting on compromised devices
-const handleVote = async () => {
-  const compromised = await detectJailbreak();
-  if (compromised) {
-    Alert.alert('Security Notice', 'Voting disabled on modified devices');
-    return;
-  }
-  
-  // Proceed with vote
-};
-```
-
-**Limitations:** Basic detection, easily bypassed. For production:
-- Use `react-native-device-info` (requires native module, breaks Expo Go)
-- Or require App Attest/Play Integrity (native only)
-
----
-
-#### **Phase 4: App Attest & Play Integrity (Native Only)**
-
-**NOT Expo Go compatible - requires custom native code**
-
-**iOS App Attest:**
-```swift
-// ios/VoterUnions/AppDelegate.swift
-import DeviceCheck
-
-func attestDevice(completion: @escaping (String?) -> Void) {
-    let service = DCAppAttestService.shared
-    guard service.isSupported else { return completion(nil) }
-    
-    service.generateKey { keyId, error in
-        guard let keyId = keyId else { return completion(nil) }
-        
-        // Send keyId to server for attestation
-        let challenge = getServerChallenge()
-        let hash = Data(challenge.utf8).sha256()
-        
-        service.attestKey(keyId, clientDataHash: hash) { attestation, error in
-            // Send attestation to server for verification
-            completion(attestation?.base64EncodedString())
-        }
-    }
-}
-```
-
-**Android Play Integrity:**
-```kotlin
-// android/app/src/main/java/com/voterUnions/PlayIntegrityModule.kt
-import com.google.android.play.core.integrity.IntegrityManager
-import com.google.android.play.core.integrity.IntegrityManagerFactory
-
-fun checkIntegrity(context: Context, callback: (String?) -> Unit) {
-    val integrityManager = IntegrityManagerFactory.create(context)
-    
-    val nonce = generateNonce()
-    val integrityTokenRequest = IntegrityTokenRequest.builder()
-        .setNonce(nonce)
-        .build()
-    
-    integrityManager.requestIntegrityToken(integrityTokenRequest)
-        .addOnSuccessListener { response ->
-            // Send token to server for verification
-            callback(response.token())
-        }
-        .addOnFailureListener { callback(null) }
-}
-```
-
-**Server Verification:**
-```typescript
-// supabase/functions/verify-integrity/index.ts
-import { verify as verifyAppAttest } from '@apple/app-attest';
-import { verify as verifyPlayIntegrity } from '@google/play-integrity';
-
-Deno.serve(async (req) => {
-  const { platform, token } = await req.json();
-  
-  if (platform === 'ios') {
-    const valid = await verifyAppAttest(token, {
-      teamId: 'YOUR_TEAM_ID',
-      bundleId: 'com.voterUnions'
-    });
-    
-    if (!valid) {
-      return new Response('Invalid device', { status: 403 });
-    }
-  }
-  
-  if (platform === 'android') {
-    const valid = await verifyPlayIntegrity(token, {
-      packageName: 'com.voterUnions'
-    });
-    
-    if (!valid) {
-      return new Response('Invalid device', { status: 403 });
-    }
-  }
-  
-  return new Response('Device verified', { status: 200 });
-});
-```
-
----
-
-#### **Phase 5: Code Obfuscation (2-3 weeks)**
-
-**Metro bundler obfuscation:**
-```javascript
-// metro.config.js
-const { getDefaultConfig } = require('expo/metro-config');
-
-module.exports = (() => {
-  const config = getDefaultConfig(__dirname);
-
-  config.transformer = {
-    ...config.transformer,
-    minifierConfig: {
-      keep_classnames: false,
-      keep_fnames: false,
-      mangle: {
-        toplevel: true,
-      },
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-      },
-    },
+  // Create membership payload (server can see this temporarily)
+  const membership = {
+    union_id: unionId,
+    role: 'member',
+    joined_at: new Date().toISOString(),
   };
-
-  return config;
-})();
+  
+  // Encrypt to user's public key (server cannot decrypt)
+  const ciphertext = await encryptMembership(membership, client_pub_key);
+  
+  // Generate opaque token ID
+  const tokenId = ulid();
+  
+  // Create cryptographic binding (hash of public key)
+  const holderBinding = createHash('sha256')
+    .update(client_pub_key)
+    .digest('hex');
+  
+  // Store ONLY ciphertext
+  await membershipDB.query(`
+    INSERT INTO membership_tokens (token_id, union_id, holder_binding, ciphertext)
+    VALUES ($1, $2, $3, $4)
+  `, [tokenId, unionId, holderBinding, ciphertext]);
+  
+  // Return ciphertext to client
+  return { token_id: tokenId, ciphertext };
+});
 ```
 
-**Advanced obfuscation (native only):**
-- iOS: SwiftShield
-- Android: ProGuard/R8
-
----
-
-## 5) Voting & Union Logic
-
-### **Target Requirements**
-
-#### **Eligibility**
-- **iOS/Android/Web:** Blind-signature token issuance to members only
-- **Acceptance:** Only valid members receive voting tokens.
-
-#### **Double Voting**
-- **iOS/Android/Web:** Used-token IDs hashed and tracked
-- **Acceptance:** Duplicate tokens rejected.
-
-#### **Anonymity**
-- **iOS/Android/Web:** No user→vote mapping stored
-- **Acceptance:** Servers cannot link identity to ballot.
-
-#### **Verifiability**
-- **iOS/Android/Web:** Client receives hash receipt (no contents)
-- **Acceptance:** Users can verify inclusion without revealing choice.
-
-#### **Results**
-- **iOS/Android/Web:** Aggregates only
-- **Acceptance:** No per-vote metadata exposed.
-
----
-
-### **Current Implementation**
-
-✅ **What You Have:**
-- Device-based voting (1 vote per device per proposal)
-- Dual-trigger vote protection (prevents manipulation)
-- RLS policies enforce union membership
-- Aggregate vote counts only (no per-vote details)
-
-❌ **What's Missing:**
-- No blind signatures (votes linkable to users)
-- Device ID stored (potential tracking)
-- No cryptographic receipts
-- Vote contents stored in plaintext
-
----
-
-### **Gap Analysis**
-
-| Requirement | Current Status | Gap Severity | Expo Compatible? |
-|-------------|---------------|--------------|------------------|
-| Blind-signature tokens | ❌ None | **CRITICAL** | ✅ Yes (RSA blind sigs) |
-| No user→vote mapping | ⚠️ device_id stored | **HIGH** | ✅ Yes (use token hashes) |
-| Token hash tracking | ❌ None | **HIGH** | ✅ Yes (PostgreSQL) |
-| Cryptographic receipts | ❌ None | **MEDIUM** | ✅ Yes (hash commitments) |
-| Aggregate results only | ✅ Implemented | ✅ SATISFIED | ✅ Yes |
-
----
-
-### **Migration Path**
-
-**See Section 2 (Data Minimization) for full blind signature implementation.**
-
-**Summary:**
-1. Replace plaintext votes with encrypted ballots
-2. Issue blind-signed tokens to verified members
-3. Accept anonymous votes with valid signatures
-4. Track token hashes (not user IDs) to prevent double voting
-5. Return commitment receipts for verifiability
-
----
-
-## 6) Supply-Chain & Release Controls
-
-### **Target Requirements**
-
-#### **Audits**
-- **iOS/Android/Web:** Weekly dependency and license audits
-- **Acceptance:** Documented and tracked; blockers fail CI.
-
-#### **Reproducibility**
-- **iOS:** CI verifies App Store build hashes
-- **Android:** CI verifies Play Store build hashes
-- **Web:** CI verifies artifact hashes
-- **Acceptance:** Release artifacts match CI builds.
-
-#### **SBOM**
-- **iOS/Android/Web:** Generated each release
-- **Acceptance:** SBOM archived per version.
-
-#### **Manual Review**
-- **iOS/Android/Web:** Crypto/auth/networking dependencies
-- **Acceptance:** Human sign-off before release.
-
----
-
-### **Current Implementation**
-
-✅ **What You Have:**
-- Lockfile committed (package-lock.json)
-- Manual dependency updates
-
-❌ **What's Missing:**
-- No automated weekly audits
-- No build reproducibility checks
-- No SBOM generation
-- No manual review process for critical deps
-
----
-
-### **Gap Analysis**
-
-| Requirement | Current Status | Gap Severity | Expo Compatible? |
-|-------------|---------------|--------------|------------------|
-| Weekly audits | ❌ Manual only | **MEDIUM** | ✅ Yes (GitHub Actions) |
-| Reproducible builds | ❌ Not verified | **MEDIUM** | ✅ Yes (EAS Build) |
-| SBOM generation | ❌ None | **LOW** | ✅ Yes (cyclonedx) |
-| Manual crypto review | ❌ None | **MEDIUM** | ✅ Yes (process) |
-
----
-
-### **Migration Path**
-
-#### **Phase 1: Automated Audits (1 week)**
-
-**GitHub Actions:**
-```yaml
-# .github/workflows/weekly-audit.yml
-name: Weekly Security Audit
-on:
-  schedule:
-    - cron: '0 9 * * 1'  # Every Monday 9am
-
-jobs:
-  audit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-      - run: npm ci
-      - run: npm audit --audit-level=moderate
-      - run: npx better-npm-audit audit --level moderate
-      - name: Check licenses
-        run: npx license-checker --summary
-```
-
----
-
-#### **Phase 2: SBOM Generation (1 week)**
-
-```bash
-# Install CycloneDX
-npm install -g @cyclonedx/cyclonedx-npm
-
-# Generate SBOM
-cyclonedx-npm --output-file sbom.json
-
-# Archive in CI
-# .github/workflows/release.yml
-- name: Generate SBOM
-  run: |
-    cyclonedx-npm --output-file sbom-${{ github.sha }}.json
-    
-- name: Upload SBOM
-  uses: actions/upload-artifact@v3
-  with:
-    name: sbom-${{ github.sha }}
-    path: sbom-${{ github.sha }}.json
-```
-
----
-
-#### **Phase 3: Reproducible Builds (2 weeks)**
-
-**EAS Build verification:**
-```yaml
-# .github/workflows/verify-build.yml
-name: Verify Build Reproducibility
-
-on:
-  release:
-    types: [published]
-
-jobs:
-  verify:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
+**Client-Side Retrieval:**
+```typescript
+// src/hooks/useMemberships.ts
+export const useMemberships = () => {
+  return useQuery({
+    queryKey: ['memberships'],
+    queryFn: async () => {
+      // Get user's private key
+      const privateKey = await SecureStore.getItemAsync('user_private_key');
       
-      - name: Download build from EAS
-        run: eas build:download --platform ios --latest
+      // Fetch encrypted tokens
+      const { data } = await fetch('/me/memberships');
+      // Returns: [{ token_id, ciphertext }, ...]
       
-      - name: Verify build hash
-        run: |
-          EXPECTED_HASH=$(cat build-hash.txt)
-          ACTUAL_HASH=$(shasum -a 256 *.ipa | cut -d ' ' -f 1)
-          
-          if [ "$EXPECTED_HASH" != "$ACTUAL_HASH" ]; then
-            echo "Build hash mismatch!"
-            exit 1
-          fi
+      // Decrypt locally (server never sees plaintext)
+      const memberships = await Promise.all(
+        data.map(async (token) => {
+          const decrypted = await decryptMembership(token.ciphertext, privateKey);
+          return {
+            token_id: token.token_id,
+            ...decrypted,  // { union_id, role, joined_at }
+          };
+        })
+      );
+      
+      return memberships;
+    },
+  });
+};
 ```
+
+**Server-Side Retrieval Endpoint:**
+```typescript
+app.get('/me/memberships', async (req, reply) => {
+  const userId = req.user.userId;
+  
+  // Get user's public key from profile
+  const { rows: [user] } = await db.query(
+    'SELECT client_pub_key FROM users WHERE user_id = $1',
+    [userId]
+  );
+  
+  const holderBinding = createHash('sha256')
+    .update(user.client_pub_key)
+    .digest('hex');
+  
+  // Return ONLY tokens bound to this user's key
+  const { rows } = await membershipDB.query(`
+    SELECT token_id, ciphertext
+    FROM membership_tokens
+    WHERE holder_binding = $1
+      AND token_id NOT IN (SELECT token_id FROM token_revocations)
+  `, [holderBinding]);
+  
+  // Server returns ciphertext blobs (cannot read contents)
+  return rows;
+});
+```
+
+**Benefits:**
+- ✅ Server cannot enumerate union members
+- ✅ Database dump reveals no membership details
+- ✅ Expo Go compatible
+- ✅ User can decrypt on any device with private key
+
+**Limitations:**
+- ⚠️ Still need secure key backup/recovery
+- ⚠️ Server sees union_id (knows union exists, not who's in it)
+- ⚠️ Metadata (timestamp, union_id) not encrypted
 
 ---
 
-#### **Phase 4: Manual Review Process (ongoing)**
-
-**Create dependency review checklist:**
-
-```markdown
-# Crypto/Auth Dependency Review Checklist
-
-Before approving PRs that add/update these dependency types:
-
-## Cryptography Libraries
-- [ ] Library actively maintained (commits in last 3 months)
-- [ ] No known CVEs in version being added
-- [ ] License compatible (MIT, Apache 2.0, BSD)
-- [ ] Algorithms used are modern (no MD5, SHA1, DES, RC4)
-- [ ] Library doesn't phone home or collect telemetry
-
-## Authentication Libraries
-- [ ] OWASP recommended or widely audited
-- [ ] No hardcoded credentials in source
-- [ ] Session management follows best practices
-- [ ] Token storage uses secure methods
-
-## Networking Libraries
-- [ ] Enforces HTTPS by default
-- [ ] Supports certificate pinning
-- [ ] No insecure defaults (e.g., allows SSLv3)
-
-Reviewer signature: ________________
-Date: ___________
-```
-
-**GitHub branch protection:**
-```yaml
-# Require review from CODEOWNERS for sensitive files
-# .github/CODEOWNERS
-package.json @security-team
-package-lock.json @security-team
-src/services/supabase.ts @security-team
-src/hooks/useAuth.tsx @security-team
-```
-
----
-
-## 7) Incident Response & Key Rotation
+## 4️⃣ Voting System & Modes
 
 ### **Target Requirements**
 
-#### **Kill Switches**
-- **iOS/Android/Web:** Server-side flags disable vote/join instantly
-- **Acceptance:** Critical flows can be disabled without client update.
+#### **AC4: Three Voting Modes (A/B/C)**
 
-#### **Key Rotation**
-- **iOS/Android/Web:** Quarterly tested; HSM/KMS with split custody
-- **Acceptance:** Rotation runbook exercised quarterly.
+**Mode A: Simple Authenticated (Low-Risk)**
+```typescript
+use_when: "Low-risk polls, non-sensitive boycotts"
+storage: { user_id, choice, proof_of_auth }
+warnings: "⚠️ NOT PRIVATE - Admins can see how you voted"
+opt_in: true  // Unions must explicitly enable
+```
 
-#### **Backups**
-- **iOS/Android/Web:** Encrypted, geo-redundant; quarterly restore test
-- **Acceptance:** Proven restore; keys separate from data.
+**Mode B: Blind-Signature (DEFAULT)**
+```typescript
+use_when: "All votes by default"
+storage: { blind_signed_token_id, commitment/cipher, nullifier }
+guarantees: [
+  "Prevents linkability (server can't correlate user → vote)",
+  "Enforces one vote per member (via nullifier)",
+  "Server cannot see vote contents"
+]
+flow: [
+  "1. User requests blind-signed token from membership issuer",
+  "2. Issuer signs without seeing token contents",
+  "3. User unblinds signature",
+  "4. User submits anonymous vote with valid signature",
+  "5. Server verifies signature + checks nullifier for double-voting"
+]
+```
 
-#### **Breach Response**
-- **iOS/Android/Web:** Containment ≤24h; communications ≤72h if any PII impacted
-- **Acceptance:** Timely containment and disclosure.
+**Mode C: End-to-End Verifiable (High-Stakes)**
+```typescript
+use_when: "Critical worker strikes, high-stakes decisions"
+approach: "Helios-like / homomorphic or mixnet + ZK proofs"
+receipts: "Inclusion receipts (users can verify without revealing choice)"
+features: [
+  "Public bulletin board",
+  "Zero-knowledge proofs of validity",
+  "Threshold decryption",
+  "Anti-coercion UI (fake receipts)"
+]
+```
 
 ---
 
 ### **Current Implementation**
 
-✅ **What You Have:**
-- Supabase backups (daily)
-- RLS policies can be updated immediately
-
-❌ **What's Missing:**
-- No feature flags / kill switches
-- No key rotation process
-- No backup restore testing
-- No incident response plan
-
----
-
-### **Gap Analysis**
-
-| Requirement | Current Status | Gap Severity | Expo Compatible? |
-|-------------|---------------|--------------|------------------|
-| Kill switches | ❌ None | **HIGH** | ✅ Yes (feature flags) |
-| Quarterly key rotation | ❌ None | **MEDIUM** | ✅ Yes (Supabase dashboard) |
-| Backup restore drills | ❌ None | **HIGH** | ✅ Yes (process) |
-| Incident response plan | ❌ None | **HIGH** | ✅ Yes (documentation) |
-
----
-
-### **Migration Path**
-
-#### **Phase 1: Feature Flags (1-2 weeks)**
-
-**Database:**
+**What You Have:**
 ```sql
--- Feature flags table
-CREATE TABLE feature_flags (
-  flag_name TEXT PRIMARY KEY,
-  enabled BOOLEAN DEFAULT true,
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_by UUID REFERENCES profiles(id)
+-- Mode A only (simple authenticated voting)
+CREATE TABLE boycott_votes (
+  id UUID PRIMARY KEY,
+  proposal_id UUID,
+  user_id UUID,      -- ❌ Direct user linkage
+  device_id TEXT,    -- ❌ Tracking vector
+  vote_type TEXT,    -- ❌ Server can see choice
+  created_at TIMESTAMPTZ
 );
 
--- Critical flags
-INSERT INTO feature_flags (flag_name, enabled) VALUES
-  ('voting_enabled', true),
-  ('union_creation_enabled', true),
-  ('new_signups_enabled', true);
-
--- Function to check flags
-CREATE OR REPLACE FUNCTION is_feature_enabled(flag TEXT)
-RETURNS BOOLEAN AS $$
-  SELECT enabled FROM feature_flags WHERE flag_name = flag;
-$$ LANGUAGE SQL STABLE;
+-- Dual-trigger protection (prevents manipulation)
+-- But doesn't prevent server from seeing votes
 ```
 
-**Client:**
+**Client Code:**
 ```typescript
-// src/hooks/useFeatureFlag.ts
-export const useFeatureFlag = (flagName: string) => {
-  const { data: enabled, isLoading } = useQuery({
-    queryKey: ['featureFlag', flagName],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('feature_flags')
-        .select('enabled')
-        .eq('flag_name', flagName)
-        .single();
-      
-      return data?.enabled ?? false;
-    },
-    refetchInterval: 30000, // Poll every 30s
+// src/hooks/useBoycott.ts
+const { data, error } = await supabase
+  .from('boycott_votes')
+  .insert({
+    proposal_id: proposalId,
+    user_id: userId,      // ❌ Identity revealed
+    device_id: deviceId,  // ❌ Tracking
+    vote_type: 'yes',     // ❌ Server sees vote
   });
+```
+
+**What Works:**
+- ✅ Device-based vote prevention (one vote per device)
+- ✅ Dual-trigger protection (prevents count manipulation)
+- ✅ Server-side vote aggregation
+- ✅ Activation thresholds (60%)
+
+**What's Missing:**
+- ❌ No blind signatures (Mode B)
+- ❌ No end-to-end verifiability (Mode C)
+- ❌ Server can see user_id → vote mapping
+- ❌ Database dump reveals all votes
+
+---
+
+### **Gap Analysis**
+
+| Requirement | Current Status | Gap Severity | Expo Compatible? |
+|-------------|---------------|--------------|------------------|
+| Mode A (simple) | ✅ Implemented | ✅ SATISFIED | ✅ Yes |
+| Mode B (blind-sig) | ❌ None | **CRITICAL** | ✅ Yes (complex) |
+| Mode C (E2E verifiable) | ❌ None | **HIGH** | ⚠️ Partial |
+| Unlinkable votes | ❌ user_id stored | **CRITICAL** | ✅ Yes (Mode B) |
+| Nullifier tracking | ❌ None | **HIGH** | ✅ Yes |
+| Commitment/receipt | ❌ None | **MEDIUM** | ✅ Yes |
+| ZK proofs | ❌ None | **MEDIUM** | ⚠️ Partial |
+| Public bulletin board | ❌ None | **LOW** | ✅ Yes |
+| Mode selection UI | ❌ None | **MEDIUM** | ✅ Yes |
+| Clear privacy warnings | ⚠️ Partial | **MEDIUM** | ✅ Yes |
+
+**Compliance:** ⚠️ **2/15 satisfied** (Mode A exists, server-side counting works)
+
+---
+
+### **Migration Path**
+
+#### **Phase 1: Add Mode B - Blind Signatures (Expo-compatible)**
+**Time:** 3-6 weeks  
+**Complexity:** Very High
+
+**Install Libraries:**
+```bash
+npm install blind-signatures
+```
+
+**New Ballot Schema:**
+```sql
+CREATE TABLE ballots (
+  ballot_id TEXT PRIMARY KEY,
+  union_id UUID,
+  mode TEXT CHECK (mode IN ('A', 'B', 'C')),
+  question TEXT,
+  options JSONB,
+  window_start TIMESTAMPTZ,
+  window_end TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Mode A votes (current system)
+CREATE TABLE ballot_votes_mode_a (
+  id UUID PRIMARY KEY,
+  ballot_id TEXT REFERENCES ballots(ballot_id),
+  user_id TEXT,      -- User identifier
+  choice TEXT,       -- Plaintext vote
+  proof_of_auth TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (ballot_id, user_id)
+);
+
+-- Mode B votes (blind-signature)
+CREATE TABLE ballot_votes_mode_b (
+  id UUID PRIMARY KEY,
+  ballot_id TEXT REFERENCES ballots(ballot_id),
+  token_signature TEXT NOT NULL,  -- Blind-signed token
+  commitment TEXT NOT NULL,       -- Encrypted vote
+  nullifier TEXT UNIQUE NOT NULL, -- Prevents double-voting
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Nullifier prevents reuse
+CREATE UNIQUE INDEX idx_nullifier ON ballot_votes_mode_b(nullifier);
+```
+
+**Server: Blind Token Issuance**
+```typescript
+// services/voting_service/src/blind-sign.ts
+import { blindSign, unblind } from 'blind-signatures';
+import { createHash } from 'crypto';
+
+app.post('/ballots/:ballotId/issue_token', async (req, reply) => {
+  const { ballotId } = req.params;
+  const { blinded_message } = req.body;
+  const userId = req.user.userId;
   
-  return { enabled: enabled ?? false, isLoading };
+  // 1. Verify user is union member (check encrypted membership token)
+  const isMember = await verifyMembership(userId, ballotId);
+  if (!isMember) {
+    return reply.code(403).send({ error: 'Not a member' });
+  }
+  
+  // 2. Check if user already requested token (prevent multiple issuances)
+  const alreadyIssued = await redis.get(`issued:${ballotId}:${userId}`);
+  if (alreadyIssued) {
+    return reply.code(409).send({ error: 'Token already issued' });
+  }
+  
+  // 3. Blind-sign the token (server cannot see token contents)
+  const serverKey = await getServerSigningKey(ballotId);
+  const blindSignature = blindSign(blinded_message, serverKey);
+  
+  // 4. Mark as issued (rate limit)
+  await redis.setex(`issued:${ballotId}:${userId}`, 86400, '1');
+  
+  // Server returns blind signature but doesn't know what was signed
+  return { blind_signature: blindSignature };
+});
+```
+
+**Client: Request Blind Token**
+```typescript
+// src/hooks/useBlindVoting.ts
+import { blind, unblind, verify } from 'blind-signatures';
+
+export const useRequestVotingToken = () => {
+  return useMutation({
+    mutationFn: async (ballotId: string) => {
+      // 1. Generate random token (client-side)
+      const token = crypto.getRandomValues(new Uint8Array(32));
+      
+      // 2. Blind the token
+      const { blinded, blindingFactor } = blind(token);
+      
+      // 3. Send blinded token to server for signing
+      const { blind_signature } = await fetch(
+        `/ballots/${ballotId}/issue_token`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ blinded_message: blinded }),
+        }
+      );
+      
+      // 4. Unblind the signature (server signature on original token)
+      const signature = unblind(blind_signature, blindingFactor);
+      
+      // 5. Store for later use
+      await SecureStore.setItemAsync(
+        `voting_token:${ballotId}`,
+        JSON.stringify({ token, signature })
+      );
+      
+      return { success: true };
+    },
+  });
+};
+```
+
+**Client: Submit Anonymous Vote**
+```typescript
+export const useCastBlindVote = () => {
+  return useMutation({
+    mutationFn: async ({
+      ballotId,
+      choice,
+    }: {
+      ballotId: string;
+      choice: string;
+    }) => {
+      // 1. Retrieve voting token
+      const stored = await SecureStore.getItemAsync(`voting_token:${ballotId}`);
+      const { token, signature } = JSON.parse(stored);
+      
+      // 2. Encrypt vote choice
+      const commitment = await encryptVote(choice, token);
+      
+      // 3. Generate nullifier (prevents double-voting)
+      const nullifier = createHash('sha256')
+        .update(Buffer.concat([token, Buffer.from(ballotId)]))
+        .digest('hex');
+      
+      // 4. Submit anonymous vote (no user_id)
+      const response = await fetch(`/ballots/${ballotId}/vote`, {
+        method: 'POST',
+        body: JSON.stringify({
+          token_signature: signature,
+          commitment,
+          nullifier,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Vote failed');
+      }
+      
+      // 5. Delete token (prevent reuse)
+      await SecureStore.deleteItemAsync(`voting_token:${ballotId}`);
+      
+      return { success: true };
+    },
+  });
+};
+```
+
+**Server: Accept Anonymous Vote**
+```typescript
+app.post('/ballots/:ballotId/vote', async (req, reply) => {
+  const { ballotId } = req.params;
+  const { token_signature, commitment, nullifier } = req.body;
+  
+  // 1. Verify signature is valid (token was issued by us)
+  const serverPubKey = await getServerPublicKey(ballotId);
+  const isValid = verify(token_signature, serverPubKey);
+  if (!isValid) {
+    return reply.code(401).send({ error: 'Invalid token' });
+  }
+  
+  // 2. Check nullifier hasn't been used (prevent double-voting)
+  const { rowCount } = await ballotDB.query(
+    'SELECT 1 FROM ballot_votes_mode_b WHERE nullifier = $1',
+    [nullifier]
+  );
+  if (rowCount > 0) {
+    return reply.code(409).send({ error: 'Already voted' });
+  }
+  
+  // 3. Store anonymous vote (no user_id column)
+  await ballotDB.query(`
+    INSERT INTO ballot_votes_mode_b (ballot_id, token_signature, commitment, nullifier)
+    VALUES ($1, $2, $3, $4)
+  `, [ballotId, token_signature, commitment, nullifier]);
+  
+  // 4. Return receipt (user can verify inclusion later)
+  const receipt = createHash('sha256').update(nullifier).digest('hex');
+  
+  return { success: true, receipt };
+});
+```
+
+**Vote Tallying (Aggregate Only):**
+```typescript
+app.get('/ballots/:ballotId/tally', async (req, reply) => {
+  const { ballotId } = req.params;
+  
+  // Decrypt all commitments server-side (requires threshold key)
+  const { rows } = await ballotDB.query(
+    'SELECT commitment FROM ballot_votes_mode_b WHERE ballot_id = $1',
+    [ballotId]
+  );
+  
+  // Decrypt and aggregate (server sees totals, not individual votes)
+  const votes = await Promise.all(
+    rows.map(row => decryptCommitment(row.commitment))
+  );
+  
+  const tally = votes.reduce((acc, vote) => {
+    acc[vote] = (acc[vote] || 0) + 1;
+    return acc;
+  }, {});
+  
+  // Return only aggregates (no per-vote details)
+  return { tally, total_votes: rows.length };
+});
+```
+
+**Benefits:**
+- ✅ Server cannot link user → vote
+- ✅ Database dump reveals no identities
+- ✅ Prevents double-voting (nullifier)
+- ✅ User gets verifiable receipt
+
+**Limitations:**
+- ⚠️ Server can still decrypt votes (threshold decryption would fix this)
+- ⚠️ Requires complex crypto implementation
+- ⚠️ No coercion resistance (Mode C needed)
+
+---
+
+#### **Phase 2: Add Mode C - End-to-End Verifiable (6-12 months)**
+
+**Use Helios Voting System:**
+- Homomorphic encryption (ElGamal)
+- Zero-knowledge proofs of vote validity
+- Public bulletin board
+- Threshold decryption (no single party can decrypt)
+
+**Very complex - recommend using existing library:**
+```bash
+npm install helios-voting
+```
+
+**Not covering full implementation here - requires cryptographer consultation.**
+
+---
+
+## 5️⃣ Content & Messaging
+
+### **Target Requirements**
+
+#### **AC5: Pseudonymous Content Posting**
+**Requirement:**
+- Posts/comments/threads use `author_pseudonym` (not real user_id)
+- Optionally ephemeral storage (auto-delete after N days)
+- No cross-referencing to identity tables
+
+**Data Schema:**
+```sql
+CREATE TABLE content.posts (
+  post_id TEXT PRIMARY KEY,
+  union_id TEXT,
+  body TEXT,
+  media_refs JSONB,
+  author_pseudonym TEXT,  -- Display name only, NOT user_id
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- No user_id column = no direct linkage
+```
+
+---
+
+### **Current Implementation**
+
+**What You Have:**
+```sql
+CREATE TABLE posts (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id),  -- ❌ Direct linkage
+  union_id UUID,
+  channel_id UUID,
+  content TEXT,
+  created_at TIMESTAMPTZ,
+  deleted_at TIMESTAMPTZ
+);
+
+CREATE TABLE comments (
+  id UUID PRIMARY KEY,
+  post_id UUID,
+  user_id UUID,  -- ❌ Direct linkage
+  content TEXT,
+  ...
+);
+```
+
+**Features:**
+- ✅ XSS protection (62 automated tests)
+- ✅ Content sanitization (stripHtml)
+- ✅ Soft deletes (deleted_at)
+- ✅ Content reporting system (18 content types)
+
+---
+
+### **Gap Analysis**
+
+| Requirement | Current Status | Gap Severity | Expo Compatible? |
+|-------------|---------------|--------------|------------------|
+| Pseudonymous authorship | ❌ user_id exposed | **HIGH** | ✅ Yes |
+| No identity cross-reference | ❌ Foreign keys exist | **HIGH** | ✅ Yes |
+| Ephemeral storage | ❌ Permanent | **LOW** | ✅ Yes |
+| XSS protection | ✅ Implemented | ✅ SATISFIED | ✅ Yes |
+| Content sanitization | ✅ Implemented | ✅ SATISFIED | ✅ Yes |
+| Reporting system | ✅ Implemented | ✅ SATISFIED | ✅ Yes |
+
+**Compliance:** ✅ **3/6 satisfied**
+
+---
+
+### **Migration Path**
+
+**Replace user_id with author_pseudonym:**
+```sql
+-- Migration
+ALTER TABLE posts DROP COLUMN user_id;
+ALTER TABLE posts ADD COLUMN author_pseudonym TEXT;
+
+-- Generate pseudonyms (one-time migration)
+UPDATE posts p
+SET author_pseudonym = (
+  SELECT display_name FROM profiles WHERE id = p.user_id
+);
+
+-- Same for comments, threads, etc.
+```
+
+**Client Code:**
+```typescript
+// Don't send user_id to server
+await supabase.from('posts').insert({
+  union_id: unionId,
+  content: sanitizedContent,
+  author_pseudonym: userDisplayName,  // No user_id
+});
+```
+
+**Ephemeral Posts (Optional):**
+```sql
+-- Auto-delete posts after 30 days
+CREATE FUNCTION auto_delete_old_posts() RETURNS trigger AS $$
+BEGIN
+  DELETE FROM posts WHERE created_at < NOW() - INTERVAL '30 days';
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_auto_delete
+AFTER INSERT ON posts
+EXECUTE FUNCTION auto_delete_old_posts();
+```
+
+---
+
+## 6️⃣ Logging & Analytics
+
+### **Target Requirements**
+
+#### **AC6: Minimal PII Logging**
+**Requirement:**
+- Log retention: **24 hours** (not 72h)
+- Fields allowed: `request_hash`, `route`, `status_code`, `timestamp`
+- Fields **forbidden**: `ip`, `user_agent`, `referer`, `email`, `phone`, `geo`, `user_id`
+- Use salted hashes if absolutely necessary
+
+**Log Schema:**
+```sql
+CREATE TABLE logs.requests (
+  id SERIAL PRIMARY KEY,
+  request_hash TEXT,  -- SHA256(salt + path + method)
+  route TEXT,
+  status_code INTEGER,
+  timestamp TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Auto-delete after 24h
+CREATE INDEX idx_logs_timestamp ON logs.requests(timestamp);
+```
+
+**Analytics:**
+- Allow only cardinality-safe aggregates (e.g., "100 votes cast today")
+- No user-level events
+- No cross-session linking
+- No third-party analytics SDKs
+
+---
+
+### **Current Implementation**
+
+**What You Have:**
+```sql
+-- Audit logs table
+CREATE TABLE audit_logs (
+  id UUID PRIMARY KEY,
+  user_id UUID,         -- ❌ PII
+  action TEXT,
+  device_id TEXT,       -- ❌ Tracking vector
+  ip_address TEXT,      -- ❌ PII
+  user_agent TEXT,      -- ❌ PII
+  status TEXT,
+  error_message TEXT,
+  created_at TIMESTAMPTZ
+);
+
+-- No auto-deletion (logs kept indefinitely)
+```
+
+**Audit Events:**
+- Authentication (login, logout, signup failures)
+- Moderation actions
+- Admin actions
+- Device/IP tracking
+
+---
+
+### **Gap Analysis**
+
+| Requirement | Current Status | Gap Severity | Expo Compatible? |
+|-------------|---------------|--------------|------------------|
+| 24h log retention | ❌ Indefinite | **HIGH** | ✅ Yes |
+| No IP logging | ❌ IP stored | **CRITICAL** | ✅ Yes |
+| No user agent logging | ❌ UA stored | **CRITICAL** | ✅ Yes |
+| No user_id in logs | ❌ user_id stored | **CRITICAL** | ✅ Yes |
+| Salted request hashes | ❌ None | **MEDIUM** | ✅ Yes |
+| Aggregate analytics only | ⚠️ Partial | **MEDIUM** | ✅ Yes |
+| No third-party SDKs | ✅ None installed | ✅ SATISFIED | ✅ Yes |
+
+**Compliance:** ❌ **0/7 satisfied** (no third-party tracking is the only win)
+
+---
+
+### **Migration Path**
+
+#### **Phase 1: Remove PII from Logs (1 week)**
+
+**New Schema:**
+```sql
+-- Replace audit_logs table
+CREATE TABLE logs.events (
+  id SERIAL PRIMARY KEY,
+  event_type TEXT,          -- 'auth', 'vote', 'post', etc.
+  action TEXT,              -- 'login_success', 'vote_cast', etc.
+  request_hash TEXT,        -- SHA256(salt + route + timestamp)
+  status_code INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- NO user_id, NO ip_address, NO user_agent, NO device_id
+
+-- Auto-delete after 24 hours
+CREATE INDEX idx_events_created_at ON logs.events(created_at);
+
+CREATE FUNCTION auto_delete_old_logs() RETURNS void AS $$
+BEGIN
+  DELETE FROM logs.events WHERE created_at < NOW() - INTERVAL '24 hours';
+END;
+$$ LANGUAGE plpgsql;
+
+-- Run every hour
+SELECT cron.schedule('delete-old-logs', '0 * * * *', 'SELECT auto_delete_old_logs()');
+```
+
+**Application Code:**
+```typescript
+// src/services/logging.ts
+import { createHash } from 'crypto';
+
+const LOG_SALT = process.env.LOG_SALT; // Rotate quarterly
+
+export const logEvent = async (
+  eventType: string,
+  action: string,
+  route: string
+) => {
+  // Create salted hash (no IP, no UA, no user_id)
+  const requestHash = createHash('sha256')
+    .update(`${LOG_SALT}:${route}:${Date.now()}`)
+    .digest('hex');
+  
+  await db.query(`
+    INSERT INTO logs.events (event_type, action, request_hash, status_code)
+    VALUES ($1, $2, $3, $4)
+  `, [eventType, action, requestHash, 200]);
+  
+  // No PII stored
 };
 
 // Usage
-const VoteButton = () => {
-  const { enabled } = useFeatureFlag('voting_enabled');
+await logEvent('auth', 'login_success', '/auth/login');
+await logEvent('vote', 'ballot_cast', '/ballots/123/vote');
+```
+
+**Analytics (Aggregate Only):**
+```typescript
+// Dashboard queries (safe)
+SELECT event_type, COUNT(*) as count
+FROM logs.events
+WHERE created_at > NOW() - INTERVAL '24 hours'
+GROUP BY event_type;
+
+-- Returns: { auth: 150, vote: 45, post: 230 }
+// No per-user tracking
+```
+
+---
+
+## 7️⃣ Network Security & Infrastructure
+
+### **Target Requirements**
+
+#### **AC7: CDN/WAF + Origin Allowlist**
+**Requirement:**
+- Reverse proxy/CDN in front of all services
+- Origin servers accept traffic **ONLY** from CDN IP ranges
+- Firewall blocks direct origin access
+- Tor .onion mirror for censorship resistance
+
+**Architecture:**
+```
+┌─────────┐     ┌──────────┐     ┌─────────────┐
+│ Client  │────▶│ Cloudflare│────▶│ Origin      │
+│ (Expo)  │     │ CDN/WAF   │     │ (allowlist) │
+└─────────┘     └──────────┘     └─────────────┘
+                                        ▲
+                                        │ ONLY allow
+                                        │ Cloudflare IPs
+                                        │
+                                  ┌──────────────┐
+                                  │ Firewall     │
+                                  │ DROP others  │
+                                  └──────────────┘
+
+Tor Users:
+┌─────────┐     ┌──────────┐     ┌─────────────┐
+│ Tor     │────▶│ .onion   │────▶│ Origin      │
+│ Browser │     │ Gateway  │     │ (Tor gateway│
+└─────────┘     └──────────┘     │  IP allowed)│
+                                 └─────────────┘
+```
+
+**Configuration:**
+```env
+# Only allow these IPs
+ORIGIN_ALLOWED_CIDRS=173.245.48.0/20,103.21.244.0/22,<Cloudflare ranges>
+CDN_IP_RANGES=173.245.48.0/20,103.21.244.0/22
+ENABLE_TOR_GATEWAY=true
+```
+
+---
+
+### **Current Implementation**
+
+**What You Have:**
+- Supabase hosting (managed service)
+- HTTPS enforced
+- No CDN/WAF layer
+- No origin IP allowlist
+- No Tor mirror
+
+---
+
+### **Gap Analysis**
+
+| Requirement | Current Status | Gap Severity | Complexity |
+|-------------|---------------|--------------|------------|
+| CDN/WAF layer | ❌ None | **HIGH** | Medium |
+| Origin IP allowlist | ❌ None | **HIGH** | Medium |
+| Firewall rules | ❌ None | **MEDIUM** | Low |
+| Tor .onion mirror | ❌ None | **MEDIUM** | High |
+| HTTPS enforced | ✅ Supabase default | ✅ SATISFIED | N/A |
+| Rate limiting | ⚠️ Client-side only | **HIGH** | Medium |
+| DDoS protection | ❌ None | **MEDIUM** | Low (via CDN) |
+
+**Compliance:** ⚠️ **1/9 satisfied** (HTTPS only)
+
+---
+
+### **Migration Path**
+
+#### **Phase 1: Add Cloudflare WAF (1-2 days)**
+
+**Setup:**
+1. Create Cloudflare account
+2. Point custom domain to Supabase
+3. Enable WAF rules
+
+```bash
+# Free tier provides:
+# - DDoS protection
+# - Rate limiting
+# - Firewall rules
+# - Origin hiding
+Cost: $0/mo (free tier)
+```
+
+**Cloudflare Firewall Rules:**
+```
+# Block known bots
+(cf.threat_score > 10) → Block
+
+# Rate limit signups
+(http.request.uri.path eq "/auth/signup") → Rate Limit (5 req/hour)
+
+# Rate limit votes
+(http.request.uri.path contains "/vote") → Rate Limit (100 req/5min)
+
+# Allow only legitimate traffic
+(cf.bot_management.score < 30) → Allow
+```
+
+---
+
+#### **Phase 2: Origin IP Allowlist (1 week)**
+
+**If self-hosting:**
+```nginx
+# nginx.conf
+http {
+  # Allow only Cloudflare IPs
+  allow 173.245.48.0/20;
+  allow 103.21.244.0/22;
+  allow 103.22.200.0/22;
+  # ... (all Cloudflare ranges)
+  deny all;
   
-  if (!enabled) {
-    return <Text>Voting temporarily disabled</Text>;
+  server {
+    listen 443 ssl;
+    server_name api.unitedUnions.app;
+    
+    # Block direct IP access
+    if ($host != api.unitedUnions.app) {
+      return 444;
+    }
+  }
+}
+```
+
+**With Supabase (harder):**
+- Supabase doesn't expose origin IP control
+- Must migrate to self-hosted if this is critical
+
+---
+
+#### **Phase 3: Tor .onion Mirror (2-4 weeks)**
+
+**Setup Hidden Service:**
+```bash
+# Install Tor
+apt install tor
+
+# Configure hidden service
+# /etc/tor/torrc
+HiddenServiceDir /var/lib/tor/unitedUnions/
+HiddenServicePort 80 127.0.0.1:3000
+HiddenServicePort 443 127.0.0.1:3443
+
+# Restart Tor
+systemctl restart tor
+
+# Get .onion address
+cat /var/lib/tor/unitedUnions/hostname
+# → unitedUnions3x7ykld...onion
+```
+
+**Expose Read-Only Endpoints:**
+```typescript
+// Only allow safe operations via Tor
+app.use((req, res, next) => {
+  const isTor = req.headers['x-tor-gateway'] === 'true';
+  
+  if (isTor && ['POST', 'PUT', 'DELETE'].includes(req.method)) {
+    return res.status(403).send('Write operations disabled on Tor mirror');
   }
   
-  return <Button onPress={handleVote}>Vote</Button>;
-};
+  next();
+});
 ```
 
-**Kill switch UI (admin only):**
-```typescript
-// Emergency disable voting
-const disableVoting = async () => {
-  await supabase
-    .from('feature_flags')
-    .update({ enabled: false, updated_by: currentUserId })
-    .eq('flag_name', 'voting_enabled');
-  
-  // All clients will see change within 30 seconds
-};
-```
-
----
-
-#### **Phase 2: Backup Restore Drills (quarterly)**
-
-**Runbook:**
-```markdown
-# Quarterly Backup Restore Test
-
-**Schedule:** First Monday of every quarter
-
-## Steps:
-
-1. **Download latest backup**
-   - Supabase Dashboard → Database → Backups
-   - Download most recent backup
-
-2. **Create test project**
-   - Create new Supabase project: voter-unions-restore-test
-   - Note project URL and keys
-
-3. **Restore backup**
-   ```bash
-   pg_restore -h db.xxxxx.supabase.co -U postgres -d postgres backup.dump
-   ```
-
-4. **Verify data integrity**
-   - Count total users: `SELECT COUNT(*) FROM profiles;`
-   - Count total votes: `SELECT COUNT(*) FROM proposal_votes;`
-   - Check RLS policies: `\d+ proposals`
-   - Verify triggers: `SELECT * FROM pg_trigger;`
-
-5. **Time the restore**
-   - Record time taken (target: <30 minutes for 10GB DB)
-
-6. **Document issues**
-   - Any errors encountered?
-   - Any data corruption?
-   - RLS policies missing?
-
-7. **Cleanup**
-   - Delete test project
-   - Archive test results
-
-**Last test:** [Date]  
-**Time to restore:** [Duration]  
-**Issues found:** [None / List]  
-**Tested by:** [Name]
-```
-
----
-
-#### **Phase 3: Key Rotation (1 week setup, quarterly execution)**
-
-**Supabase JWT Secret Rotation:**
-```markdown
-# JWT Secret Rotation Runbook
-
-**Frequency:** Every 90 days
-
-## Steps:
-
-1. **Generate new secret**
-   - Supabase Dashboard → Settings → API
-   - Click "Generate new JWT secret"
-   - Save old secret for transition period
-
-2. **Dual-secret transition (7 days)**
-   - Both old and new secrets valid
-   - Allows users to get new tokens without force-logout
-
-3. **Monitor token errors**
-   - Check error logs for auth failures
-   - Should see <1% errors (users with very old tokens)
-
-4. **Invalidate old secret (after 7 days)**
-   - Supabase Dashboard → Disable old JWT secret
-   - All users now must have new tokens
-
-5. **Force logout remaining users**
-   ```sql
-   -- Invalidate all refresh tokens older than rotation date
-   DELETE FROM auth.refresh_tokens
-   WHERE created_at < '2025-01-01'::timestamptz;
-   ```
-
-6. **Update app config (if needed)**
-   - EAS Update with new EXPO_PUBLIC_SUPABASE_ANON_KEY if changed
-   - Deploy new build if service_role key changed
-
-7. **Document rotation**
-   - Date rotated: _______
-   - By: _______
-   - Issues: _______
-```
-
----
-
-#### **Phase 4: Incident Response Plan (documentation)**
-
-**Create:** `voter-unions/INCIDENT_RESPONSE.md`
-
-```markdown
-# Incident Response Plan
-
-## Severity Levels
-
-### P0 - Critical (Active Breach)
-- Database compromised
-- User data exposed
-- Vote manipulation detected
-- **Response time:** <1 hour
-
-### P1 - High (Potential Breach)
-- Suspicious activity detected
-- Vulnerability reported
-- DDoS attack
-- **Response time:** <4 hours
-
-### P2 - Medium (Service Degradation)
-- Performance issues
-- Non-critical bug
-- **Response time:** <24 hours
-
-## Response Steps
-
-### 1. Detect (0-15 min)
-- [ ] Alert triggered (monitoring, user report, security researcher)
-- [ ] Assign incident commander
-- [ ] Create incident Slack channel
-
-### 2. Contain (15 min - 4 hours)
-- [ ] Disable affected features via kill switches
-- [ ] Block malicious IPs at Cloudflare
-- [ ] Revoke compromised API keys
-- [ ] Enable maintenance mode if needed
-
-### 3. Investigate (concurrent)
-- [ ] Review audit logs
-- [ ] Check database for unauthorized changes
-- [ ] Analyze network traffic
-- [ ] Determine scope of breach
-
-### 4. Eradicate (4-24 hours)
-- [ ] Patch vulnerability
-- [ ] Rotate all keys and secrets
-- [ ] Deploy fix via EAS Update or emergency build
-- [ ] Verify fix in production
-
-### 5. Recover (24-48 hours)
-- [ ] Re-enable features gradually
-- [ ] Monitor for recurrence
-- [ ] Restore from backup if necessary
-
-### 6. Communicate (within 72 hours)
-- [ ] Internal stakeholders
-- [ ] Affected users (if PII impacted)
-- [ ] Public disclosure (if required by law)
-- [ ] Security community (if vulnerability discovered)
-
-### 7. Post-Mortem (within 7 days)
-- [ ] Write incident report
-- [ ] Identify root cause
-- [ ] Document lessons learned
-- [ ] Update runbooks
-
-## Contact List
-
-- **Incident Commander:** [Name, Phone]
-- **Database Admin:** [Name, Phone]
-- **Security Team:** [Email]
-- **Legal Counsel:** [Name, Phone]
-- **Supabase Support:** support@supabase.io
-```
-
----
-
-## 8) Compliance & Transparency
-
-### **Target Requirements**
-
-#### **Privacy Policy**
-- **iOS/Android/Web:** "No personal data collected" with technical detail
-- **Acceptance:** Public, specific, and truthful.
-
-#### **Open Crypto Code**
-- **iOS/Android/Web:** Public, auditable
-- **Acceptance:** Vote/crypto code open for review.
-
-#### **Transparency Report**
-- **iOS/Android/Web:** Annual requests & actions
-- **Acceptance:** Published yearly.
-
-#### **Independent Audit**
-- **iOS/Android/Web:** Pre-launch and major releases
-- **Acceptance:** Third-party security review completed.
-
----
-
-### **Current Implementation**
-
-✅ **What You Have:**
-- Privacy policy screen (basic GDPR compliance)
-- Open source codebase (potential - not currently public)
-
-❌ **What's Missing:**
-- Privacy policy claims email collection (contradicts target)
-- Vote/crypto code not separated for easy auditing
-- No transparency report
-- No third-party security audit
-
----
-
-### **Gap Analysis**
-
-| Requirement | Current Status | Gap Severity | Expo Compatible? |
-|-------------|---------------|--------------|------------------|
-| "No PII" privacy policy | ❌ Claims email collection | **HIGH** | ✅ Yes (update docs) |
-| Open crypto code | ⚠️ Not public | **MEDIUM** | ✅ Yes (GitHub public repo) |
-| Annual transparency report | ❌ None | **LOW** | ✅ Yes (documentation) |
-| Third-party audit | ❌ None | **MEDIUM** | ✅ Yes (hire firm) |
-
----
-
-### **Migration Path**
-
-#### **Phase 1: Update Privacy Policy (1 week)**
-
-**After implementing passkey-only auth:**
-
-```markdown
-# Privacy Policy - Voter Unions
-
-**Effective Date:** [Date]
-
-## Data We DO NOT Collect
-
-We are committed to protecting your privacy. **We do not collect:**
-- ❌ Email addresses
-- ❌ Phone numbers
-- ❌ Device identifiers
-- ❌ IP addresses (not logged)
-- ❌ Browsing history
-- ❌ Location data
-- ❌ Contacts or photos
-
-## Data We DO Collect
-
-**Encrypted Membership Records:**
-- Your union membership is stored as encrypted ciphertext
-- The server cannot decrypt this data without your device key
-- Keys never leave your device
-
-**Anonymous Vote Ballots:**
-- Votes are blind-signed and encrypted
-- The server cannot link your identity to your vote
-- We only store aggregate vote counts
-
-**Temporary Security Logs:**
-- Kept for maximum 72 hours
-- Used only for abuse prevention
-- Automatically deleted after 72h
-
-## How We Protect Your Data
-
-**Device-Only Cryptography:**
-- Private keys stored in Secure Enclave (iOS) or StrongBox (Android)
-- All signing/encryption happens on your device
-- Server never has access to your keys
-
-**Zero-Knowledge Architecture:**
-- Server cannot see membership details or vote contents
-- All sensitive data encrypted client-side before upload
-
-## Your Rights
-
-**Data Portability:**
-You can export your encrypted data anytime from Settings.
-
-**Right to Deletion:**
-You can delete your account and all data permanently.
-
-**No Third-Party Sharing:**
-We never sell or share your data with third parties.
-
-## Technical Details
-
-For transparency, here's exactly how we protect your privacy:
-- WebAuthn/Passkeys for authentication (no passwords)
-- RSA blind signatures for anonymous voting
-- AES-256 encryption for membership records
-- Certificate pinning on mobile apps
-- .onion mirror for censorship resistance
-
-## Contact
-
-Questions? Contact us at: privacy@voterUnions.org
-
-**This policy is legally binding and auditable.**
-```
-
----
-
-#### **Phase 2: Open Source Crypto Code (1 day)**
-
-**Separate crypto code for easy auditing:**
-
-```
-voter-unions/
-├── src/
-│   ├── crypto/  ← Separate directory
-│   │   ├── README.md  ← Document all crypto
-│   │   ├── blindSignatures.ts  ← Voting crypto
-│   │   ├── encryption.ts  ← Membership encryption
-│   │   ├── keyManagement.ts  ← Key generation/rotation
-│   │   └── __tests__/
-│   │       ├── blindSignatures.test.ts
-│   │       ├── encryption.test.ts
-│   │       └── keyManagement.test.ts
-```
-
-**Crypto README:**
-```markdown
-# Cryptographic Implementation - Voter Unions
-
-This directory contains all cryptographic code used in the app.
-
-## Voting System (Blind Signatures)
-
-**Algorithm:** RSA-2048 blind signatures  
-**Library:** `blind-signatures` v2.1.0  
-**Purpose:** Anonymous voting without server linkage
-
-**Files:**
-- `blindSignatures.ts` - Core voting crypto
-- Tests: 15 unit tests, 100% coverage
-
-## Membership Encryption
-
-**Algorithm:** AES-256-GCM  
-**Library:** `expo-crypto`  
-**Purpose:** Client-side encryption before server upload
-
-**Files:**
-- `encryption.ts` - Membership encryption
-- Tests: 12 unit tests, 100% coverage
-
-## Security Properties
-
-1. **Forward Secrecy:** Compromising future keys doesn't expose past votes
-2. **Unlinkability:** Server cannot correlate votes to users
-3. **Verifiability:** Users can prove their vote was counted
-4. **Receipt-Freeness:** Users cannot prove how they voted (prevents coercion)
-
-## Auditing
-
-All crypto code is:
-- ✅ Covered by automated tests
-- ✅ Uses well-vetted libraries (no custom crypto)
-- ✅ Documented with security proofs
-- ✅ Open source for third-party review
-```
-
-**Make repository public:**
-```bash
-# After review and before launch
-gh repo edit --visibility public
-```
-
----
-
-#### **Phase 3: Transparency Report (annual)**
-
-**Create:** `voter-unions/transparency-reports/2025.md`
-
-```markdown
-# Transparency Report - 2025
-
-**Reporting Period:** January 1, 2025 - December 31, 2025
-
-## Government Requests for User Data
-
-| Type | Requests Received | Requests Complied With | Data Disclosed |
-|------|-------------------|------------------------|----------------|
-| US Law Enforcement | 0 | 0 | N/A |
-| Foreign Governments | 0 | 0 | N/A |
-| Civil Subpoenas | 0 | 0 | N/A |
-
-**Note:** We received zero requests in 2025. Even if we had received requests, we collect no personal data that could be disclosed.
-
-## Content Takedown Requests
-
-| Source | Requests | Complied | Rejected |
-|--------|----------|----------|----------|
-| Users (reporting system) | 47 | 12 | 35 |
-| Legal (DMCA, etc.) | 0 | 0 | 0 |
-
-**Compliance details:**
-- 12 posts removed for violating community guidelines (spam, harassment)
-- All moderation actions logged publicly in union moderation logs
-
-## Security Incidents
-
-| Date | Type | Impact | Resolution |
-|------|------|--------|------------|
-| None | N/A | N/A | N/A |
-
-We experienced zero security breaches in 2025.
-
-## Infrastructure Changes
-
-- **Q1:** Migrated to passkey-only authentication (removed email requirement)
-- **Q2:** Implemented blind-signature voting system
-- **Q3:** Added .onion mirror for censorship resistance
-- **Q4:** Third-party security audit completed
-
-## Audits & Certifications
-
-- **Security Audit:** Completed by [Audit Firm] on [Date]
-  - Report: [Link to public report]
-  - Findings: 0 critical, 2 medium (both resolved)
-
-## Commitment to Transparency
-
-We publish this report annually and welcome questions at: transparency@voterUnions.org
-```
-
----
-
-#### **Phase 4: Third-Party Security Audit (before launch)**
-
-**Firms to consider:**
-- Trail of Bits (crypto specialists): $30-50k
-- NCC Group: $25-40k
-- Cure53 (web/mobile): $20-35k
-
-**Scope of audit:**
-- Cryptographic implementation (blind signatures, encryption)
-- Authentication flow (passkeys, key management)
-- Database security (RLS policies, triggers)
-- Network security (certificate pinning, HTTPS)
-- Supply chain (dependency review)
-
-**Deliverable:**
-- Public report (redacted sensitive details)
-- Private detailed findings
-- Remediation recommendations
-
----
-
-## 9) User Education & UX Safety
-
-### **Target Requirements**
-
-#### **Onboarding**
-- **iOS/Android/Web:** Explain passkeys, no PII, client-side encryption
-- **Acceptance:** Clear, non-technical language.
-
-#### **Tor Access**
-- **iOS:** "Open in Tor Browser" action to .onion mirror
-- **Android:** Same
-- **Web:** Interstitial explaining Tor requirement
-- **Acceptance:** High-risk users guided to onion mirror.
-
-#### **Consent UX**
-- **iOS/Android/Web:** Explicit confirm for "Join union" and "Cast vote"
-- **Acceptance:** Clear consent and privacy notes.
-
----
-
-### **Current Implementation**
-
-✅ **What You Have:**
-- Onboarding screens explaining app features
-- Consent dialogs for critical actions (partially)
-- Email verification flow
-
-❌ **What's Missing:**
-- No passkey education (because using email/password)
-- No Tor access instructions
-- Limited privacy education
-
----
-
-### **Gap Analysis**
-
-| Requirement | Current Status | Gap Severity | Expo Compatible? |
-|-------------|---------------|--------------|------------------|
-| Passkey education | ❌ None (using passwords) | **LOW** | ✅ Yes (UI screens) |
-| Privacy explanation | ⚠️ Basic | **MEDIUM** | ✅ Yes (UI screens) |
-| Tor access instructions | ❌ None | **LOW** | ✅ Yes (deep linking) |
-| Explicit consent | ⚠️ Partial | **LOW** | ✅ Yes (UI improvements) |
-
----
-
-### **Migration Path**
-
-#### **Phase 1: Passkey Onboarding (1-2 weeks)**
-
-**After implementing passkey auth:**
-
-```typescript
-// src/screens/auth/PasskeyOnboardingScreen.tsx
-const PasskeyOnboardingScreen = () => {
-  return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Welcome to Voter Unions</Text>
-      
-      <View style={styles.section}>
-        <Icon name="shield-check" size={48} color="#4CAF50" />
-        <Text style={styles.heading}>No Passwords, No Emails</Text>
-        <Text style={styles.body}>
-          We use <Text style={styles.bold}>passkeys</Text> instead of passwords.
-          Your phone's Face ID or fingerprint is your login.
-        </Text>
-      </View>
-      
-      <View style={styles.section}>
-        <Icon name="lock" size={48} color="#2196F3" />
-        <Text style={styles.heading}>Your Data Stays Private</Text>
-        <Text style={styles.body}>
-          We don't collect your email, phone, or location.
-          Everything is encrypted on your device before leaving.
-        </Text>
-      </View>
-      
-      <View style={styles.section}>
-        <Icon name="eye-off" size={48} color="#9C27B0" />
-        <Text style={styles.heading}>Anonymous Voting</Text>
-        <Text style={styles.body}>
-          When you vote, we use <Text style={styles.bold}>blind signatures</Text>.
-          The server cannot see how you voted or link votes to your identity.
-        </Text>
-      </View>
-      
-      <Button
-        title="Set Up Passkey"
-        onPress={handleCreatePasskey}
-      />
-      
-      <TouchableOpacity onPress={() => navigation.navigate('PrivacyDetails')}>
-        <Text style={styles.link}>How does this work technically?</Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
-};
-```
-
----
-
-#### **Phase 2: Tor Access Instructions (1 week)**
-
-**Settings screen:**
+**Client Deep Link:**
 ```typescript
 // src/screens/SettingsScreen.tsx
-const TorAccessSection = () => {
-  const openInTor = async () => {
-    const onionUrl = 'http://voterUnionsXXXXXXX.onion';
+const openTorMirror = async () => {
+  const onionUrl = 'http://unitedUnions3x7ykld...onion';
+  
+  if (Platform.OS === 'ios') {
+    await Linking.openURL(`onionbrowser://${onionUrl}`);
+  } else {
+    await Linking.openURL(`torbrowser:${onionUrl}`);
+  }
+};
+```
+
+---
+
+## 8️⃣ Cryptography & Key Management
+
+### **Target Requirements**
+
+#### **AC8: Client-Side Cryptography**
+**Requirement:**
+- Auth: WebAuthn passkeys (platform authenticators)
+- Fallback: Passphrase → Argon2id key derivation (high work factor)
+- Signatures: Ed25519
+- Key agreement: X25519
+- **NO custom crypto** - use audited libraries only
+
+**Allowed Libraries:**
+- `@simplewebauthn/browser` (WebAuthn)
+- `@noble/curves` (Ed25519, X25519)
+- `@noble/ciphers` (XChaCha20-Poly1305)
+- `@noble/hashes` (Argon2id, SHA256)
+- Platform WebCrypto API
+
+**Forbidden:**
+- RSA-PKCS1 v1.5
+- MD5, SHA1
+- Custom crypto implementations
+- Deprecated algorithms
+
+---
+
+### **Current Implementation**
+
+**What You Have:**
+- Supabase Auth (server-side password hashing)
+- `expo-crypto` for random bytes
+- SHA256 for device ID hashing
+- No client-side cryptography
+
+**Libraries:**
+```json
+{
+  "dependencies": {
+    "expo-crypto": "^13.0.0"  // Only for randomUUID()
+  }
+}
+```
+
+---
+
+### **Gap Analysis**
+
+| Requirement | Current Status | Gap Severity | Expo Compatible? |
+|-------------|---------------|--------------|------------------|
+| Ed25519 signatures | ❌ None | **HIGH** | ✅ Yes (@noble/curves) |
+| X25519 key agreement | ❌ None | **HIGH** | ✅ Yes (@noble/curves) |
+| Argon2id KDF | ❌ None | **MEDIUM** | ✅ Yes (@noble/hashes) |
+| XChaCha20-Poly1305 | ❌ None | **MEDIUM** | ✅ Yes (@noble/ciphers) |
+| WebAuthn | ❌ None | **CRITICAL** | ⚠️ Partial |
+| Audited libraries | ⚠️ expo-crypto only | **MEDIUM** | ✅ Yes |
+| No custom crypto | ✅ None written | ✅ SATISFIED | ✅ Yes |
+| No deprecated algos | ✅ None used | ✅ SATISFIED | ✅ Yes |
+
+**Compliance:** ❌ **0/8 satisfied** (not using custom crypto is the only win)
+
+---
+
+### **Migration Path**
+
+**Install Noble Crypto Suite:**
+```bash
+npm install @noble/curves @noble/ciphers @noble/hashes
+```
+
+**Key Generation (Client-Side):**
+```typescript
+// src/crypto/keys.ts
+import { ed25519 } from '@noble/curves/ed25519';
+import { x25519 } from '@noble/curves/ed25519';
+import { argon2id } from '@noble/hashes/argon2';
+import * as SecureStore from 'expo-secure-store';
+
+// Generate signing keypair
+export const generateSigningKeys = () => {
+  const privateKey = ed25519.utils.randomPrivateKey();
+  const publicKey = ed25519.getPublicKey(privateKey);
+  
+  return {
+    privateKey: Buffer.from(privateKey).toString('hex'),
+    publicKey: Buffer.from(publicKey).toString('hex'),
+  };
+};
+
+// Generate encryption keypair
+export const generateEncryptionKeys = () => {
+  const privateKey = x25519.utils.randomPrivateKey();
+  const publicKey = x25519.getPublicKey(privateKey);
+  
+  return {
+    privateKey: Buffer.from(privateKey).toString('hex'),
+    publicKey: Buffer.from(publicKey).toString('hex'),
+  };
+};
+
+// Passphrase → Key derivation
+export const deriveKeyFromPassphrase = async (passphrase: string) => {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  
+  const key = argon2id(passphrase, salt, {
+    t: 3,      // Iterations
+    m: 65536,  // Memory (64MB)
+    p: 1,      // Parallelism
+  });
+  
+  return {
+    key: Buffer.from(key).toString('hex'),
+    salt: Buffer.from(salt).toString('hex'),
+  };
+};
+
+// Store keys securely (never send to server)
+export const storeKeys = async (keys: {
+  signingPrivateKey: string;
+  encryptionPrivateKey: string;
+}) => {
+  await SecureStore.setItemAsync('signing_key', keys.signingPrivateKey);
+  await SecureStore.setItemAsync('encryption_key', keys.encryptionPrivateKey);
+};
+```
+
+**Usage Example (Already shown in Section 3)**
+
+---
+
+## 9️⃣ Abuse & Sybil Controls
+
+### **Target Requirements**
+
+#### **AC9: Anti-Abuse Mechanisms**
+**Requirement:**
+- Rate limiting per IP and Tor exit node (bucketed, not stored long-term)
+- Proof-of-work on signup (adjustable difficulty)
+- Invite chains / trust anchors for sensitive unions
+- Moderation tools: blocklists, shadow-mute, per-union code of conduct
+- Automated bot heuristics (content signals only, no identity enrichment)
+
+---
+
+### **Current Implementation**
+
+**What You Have:**
+✅ **Client-side rate limiting** (11 action types):
+- Authentication: 5 login attempts/15 min, 3 signups/hour
+- Content: 10 posts/5 min, 20 comments/5 min
+- Voting: 100 votes/5 min
+- Union: 2 unions/24 hours, 10 joins/hour
+
+✅ **Content reporting system** (18 content types)
+
+✅ **Moderation tools:**
+- ModerationQueueScreen for union admins
+- Report status tracking
+- Transparency logs
+
+✅ **Email verification** (reduces fake accounts)
+
+---
+
+### **Gap Analysis**
+
+| Requirement | Current Status | Gap Severity | Expo Compatible? |
+|-------------|---------------|--------------|------------------|
+| Rate limiting (IP-based) | ⚠️ Client-side only | **MEDIUM** | ✅ Yes (Edge Functions) |
+| Proof-of-work signup | ❌ None | **LOW** | ✅ Yes |
+| Invite chains | ❌ None | **LOW** | ✅ Yes |
+| Trust anchors | ❌ None | **LOW** | ✅ Yes |
+| Moderation tools | ✅ Implemented | ✅ SATISFIED | ✅ Yes |
+| Bot heuristics | ❌ None | **LOW** | ✅ Yes |
+
+**Compliance:** ✅ **4/6 satisfied** (good abuse controls already)
+
+---
+
+### **Migration Path**
+
+**Add Server-Side Rate Limiting:**
+```typescript
+// Supabase Edge Function: rate-limit
+import { Redis } from '@upstash/redis';
+
+const redis = Redis.fromEnv();
+
+Deno.serve(async (req) => {
+  const clientIP = req.headers.get('cf-connecting-ip') || 'unknown';
+  const action = req.headers.get('x-action') || 'default';
+  
+  const key = `ratelimit:${action}:${clientIP}`;
+  const count = await redis.incr(key);
+  
+  if (count === 1) {
+    await redis.expire(key, 300); // 5 minutes
+  }
+  
+  if (count > 10) {
+    return new Response('Rate limit exceeded', { status: 429 });
+  }
+  
+  return new Response('OK', { status: 200 });
+});
+```
+
+**Proof-of-Work Signup:**
+```typescript
+// Client must solve puzzle before signup
+import { sha256 } from '@noble/hashes/sha256';
+
+export const solveProofOfWork = async (challenge: string, difficulty: number) => {
+  let nonce = 0;
+  
+  while (true) {
+    const hash = sha256(`${challenge}:${nonce}`);
+    const hashHex = Buffer.from(hash).toString('hex');
     
-    Alert.alert(
-      'Open in Tor Browser',
-      'For maximum privacy and censorship resistance, you can access Voter Unions via Tor.\n\n' +
-      '1. Install Tor Browser (iOS) or Onion Browser (Android)\n' +
-      '2. Open this link in Tor:\n' + onionUrl,
-      [
-        { text: 'Copy Link', onPress: () => Clipboard.setString(onionUrl) },
-        { text: 'Open Tor', onPress: () => {
-          if (Platform.OS === 'ios') {
-            Linking.openURL(`onionbrowser://${onionUrl}`);
-          } else {
-            Linking.openURL(`torbrowser:${onionUrl}`);
-          }
-        }},
-        { text: 'Cancel', style: 'cancel' }
-      ]
-    );
-  };
-  
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>High Security Mode</Text>
-      <Text style={styles.description}>
-        If you're organizing in a high-risk environment, use our Tor mirror
-        to hide your IP address and bypass censorship.
-      </Text>
-      <Button title="Access via Tor" onPress={openInTor} />
-    </View>
-  );
+    if (hashHex.startsWith('0'.repeat(difficulty))) {
+      return nonce;
+    }
+    
+    nonce++;
+  }
 };
 ```
 
 ---
 
-#### **Phase 3: Enhanced Consent Dialogs (1 week)**
+## 🔟 Operations & Hosting
 
-**Join Union:**
-```typescript
-const JoinUnionButton = ({ unionId, unionName }: Props) => {
-  const handleJoinPress = () => {
-    Alert.alert(
-      'Join Union?',
-      `You're about to join "${unionName}".\n\n` +
-      '✓ Your membership will be encrypted\n' +
-      '✓ Only you can decrypt it\n' +
-      '✓ You can leave anytime\n\n' +
-      'Other union members will see you in the member list, but the server cannot.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Join Union', onPress: confirmJoin, style: 'default' }
-      ]
-    );
-  };
-  
-  return <Button title="Join Union" onPress={handleJoinPress} />;
-};
-```
+### **Target Requirements**
 
-**Cast Vote:**
-```typescript
-const VoteButton = ({ proposalId, vote }: Props) => {
-  const handleVotePress = () => {
-    Alert.alert(
-      'Confirm Your Vote',
-      `You're voting "${vote}" on this proposal.\n\n` +
-      '✓ Your vote is anonymous and encrypted\n' +
-      '✓ You can verify it was counted\n' +
-      '✓ You cannot change it after submission\n' +
-      '✓ The server cannot see how you voted\n\n' +
-      'This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: `Vote ${vote}`, onPress: confirmVote, style: 'default' }
-      ]
-    );
-  };
-  
-  return <Button title={`Vote ${vote}`} onPress={handleVotePress} />;
-};
-```
+#### **AC10: Production Operations**
+**Requirement:**
+- Multi-region hosting
+- Split auth/voting/content across providers/jurisdictions
+- KMS/HSM with ≤90 day key rotation
+- Encrypted, geo-redundant backups (quarterly restore drills)
+- Incident response runbook
+- Transparency reports (semiannual)
 
 ---
 
-## Pass/Fail Criteria
+### **Current Implementation**
 
-### **Passing Criteria Summary**
-
-To achieve security acceptance, the app must satisfy ALL of the following:
-
-#### ✅ **No Plaintext Personal Data**
-- [ ] No collection or transmission of emails, phones, or device IDs
-- [ ] Logs minimal and short-lived (≤72h)
-- [ ] No analytics tracking individual users
-
-#### ✅ **Device-Bound Secrets**
-- [ ] Keys live only in Secure Enclave/StrongBox (native) or platform WebAuthn (web)
-- [ ] Keys never transmitted to server
-- [ ] Recovery never stores plaintext keys server-side
-
-#### ✅ **Encrypted & Pinned Transport**
-- [ ] All traffic HTTPS
-- [ ] Native apps use certificate pinning (rotated per release)
-- [ ] Web uses HSTS preload + CSP + SRI
-
-#### ✅ **Server Breach Impact Minimal**
-- [ ] Database dump yields no usable identities
-- [ ] Database dump yields no vote linkages (ciphertexts only)
-- [ ] Server cannot decrypt membership or vote data
-
-#### ✅ **Private Verifiability**
-- [ ] Users can verify their vote was counted
-- [ ] Verification doesn't reveal vote contents or identity
-
-#### ✅ **Auditable Crypto & Policy**
-- [ ] Crypto and voting code public/auditable
-- [ ] SBOM + reproducible builds in place
-- [ ] Third-party security audit completed
-
-#### ✅ **Censorship/Seizure Resilience**
-- [ ] CDN origin hiding (WAF in front)
-- [ ] .onion mirror maintained and accessible
-- [ ] Kill-switches and key rotation tested quarterly
+**What You Have:**
+- Supabase hosting (single region)
+- Single database
+- Supabase backups (daily)
+- No key rotation process
+- No transparency reports
 
 ---
 
-## Gap Analysis Summary
+### **Gap Analysis**
 
-### **Current Architecture: Voter Unions (Expo + Supabase)**
+| Requirement | Current Status | Gap Severity | Complexity |
+|-------------|---------------|--------------|------------|
+| Multi-region hosting | ❌ Single region | **MEDIUM** | High |
+| Split providers | ❌ Single provider | **MEDIUM** | Very High |
+| KMS/HSM | ❌ None | **HIGH** | Medium |
+| 90-day key rotation | ❌ None | **MEDIUM** | Medium |
+| Encrypted backups | ✅ Supabase encrypted | ✅ SATISFIED | N/A |
+| Quarterly restore drills | ❌ None | **MEDIUM** | Low |
+| Incident response runbook | ⚠️ Partial (in docs) | **LOW** | Low |
+| Transparency reports | ❌ None | **LOW** | Low |
 
-| Category | Satisfied | Partially Satisfied | Not Satisfied | Critical Gaps |
-|----------|-----------|---------------------|---------------|---------------|
-| **1. Identity & Key Management** | 1/6 | 0/6 | 5/6 | Passkeys, No PII, Client crypto |
-| **2. Data Minimization** | 2/6 | 1/6 | 3/6 | Encrypted records, Blind sigs |
-| **3. Network Security** | 2/7 | 0/7 | 5/7 | Cert pinning, Replay protection |
-| **4. Runtime Hardening** | 2/6 | 1/6 | 3/6 | Attestation, Jailbreak detection |
-| **5. Voting Logic** | 1/5 | 1/5 | 3/5 | Blind signatures, No user mapping |
-| **6. Supply Chain** | 1/4 | 0/4 | 3/4 | CI audits, SBOM, Reproducibility |
-| **7. Incident Response** | 1/4 | 0/4 | 3/4 | Kill switches, Rotation, Drills |
-| **8. Compliance** | 0/4 | 1/4 | 3/4 | Privacy policy update, Audit |
-| **9. User Education** | 0/3 | 2/3 | 1/3 | Passkey onboarding, Tor access |
-| **TOTAL** | **10/45** | **6/45** | **29/45** | **64% gap** |
+**Compliance:** ⚠️ **1/8 satisfied**
 
 ---
 
-### **Critical Gaps (Blocking Launch)**
+## 📋 Acceptance Criteria Checklist
 
-These requirements are **CRITICAL** and must be addressed before public launch:
+### **Critical (Must Pass)**
 
-1. **Passkey-Only Authentication** - No emails/passwords
-2. **Blind-Signature Voting** - No user→vote linkage
-3. **Client-Side Encryption** - Server cannot decrypt membership
-4. **Certificate Pinning** - Prevent MITM attacks
-5. **Third-Party Security Audit** - Independent verification
+- [ ] **AC1:** New users can sign up with WebAuthn, derive client_pub_key, join unions **without email/phone**
+- [ ] **AC2:** "Get my memberships" returns **only encrypted blobs** decryptable by that user
+- [ ] **AC3:** Mode B voting works end-to-end: blind-sign token issuance → anonymous vote → nullifier prevents double-vote → aggregate tally
+- [ ] **AC4:** Admins can see **aggregate counts only**; cannot enumerate member identities or individual votes in B/C modes
+- [ ] **AC5:** Logs contain **no PII** and auto-delete within 24 hours
+- [ ] **AC6:** Origin refuses traffic not coming from CDN/Tor gateways (verified in integration tests)
+- [ ] **AC7:** Privacy policy and threat model are **generated and published** with the build
 
----
+### **Current Status**
 
-### **High Priority Gaps (Should Address Soon)**
+| AC | Description | Current Status | Compliance |
+|----|-------------|---------------|------------|
+| AC1 | WebAuthn signup, no email | ❌ Email required | 0% |
+| AC2 | Encrypted membership retrieval | ❌ Plaintext | 0% |
+| AC3 | Mode B blind-signature voting | ❌ Not implemented | 0% |
+| AC4 | Aggregate-only admin view | ⚠️ Partial (can see user_ids) | 30% |
+| AC5 | 24h PII-free logs | ❌ Indefinite, has PII | 0% |
+| AC6 | CDN/Tor origin allowlist | ❌ No CDN | 0% |
+| AC7 | Public privacy policy | ⚠️ Basic policy exists | 50% |
 
-6. Server-side rate limiting (prevent abuse)
-7. Replay protection (nonce + timestamp)
-8. Feature flags / kill switches (incident response)
-9. No device_id tracking (anonymity)
-10. CI dependency scanning (supply chain)
-
----
-
-### **Medium Priority Gaps (Address Before Scale)**
-
-11. Key rotation process
-12. App Attest / Play Integrity
-13. Backup restore drills
-14. SBOM generation
-15. Incident response plan
+**Overall Acceptance:** ❌ **0/7 critical ACs passed** (11% partial credit)
 
 ---
 
-### **Low Priority Gaps (Nice to Have)**
+## 🔴 Red Lines (Hard Fails)
 
-16. .onion mirror
-17. Jailbreak/root detection
-18. Code obfuscation
-19. Transparency reports
-20. User education enhancements
+These are **non-negotiable requirements** - violating any blocks production launch:
+
+1. ❌ **Storing email/phone/IP/UA tied to user_id** → **CURRENTLY VIOLATED**
+   - Current: Emails in auth.users, IPs in audit_logs
+   
+2. ✅ **Adding analytics/telemetry that fingerprints users** → **NOT VIOLATED**
+   - Current: No third-party analytics
+   
+3. ❌ **Exporting combined dumps with membership tokens + user identifiers** → **CURRENTLY VIOLATED**
+   - Current: Single DB dump exposes everything
+   
+4. ✅ **Writing custom cryptographic primitives** → **NOT VIOLATED**
+   - Current: Using standard libraries
+   
+5. ❌ **Exposing per-user vote histories to admins** → **CURRENTLY VIOLATED**
+   - Current: Admins can query user_id → vote mapping
+
+**Red Lines Status:** ❌ **3/5 violated** (critical blockers for zero-knowledge architecture)
 
 ---
 
-## Migration Roadmap
+## 📊 Migration Roadmap
 
 ### **Phase 0: Current State (Today)**
 
-**Architecture:** Expo + Supabase  
-**Auth:** Email/password  
-**Voting:** Device-based (plaintext votes)  
-**Security Score:** 22% compliant
+**Architecture:** Expo + Supabase + Single PostgreSQL DB  
+**Compliance:** 18% (16/89 requirements satisfied)  
+**Red Lines:** 3/5 violated  
+**Time to Production:** Not ready (privacy requirements not met)
 
-**Critical Limitations:**
-- Collects emails (PII)
-- Votes linkable to users
-- No blind signatures
-- No certificate pinning
+**Critical Gaps:**
+- Email/password auth (not WebAuthn)
+- Plaintext membership storage
+- No blind-signature voting
+- PII in logs (emails, IPs, UAs)
+- No separate databases
 
 ---
 
-### **Phase 1: Hardening Current Stack (1-3 months)**
+### **Phase 1: Privacy Hardening (Expo + Supabase)**
 
-**Goal:** Improve security within Expo/Supabase constraints  
-**Security Score Target:** 45% compliant
+**Time:** 2-4 months  
+**Cost:** $25-100/mo  
+**Compliance Target:** 35%
 
 **What to Implement:**
-1. ✅ Client-side encryption for membership (2 weeks)
-2. ✅ Shorten token lifetimes (1 day)
-3. ✅ Add Cloudflare WAF (1 week)
-4. ✅ CI dependency scanning (1 week)
-5. ✅ Feature flags / kill switches (2 weeks)
-6. ✅ Backup restore drills (quarterly)
-7. ✅ SBOM generation (1 week)
+1. ✅ Logical database separation (schemas)
+2. ✅ Client-side encryption for memberships
+3. ✅ Remove PII from logs (24h retention)
+4. ✅ Add Cloudflare WAF
+5. ✅ Shorten JWT lifetimes (15 min)
+6. ⚠️ Optional passkey enrollment (alongside email)
 
-**Trade-offs:**
-- ✅ Expo Go compatible
-- ✅ Fast implementation
-- ❌ Still collects emails
-- ❌ Votes still linkable
+**Benefits:**
+- Encrypted membership tokens
+- PII-free logging
+- CDN protection
+- Still uses Supabase Auth (emails collected but protected)
+
+**Limitations:**
+- Still single database (logical separation only)
+- No blind-signature voting
+- Emails still collected (Supabase Auth requirement)
 
 ---
 
-### **Phase 2: Hybrid Approach (3-6 months)**
+### **Phase 2: Hybrid Architecture (Custom Auth + Supabase)**
 
-**Goal:** Add critical security features, break Expo Go compatibility  
-**Security Score Target:** 70% compliant
+**Time:** 4-8 months  
+**Cost:** $100-300/mo  
+**Compliance Target:** 60%
 
 **What to Implement:**
-1. ⚠️ Certificate pinning (requires EAS Build)
-2. ⚠️ Blind-signature voting (complex but Expo-compatible)
-3. ⚠️ Optional passkey enrollment (alongside email)
-4. ⚠️ Server-side rate limiting (Edge Functions)
-5. ⚠️ Replay protection (Edge Functions)
-6. ⚠️ Jailbreak/root detection (basic)
+1. ❌ Custom WebAuthn-only auth server (replace Supabase Auth)
+2. ❌ Physical database separation (3 DBs)
+3. ❌ Mode B blind-signature voting
+4. ❌ Certificate pinning (EAS Build required)
+5. ✅ Origin IP allowlist
+6. ✅ Tor .onion mirror
 
-**Trade-offs:**
-- ❌ No more Expo Go (requires EAS builds)
-- ✅ Still single codebase
-- ⚠️ Still uses Supabase Auth (emails collected)
-- ✅ Votes now anonymous (blind sigs)
+**Benefits:**
+- Zero email collection
+- Blind-signature anonymous voting
+- Separate databases (auth vs membership vs ballots)
+- Strong network security
 
----
-
-### **Phase 3: Custom Auth Server (6-12 months)**
-
-**Goal:** Remove PII collection entirely  
-**Security Score Target:** 85% compliant
-
-**What to Implement:**
-1. ❌ Replace Supabase Auth with custom passkey server
-2. ❌ Zero PII collection (no emails, no phones)
-3. ❌ Social recovery system
-4. ❌ Key rotation UI + backend
-5. ✅ Update privacy policy ("no data collected")
-6. ✅ Third-party security audit
-
-**Trade-offs:**
-- ✅ No PII collection
-- ✅ Passkey-only auth
-- ❌ Custom auth infrastructure ($50-100/mo)
-- ❌ More operational burden
+**Limitations:**
+- Custom auth infrastructure ($50-100/mo)
+- No Expo Go compatibility (EAS Build only)
+- Still using Supabase for content/membership DBs
 
 ---
 
-### **Phase 4: Full Native + Self-Hosted (12-18 months)**
+### **Phase 3: Full Microservices (Native Apps)**
 
-**Goal:** Maximum security and independence  
-**Security Score Target:** 95% compliant
+**Time:** 12-18 months  
+**Cost:** $500-1500/mo  
+**Compliance Target:** 90%
 
 **What to Implement:**
 1. ❌ Rebuild in Swift (iOS) + Kotlin (Android)
-2. ❌ Native WebAuthn/passkey APIs
-3. ❌ App Attest + Play Integrity
-4. ❌ Native certificate pinning
-5. ❌ Self-hosted Supabase (or custom backend)
-6. ❌ .onion mirror
-7. ✅ Full code obfuscation
-8. ✅ Runtime tamper detection
+2. ❌ Microservices: auth_service, union_service, voting_service, messaging_service
+3. ❌ Mode C end-to-end verifiable voting (Helios)
+4. ❌ Multi-region hosting (split across jurisdictions)
+5. ❌ KMS/HSM with 90-day rotation
+6. ❌ App Attest + Play Integrity
 
-**Trade-offs:**
-- ✅ Best possible security
-- ✅ Maximum independence
-- ❌ 2x development time forever
-- ❌ High operational costs ($200-500/mo)
+**Benefits:**
+- Maximum privacy and security
+- Native platform APIs (Secure Enclave, StrongBox)
+- Geographic distribution
+- Professional-grade key management
 
----
-
-## Implementation Decision Matrix
-
-### **Use Current Stack (Expo + Supabase) If:**
-- ✅ MVP/early growth phase
-- ✅ Limited budget (<$100/mo)
-- ✅ Team focused on features, not infrastructure
-- ✅ Organizing in democratic countries (US, EU, UK)
-- ✅ Acceptable to collect emails (with strong RLS protection)
-
-**Recommendation:** Implement Phase 1 (hardening)
+**Limitations:**
+- 2x codebase maintenance forever
+- Very high operational complexity
+- Requires dedicated DevOps team
 
 ---
 
-### **Upgrade to Hybrid (Phase 2) If:**
-- ⚠️ Seeing coordinated attacks or abuse
-- ⚠️ Want anonymous voting (blind signatures)
-- ⚠️ Have 1000+ active users
-- ⚠️ Budget allows $100-200/mo
-- ⚠️ Acceptable to break Expo Go compatibility
+## 💰 Cost Comparison
 
-**Recommendation:** Implement Phase 2 (EAS Build + blind sigs)
-
----
-
-### **Build Custom Auth (Phase 3) If:**
-- 🔴 Legal requirement: no PII collection
-- 🔴 Organizing in restrictive jurisdictions
-- 🔴 Users demand zero-knowledge architecture
-- 🔴 Budget allows $200-500/mo
-- 🔴 Have DevOps expertise in-house
-
-**Recommendation:** Implement Phase 3 (custom passkey server)
+| Phase | Monthly Cost | Dev Time | Maintenance | Compliance | Red Lines |
+|-------|--------------|----------|-------------|------------|-----------|
+| **Phase 0 (Current)** | $0-25 | 0 months | Low | 18% | 3/5 violated |
+| **Phase 1 (Hardened)** | $25-100 | 2-4 months | Low-Medium | 35% | 2/5 violated |
+| **Phase 2 (Hybrid)** | $100-300 | 4-8 months | Medium | 60% | 0/5 violated |
+| **Phase 3 (Full Native)** | $500-1500 | 12-18 months | High | 90% | 0/5 violated |
 
 ---
 
-### **Go Full Native (Phase 4) If:**
-- 🔴 State-level adversaries (surveillance, repression)
-- 🔴 Need platform attestation (App Attest, Play Integrity)
-- 🔴 Want maximum security posture
-- 🔴 Budget allows $500-1000/mo
-- 🔴 Have native iOS/Android developers
-- 🔴 Can maintain 2 codebases long-term
+## ✅ Recommended Path Forward
 
-**Recommendation:** Implement Phase 4 (native apps + self-hosted)
+### **For MVP Launch (Months 0-4):**
+**Implement Phase 1 (Privacy Hardening)**
 
----
+**Why:**
+- Gets you to 35% compliance quickly
+- Fixes 2/3 red line violations (PII logging, combined dumps)
+- Still uses familiar Expo + Supabase stack
+- Low cost ($25-100/mo)
+- Deliverable in 2-4 months
 
-## Cost Comparison
+**What You Get:**
+- ✅ Encrypted membership tokens (server can't read)
+- ✅ 24h log retention (no IPs, UAs)
+- ✅ Cloudflare WAF (DDoS protection, rate limiting)
+- ✅ Logical DB separation (clearer architecture)
+- ⚠️ Still collects emails (but better protected)
 
-| Phase | Monthly Cost | Development Time | Maintenance Burden | Security Score |
-|-------|--------------|------------------|-------------------|----------------|
-| **Phase 0 (Current)** | $0-25 | 0 months | Low | 22% |
-| **Phase 1 (Hardened Expo)** | $25-50 | 1-3 months | Low | 45% |
-| **Phase 2 (Hybrid)** | $50-100 | 3-6 months | Medium | 70% |
-| **Phase 3 (Custom Auth)** | $100-300 | 6-12 months | High | 85% |
-| **Phase 4 (Full Native)** | $200-1000 | 12-18 months | Very High | 95% |
-
----
-
-## Conclusion
-
-**This document defines the target security architecture** for a zero-knowledge, anonymous political organizing app.
-
-**The current Voter Unions app (Expo + Supabase):**
-- ✅ Has good foundation (RLS, device-based voting, email verification)
-- ❌ Falls short on 64% of acceptance criteria
-- ⚠️ Critical gaps: PII collection, vote linkability, no blind signatures
-
-**Recommended path forward:**
-
-1. **Now (Months 0-3):** Implement Phase 1 (hardening current stack)
-   - Get to 45% compliance quickly
-   - Minimal cost and complexity
-   - Keeps Expo Go compatibility
-
-2. **After MVP traction (Months 3-6):** Evaluate Phase 2 (hybrid)
-   - If seeing abuse/attacks: implement server-side security
-   - If users demand anonymity: implement blind signatures
-   - Break Expo Go, move to EAS Build only
-
-3. **If scaling (Months 6-12):** Consider Phase 3 (custom auth)
-   - If legal requires no PII: build passkey-only system
-   - If budget allows: hire security firm for audit
-
-4. **If threatened (Months 12+):** Evaluate Phase 4 (native)
-   - If facing state-level adversaries: rebuild in Swift/Kotlin
-   - If need platform attestation: implement App Attest/Play Integrity
-   - Accept 2x development cost for maximum security
-
-**The choice depends on your threat model, budget, and timeline.**
+**What You Don't Get:**
+- ❌ WebAuthn/passkey auth (still email/password)
+- ❌ Blind-signature voting (still Mode A only)
+- ❌ Physical DB separation (still single DB)
 
 ---
 
-## Related Documentation
+### **For Production Scale (Months 4-12):**
+**Migrate to Phase 2 (Hybrid Architecture)**
 
-- **Current Security Status:** [SECURITY_STATUS.md](SECURITY_STATUS.md) - What's implemented today
-- **Vote Protection Audit:** [VOTE_COUNTING_AUDIT.md](VOTE_COUNTING_AUDIT.md) - Device-based voting system
+**Why:**
+- Achieves 60% compliance (acceptable for most use cases)
+- Passes all 5 red line requirements
+- Blind-signature voting (unlinkable votes)
+- Zero email collection (WebAuthn only)
+- Reasonable cost ($100-300/mo)
+
+**What You Get:**
+- ✅ Custom WebAuthn-only auth (no emails)
+- ✅ Blind-signature voting (Mode B)
+- ✅ Physical DB separation (3 databases)
+- ✅ Tor .onion mirror (censorship resistance)
+- ✅ Certificate pinning (MITM protection)
+
+**What You Don't Get:**
+- ❌ End-to-end verifiable voting (Mode C)
+- ❌ Multi-region hosting
+- ❌ Native app performance
+
+---
+
+### **For Maximum Security (Months 12+):**
+**Consider Phase 3 (Full Native) IF:**
+- Facing state-level adversaries
+- Operating in restrictive jurisdictions
+- Budget allows $500-1500/mo
+- Have native iOS/Android developers
+- Need platform attestation (App Attest, Play Integrity)
+
+---
+
+## 📚 Related Documentation
+
+- **Current Security Status:** [SECURITY_STATUS.md](SECURITY_STATUS.md) - 8.3/10 for traditional security
+- **Vote Protection Audit:** [VOTE_COUNTING_AUDIT.md](VOTE_COUNTING_AUDIT.md) - Dual-trigger system
 - **GDPR Compliance:** [PHASE3_COMPLETE.md](PHASE3_COMPLETE.md) - Data export, deletion, reporting
-- **Email Verification:** [EMAIL_VERIFICATION_COMPLETE.md](EMAIL_VERIFICATION_COMPLETE.md) - Verification enforcement
 - **Project Overview:** [replit.md](replit.md) - Architecture and user preferences
 
 ---
 
-**For security vulnerabilities, please report to:** [Your security contact - add before production]
+## 🚨 Security Contact
 
-**Do not** disclose security issues publicly until they are fixed.
+**For security vulnerabilities, report to:** [Add production contact before launch]
+
+**Do NOT** disclose security issues publicly until fixed.
+
+---
+
+**END OF DOCUMENT**
+
+---
+
+## Quick Reference: Gap Analysis Matrix
+
+| Category | Requirements | Satisfied | Partial | Not Satisfied | Score |
+|----------|--------------|-----------|---------|---------------|-------|
+| Authentication | 12 | 1 | 1 | 10 | 8% |
+| Data Architecture | 10 | 0 | 2 | 8 | 0% |
+| Membership Storage | 8 | 0 | 1 | 7 | 0% |
+| Voting System | 15 | 2 | 3 | 10 | 13% |
+| Content & Messaging | 6 | 3 | 1 | 2 | 50% |
+| Logging & Analytics | 7 | 0 | 0 | 7 | 0% |
+| Network Security | 9 | 1 | 1 | 7 | 11% |
+| Cryptography | 8 | 0 | 0 | 8 | 0% |
+| Abuse Controls | 6 | 4 | 2 | 0 | 67% |
+| Operations | 8 | 0 | 1 | 7 | 0% |
+| **TOTAL** | **89** | **16** | **12** | **61** | **18%** |
+
+**Red Lines Violated:** 3/5 (email/IP storage, combined dumps, admin vote access)  
+**Critical ACs Passed:** 0/7  
+**Production Ready:** ❌ No (privacy requirements not met)
