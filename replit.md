@@ -123,17 +123,23 @@ The application is undergoing a phased migration from Supabase email/password au
   - Rollout tests (`src/utils/migration/__tests__/rollout.test.ts`)
   - Adapter security tests (`src/services/data/__tests__/adapter.test.ts`)
 
+**Week 3 Completed (2025-10-19):**
+- ✅ Auth service backend fully implemented
+- ✅ WebAuthn registration and authentication endpoints
+- ✅ JWT token generation and session management
+- ✅ Security features (rate limiting, CORS, validation)
+- ✅ Comprehensive documentation (README, deployment guide)
+- ✅ Critical credential storage bug fixed (architect review)
+
 **Pending:**
-- [ ] Complete testing and verification
-- [ ] Update documentation
-- [ ] Proceed to Week 3 (Backend WebAuthn Registration)
+- [ ] Proceed to Week 5 (Frontend Integration - Week 4 not needed, auth already complete)
 
 ### Migration Timeline
 
-- **Week 0** (Current): Pre-migration preparation ⏳
-- **Week 3**: Backend WebAuthn registration
-- **Week 4**: Backend WebAuthn authentication
-- **Week 5**: Frontend integration
+- **Week 0** ✅ Complete: Pre-migration preparation
+- **Week 3** ✅ Complete: Backend WebAuthn auth service (registration + authentication + session management)
+- **Week 4** ⏭️ Skipped: Already implemented in Week 3
+- **Week 5** ⏳ Next: Frontend integration
 - **Week 6**: Testing & gradual rollout (10% → 100%)
 - **Week 7**: Cleanup & full deployment
 
