@@ -91,8 +91,12 @@ export async function registerRoutes(fastify: FastifyInstance) {
       }
       
       const { credential: verifiedCredential } = verification.registrationInfo;
-      const credentialID = verifiedCredential.id;
-      const credentialPublicKey = verifiedCredential.publicKey;
+      
+      // CRITICAL: In SimpleWebAuthn v11, credential.id is a Uint8Array
+      // We need to store it as base64url string for database compatibility
+      // and to match the credential.id sent by the browser during authentication
+      const credentialID = Buffer.from(verifiedCredential.id).toString('base64url');
+      const credentialPublicKey = Buffer.from(verifiedCredential.publicKey).toString('base64url');
       const counter = verifiedCredential.counter;
       
       // Start database transaction
@@ -106,15 +110,15 @@ export async function registerRoutes(fastify: FastifyInstance) {
           [userId]
         );
         
-        // Store credential
+        // Store credential (credential_id is stored as base64url string)
         await client.query(
           `INSERT INTO webauthn_credentials 
            (user_id, credential_id, public_key, counter) 
            VALUES ($1, $2, $3, $4)`,
           [
             userId,
-            Buffer.from(credentialID).toString('base64url'),
-            Buffer.from(credentialPublicKey).toString('base64url'),
+            credentialID,
+            credentialPublicKey,
             counter,
           ]
         );

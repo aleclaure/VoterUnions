@@ -100,14 +100,16 @@ export async function authRoutes(fastify: FastifyInstance) {
       const storedCredential = result.rows[0];
       
       // Verify authentication response
+      // Note: credential_id and public_key are stored as base64url strings in database
+      // We need to convert them back to Uint8Array for SimpleWebAuthn
       const verification = await verifyAuthenticationResponse({
         response: credential as AuthenticationResponseJSON,
         expectedChallenge,
         expectedOrigin: RP_ORIGIN,
         expectedRPID: RP_ID,
         credential: {
-          id: storedCredential.credential_id,
-          publicKey: storedCredential.public_key,
+          id: Buffer.from(storedCredential.credential_id, 'base64url'),
+          publicKey: Buffer.from(storedCredential.public_key, 'base64url'),
           counter: storedCredential.counter,
         },
       });
