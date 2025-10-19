@@ -11,14 +11,16 @@
 
 1. [Pre-Migration Analysis](#pre-migration-analysis)
 2. [Migration Strategy](#migration-strategy)
-3. [Overview](#overview)
-4. [Week 3: Backend WebAuthn Registration](#week-3-backend-webauthn-registration)
-5. [Week 4: Backend WebAuthn Authentication](#week-4-backend-webauthn-authentication)
-6. [Week 5: Frontend Integration](#week-5-frontend-integration)
-7. [Critical Migration Tasks](#critical-migration-tasks)
-8. [Testing & Validation](#testing--validation)
-9. [Deployment Checklist](#deployment-checklist)
-10. [Rollback Procedures](#rollback-procedures)
+3. [Risk Mitigation Strategies](#risk-mitigation-strategies)
+4. [Overview](#overview)
+5. [Week 0: Pre-Migration Preparation](#week-0-pre-migration-preparation) ⭐ **START HERE**
+6. [Week 3: Backend WebAuthn Registration](#week-3-backend-webauthn-registration)
+7. [Week 4: Backend WebAuthn Authentication](#week-4-backend-webauthn-authentication)
+8. [Week 5: Frontend Integration](#week-5-frontend-integration)
+9. [Critical Migration Tasks](#critical-migration-tasks)
+10. [Testing & Validation](#testing--validation)
+11. [Deployment Checklist](#deployment-checklist)
+12. [Rollback Procedures](#rollback-procedures)
 
 ---
 
@@ -1065,7 +1067,7 @@ Replace Supabase email/password authentication with a custom WebAuthn-based auth
 ┌─────────────────────────────────────────────────────────┐
 │              PostgreSQL (users table)                   │
 │                                                          │
-│  - user_id (ULID, primary key)                          │
+│  - user_id (UUID, primary key) ✅ Changed from ULID     │
 │  - webauthn_credential_id (unique)                      │
 │  - webauthn_public_key (bytes)                          │
 │  - client_pub_key (Ed25519 public key)                  │
@@ -1074,6 +1076,8 @@ Replace Supabase email/password authentication with a custom WebAuthn-based auth
 │                                                          │
 │  ❌ NO email column                                     │
 │  ❌ NO password_hash column                             │
+│                                                          │
+│  ℹ️  UUID preserves compatibility with Supabase        │
 │                                                          │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -1091,7 +1095,948 @@ Replace Supabase email/password authentication with a custom WebAuthn-based auth
 - `react-native-passkey` - WebAuthn for React Native
 - `@noble/curves` - Ed25519 key generation
 - `expo-secure-store` - Hardware-backed key storage
-- `ulid` - User ID generation
+- `uuid` - User ID generation (changed from `ulid` to preserve compatibility)
+
+---
+
+## 📅 Week 0: Pre-Migration Preparation
+
+**Duration:** 1-3 days  
+**Goal:** Set up safety mechanisms BEFORE building the auth service  
+**When:** Do this NOW, before Week 3  
+**Why:** Reduces migration risk from CRITICAL → MANAGEABLE
+
+---
+
+### **Overview: What You'll Build This Week**
+
+This week is about **infrastructure preparation**. You're NOT building the auth service yet - you're setting up the safety mechanisms that will make the migration safe:
+
+1. ✅ **Feature flag system** - Toggle auth methods easily
+2. ✅ **Data adapter layer** - Work with both Supabase AND new API
+3. ✅ **Configuration templates** - Environment variables ready
+4. ✅ **Migration utilities** - UUID generation, rollout logic
+5. ✅ **Documentation** - Migration checklists and procedures
+
+**Key Principle:** These changes work WITH your existing Supabase auth. Nothing breaks!
+
+---
+
+### **Task 0.1: Create Feature Flag Configuration**
+
+**Goal:** Add feature flags to control email verification and backend selection.
+
+**Why:** Single toggle to switch between Supabase and WebAuthn auth without code changes.
+
+---
+
+#### **Step 1: Create config file**
+
+**Create `voter-unions/src/config.ts`:**
+
+```typescript
+/**
+ * Application Configuration
+ * 
+ * Feature flags for migration safety:
+ * - REQUIRE_EMAIL_VERIFICATION: Toggle email verification guards
+ * - USE_WEBAUTHN: Switch between Supabase and WebAuthn auth
+ * - USE_NEW_BACKEND: Switch between Supabase and new API for data
+ */
+
+// Helper to parse boolean env vars
+const parseBoolean = (value: string | undefined, defaultValue: boolean = false): boolean => {
+  if (!value) return defaultValue;
+  return value.toLowerCase() === 'true';
+};
+
+export const CONFIG = {
+  // Feature Flags - Control migration behavior
+  REQUIRE_EMAIL_VERIFICATION: parseBoolean(
+    process.env.EXPO_PUBLIC_REQUIRE_EMAIL_VERIFICATION,
+    true // Default: true (keep current behavior)
+  ),
+  
+  USE_WEBAUTHN: parseBoolean(
+    process.env.EXPO_PUBLIC_USE_WEBAUTHN,
+    false // Default: false (use Supabase)
+  ),
+  
+  USE_NEW_BACKEND: parseBoolean(
+    process.env.EXPO_PUBLIC_USE_NEW_BACKEND,
+    false // Default: false (use Supabase for data)
+  ),
+  
+  // API Configuration
+  API_URL: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001',
+  
+  // Rollout Configuration (for gradual deployment)
+  WEBAUTHN_ROLLOUT_PERCENT: parseInt(
+    process.env.EXPO_PUBLIC_WEBAUTHN_ROLLOUT_PERCENT || '0'
+  ),
+} as const;
+
+// Validation - fail fast on invalid config
+if (CONFIG.WEBAUTHN_ROLLOUT_PERCENT < 0 || CONFIG.WEBAUTHN_ROLLOUT_PERCENT > 100) {
+  throw new Error('WEBAUTHN_ROLLOUT_PERCENT must be between 0 and 100');
+}
+
+// Log configuration on startup (useful for debugging)
+console.log('📋 App Configuration:', {
+  requireEmailVerification: CONFIG.REQUIRE_EMAIL_VERIFICATION,
+  useWebAuthn: CONFIG.USE_WEBAUTHN,
+  useNewBackend: CONFIG.USE_NEW_BACKEND,
+  apiUrl: CONFIG.API_URL,
+  webauthnRollout: `${CONFIG.WEBAUTHN_ROLLOUT_PERCENT}%`,
+});
+```
+
+**Deliverable:** ✅ Feature flag configuration created
+
+---
+
+#### **Step 2: Update email verification service**
+
+**Edit `voter-unions/src/services/emailVerification.ts`:**
+
+Add the feature flag check at the top of the `guardAction` function:
+
+```typescript
+import { CONFIG } from '../config';
+
+export const guardAction = async (
+  action: keyof typeof PROTECTED_ACTIONS
+): Promise<boolean> => {
+  // 🔧 FEATURE FLAG - Disable all email verification guards
+  if (!CONFIG.REQUIRE_EMAIL_VERIFICATION) {
+    console.log(`✅ Email verification disabled, allowing ${action}`);
+    return true; // Allow all actions when flag is false
+  }
+  
+  // Existing email verification logic continues below...
+  // (keep all the existing code)
+  
+  const verification = await checkEmailVerification(user);
+  
+  if (!verification.isVerified) {
+    Alert.alert(
+      'Email Verification Required',
+      `You need to verify your email to ${PROTECTED_ACTIONS[action]}`
+    );
+    return false;
+  }
+  
+  return true;
+};
+```
+
+**Deliverable:** ✅ Email verification guards now controllable via feature flag
+
+---
+
+#### **Step 3: Create environment variable template**
+
+**Create `voter-unions/.env.example`:**
+
+```bash
+# =============================================================================
+# United Unions - Environment Variables Template
+# =============================================================================
+# Copy this file to .env and fill in your values
+# DO NOT commit .env to version control!
+
+# -----------------------------------------------------------------------------
+# Supabase Configuration (Current System)
+# -----------------------------------------------------------------------------
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+
+# -----------------------------------------------------------------------------
+# Feature Flags - Migration Control
+# -----------------------------------------------------------------------------
+
+# Email Verification (default: true)
+# Set to 'false' to disable email verification guards during WebAuthn migration
+EXPO_PUBLIC_REQUIRE_EMAIL_VERIFICATION=true
+
+# WebAuthn Authentication (default: false)
+# Set to 'true' to use WebAuthn instead of Supabase auth
+# WARNING: Only enable after Week 5 is complete!
+EXPO_PUBLIC_USE_WEBAUTHN=false
+
+# New Backend API (default: false)
+# Set to 'true' to use new API instead of Supabase for data queries
+# WARNING: Only enable after backend services are deployed!
+EXPO_PUBLIC_USE_NEW_BACKEND=false
+
+# -----------------------------------------------------------------------------
+# New Backend Configuration (Week 3+)
+# -----------------------------------------------------------------------------
+
+# Auth Service URL (Week 3-5)
+# Local development: http://localhost:3001
+# Production: https://api.unitedunions.app
+EXPO_PUBLIC_API_URL=http://localhost:3001
+
+# WebAuthn Rollout Percentage (Week 6)
+# Controls gradual rollout: 0 = disabled, 100 = all users
+# Recommended schedule: 10 → 25 → 50 → 75 → 100
+EXPO_PUBLIC_WEBAUTHN_ROLLOUT_PERCENT=0
+
+# -----------------------------------------------------------------------------
+# Session Configuration
+# -----------------------------------------------------------------------------
+SESSION_SECRET=your-session-secret-here-change-in-production
+```
+
+**Deliverable:** ✅ Environment variable template created
+
+---
+
+#### **Step 4: Update .gitignore**
+
+**Edit `voter-unions/.gitignore`:**
+
+Add this if not already present:
+
+```bash
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Don't ignore the example template
+!.env.example
+```
+
+**Deliverable:** ✅ Environment files properly configured
+
+---
+
+### **Task 0.2: Create Data Adapter Layer**
+
+**Goal:** Build abstraction layer that works with BOTH Supabase and new API.
+
+**Why:** Allows gradual migration - don't need to change 50+ files at once.
+
+---
+
+#### **Step 1: Create adapter directory structure**
+
+```bash
+mkdir -p voter-unions/src/services/data
+touch voter-unions/src/services/data/adapter.ts
+touch voter-unions/src/services/data/supabase-data.ts
+touch voter-unions/src/services/data/api-data.ts
+touch voter-unions/src/services/data/types.ts
+```
+
+---
+
+#### **Step 2: Define data types**
+
+**Create `voter-unions/src/services/data/types.ts`:**
+
+```typescript
+/**
+ * Shared data types for adapter layer
+ * These types are used by both Supabase and API implementations
+ */
+
+export interface Profile {
+  id: string;
+  display_name: string;
+  username_normalized: string;
+  bio: string | null;
+  avatar_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Union {
+  id: string;
+  name: string;
+  description: string;
+  is_public: boolean;
+  member_count: number;
+  issue_tags: string[];
+  created_by: string;
+  created_at: string;
+}
+
+export interface Post {
+  id: string;
+  content: string;
+  union_id: string;
+  author_pseudonym: string;
+  is_public: boolean;
+  upvotes: number;
+  downvotes: number;
+  comment_count: number;
+  created_at: string;
+}
+
+export interface Comment {
+  id: string;
+  post_id: string;
+  content: string;
+  author_pseudonym: string;
+  created_at: string;
+}
+
+// Add more types as needed...
+```
+
+**Deliverable:** ✅ Shared types defined
+
+---
+
+#### **Step 3: Implement Supabase adapter**
+
+**Create `voter-unions/src/services/data/supabase-data.ts`:**
+
+```typescript
+/**
+ * Supabase Data Adapter
+ * Implements data access using current Supabase backend
+ */
+
+import { supabase } from '../supabase';
+import type { Profile, Union, Post, Comment } from './types';
+
+// -----------------------------------------------------------------------------
+// Profiles
+// -----------------------------------------------------------------------------
+
+export const getProfile = async (userId: string): Promise<Profile | null> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+  
+  if (error) {
+    console.error('Error fetching profile:', error);
+    throw error;
+  }
+  
+  return data;
+};
+
+export const updateProfile = async (
+  userId: string,
+  updates: Partial<Profile>
+): Promise<Profile> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', userId)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+};
+
+// -----------------------------------------------------------------------------
+// Unions
+// -----------------------------------------------------------------------------
+
+export const getUnion = async (unionId: string): Promise<Union | null> => {
+  const { data, error } = await supabase
+    .from('unions')
+    .select('*')
+    .eq('id', unionId)
+    .single();
+  
+  if (error) throw error;
+  return data;
+};
+
+export const getUnions = async (): Promise<Union[]> => {
+  const { data, error } = await supabase
+    .from('unions')
+    .select('*')
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data || [];
+};
+
+// -----------------------------------------------------------------------------
+// Posts
+// -----------------------------------------------------------------------------
+
+export const getPosts = async (unionId: string): Promise<Post[]> => {
+  const { data, error } = await supabase
+    .from('posts')
+    .select('*')
+    .eq('union_id', unionId)
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data || [];
+};
+
+export const createPost = async (params: {
+  unionId: string;
+  content: string;
+  userId: string;
+  isPublic: boolean;
+}): Promise<Post> => {
+  const { data, error } = await supabase
+    .from('posts')
+    .insert({
+      union_id: params.unionId,
+      content: params.content,
+      user_id: params.userId,
+      is_public: params.isPublic,
+    })
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+};
+
+// -----------------------------------------------------------------------------
+// Comments
+// -----------------------------------------------------------------------------
+
+export const getComments = async (postId: string): Promise<Comment[]> => {
+  const { data, error } = await supabase
+    .from('comments')
+    .select('*')
+    .eq('post_id', postId)
+    .order('created_at', { ascending: true });
+  
+  if (error) throw error;
+  return data || [];
+};
+
+// Add more functions as needed...
+```
+
+**Deliverable:** ✅ Supabase adapter implemented
+
+---
+
+#### **Step 4: Implement API adapter (stub for now)**
+
+**Create `voter-unions/src/services/data/api-data.ts`:**
+
+```typescript
+/**
+ * API Data Adapter
+ * Implements data access using new backend API
+ * 
+ * NOTE: This is a stub implementation. Complete after Week 3-4 when
+ * the backend services are built.
+ */
+
+import { CONFIG } from '../../config';
+import type { Profile, Union, Post, Comment } from './types';
+
+// Helper function for API calls
+const apiCall = async (endpoint: string, options?: RequestInit): Promise<any> => {
+  // TODO: Get auth token from storage
+  // const token = await getAuthToken();
+  
+  const response = await fetch(`${CONFIG.API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      // 'Authorization': `Bearer ${token}`,
+      ...options?.headers,
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status} ${response.statusText}`);
+  }
+  
+  return await response.json();
+};
+
+// -----------------------------------------------------------------------------
+// Profiles (stub implementations)
+// -----------------------------------------------------------------------------
+
+export const getProfile = async (userId: string): Promise<Profile | null> => {
+  // TODO: Implement after backend is built (Week 3-4)
+  throw new Error('API backend not yet implemented. Set USE_NEW_BACKEND=false');
+  // return await apiCall(`/profiles/${userId}`);
+};
+
+export const updateProfile = async (
+  userId: string,
+  updates: Partial<Profile>
+): Promise<Profile> => {
+  throw new Error('API backend not yet implemented. Set USE_NEW_BACKEND=false');
+  // return await apiCall(`/profiles/${userId}`, {
+  //   method: 'PUT',
+  //   body: JSON.stringify(updates),
+  // });
+};
+
+// -----------------------------------------------------------------------------
+// Unions (stub implementations)
+// -----------------------------------------------------------------------------
+
+export const getUnion = async (unionId: string): Promise<Union | null> => {
+  throw new Error('API backend not yet implemented. Set USE_NEW_BACKEND=false');
+};
+
+export const getUnions = async (): Promise<Union[]> => {
+  throw new Error('API backend not yet implemented. Set USE_NEW_BACKEND=false');
+};
+
+// -----------------------------------------------------------------------------
+// Posts (stub implementations)
+// -----------------------------------------------------------------------------
+
+export const getPosts = async (unionId: string): Promise<Post[]> => {
+  throw new Error('API backend not yet implemented. Set USE_NEW_BACKEND=false');
+};
+
+export const createPost = async (params: {
+  unionId: string;
+  content: string;
+  userId: string;
+  isPublic: boolean;
+}): Promise<Post> => {
+  throw new Error('API backend not yet implemented. Set USE_NEW_BACKEND=false');
+};
+
+// -----------------------------------------------------------------------------
+// Comments (stub implementations)
+// -----------------------------------------------------------------------------
+
+export const getComments = async (postId: string): Promise<Comment[]> => {
+  throw new Error('API backend not yet implemented. Set USE_NEW_BACKEND=false');
+};
+
+// Add more stub functions as needed...
+```
+
+**Deliverable:** ✅ API adapter stub created
+
+---
+
+#### **Step 5: Create adapter interface**
+
+**Create `voter-unions/src/services/data/adapter.ts`:**
+
+```typescript
+/**
+ * Data Adapter Interface
+ * 
+ * Single point of control for switching between Supabase and API backends.
+ * Uses feature flag CONFIG.USE_NEW_BACKEND to determine which implementation to use.
+ * 
+ * Usage:
+ *   import { data } from '@/services/data/adapter';
+ *   const profile = await data.getProfile(userId);
+ */
+
+import { CONFIG } from '../../config';
+import * as SupabaseData from './supabase-data';
+import * as ApiData from './api-data';
+
+// Switch between Supabase and API based on feature flag
+export const data = CONFIG.USE_NEW_BACKEND ? ApiData : SupabaseData;
+
+// Re-export types for convenience
+export type { Profile, Union, Post, Comment } from './types';
+
+// Helper to check which backend is active (useful for debugging)
+export const getActiveBackend = (): 'supabase' | 'api' => {
+  return CONFIG.USE_NEW_BACKEND ? 'api' : 'supabase';
+};
+
+console.log(`📊 Data adapter using: ${getActiveBackend()} backend`);
+```
+
+**Deliverable:** ✅ Adapter interface created
+
+---
+
+### **Task 0.3: Create Migration Utilities**
+
+**Goal:** Build utilities for UUID generation, rollout logic, and migration helpers.
+
+---
+
+#### **Step 1: Create utilities directory**
+
+```bash
+mkdir -p voter-unions/src/utils/migration
+touch voter-unions/src/utils/migration/uuid.ts
+touch voter-unions/src/utils/migration/rollout.ts
+```
+
+---
+
+#### **Step 2: Create UUID utility**
+
+**Create `voter-unions/src/utils/migration/uuid.ts`:**
+
+```typescript
+/**
+ * UUID Utilities
+ * 
+ * Uses UUID v4 instead of ULID to maintain compatibility with Supabase.
+ * This eliminates the need for user ID migration.
+ */
+
+import { randomUUID } from 'expo-crypto';
+
+/**
+ * Generate a UUID v4
+ * 
+ * Uses expo-crypto for secure random generation.
+ * Compatible with Supabase auth.users.id format.
+ */
+export const generateUserId = (): string => {
+  return randomUUID();
+};
+
+/**
+ * Validate UUID format
+ * 
+ * Checks if a string is a valid UUID v4.
+ */
+export const isValidUUID = (id: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+};
+
+/**
+ * Preserve existing Supabase user ID or generate new one
+ * 
+ * During migration, this allows keeping existing user IDs.
+ */
+export const getUserId = (existingId?: string): string => {
+  if (existingId && isValidUUID(existingId)) {
+    return existingId; // Preserve existing ID
+  }
+  return generateUserId(); // Generate new ID
+};
+```
+
+**Deliverable:** ✅ UUID utility created
+
+---
+
+#### **Step 3: Create rollout utility**
+
+**Create `voter-unions/src/utils/migration/rollout.ts`:**
+
+```typescript
+/**
+ * Gradual Rollout Utility
+ * 
+ * Determines if a user is included in a percentage-based rollout.
+ * Uses deterministic hashing so the same user always gets the same result.
+ */
+
+import { Crypto } from 'expo-crypto';
+
+/**
+ * Check if user is in rollout percentage
+ * 
+ * @param userId - User's unique identifier
+ * @param percentage - Rollout percentage (0-100)
+ * @returns true if user should use new feature
+ * 
+ * Example:
+ *   isUserInRollout('user-123', 10) => 10% chance of true
+ *   isUserInRollout('user-123', 10) => SAME result every time for same user
+ */
+export const isUserInRollout = async (
+  userId: string,
+  percentage: number
+): Promise<boolean> => {
+  if (percentage <= 0) return false;
+  if (percentage >= 100) return true;
+  
+  // Hash the user ID to get deterministic result
+  const hash = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    userId
+  );
+  
+  // Convert first 8 characters of hash to number
+  const hashNumber = parseInt(hash.substring(0, 8), 16);
+  
+  // Map to 0-99 range
+  const userPercentile = hashNumber % 100;
+  
+  // User is in rollout if their percentile is less than target percentage
+  return userPercentile < percentage;
+};
+
+/**
+ * Get rollout status for debugging
+ */
+export const getRolloutStatus = async (
+  userId: string,
+  percentage: number
+): Promise<{
+  userId: string;
+  percentage: number;
+  inRollout: boolean;
+  userPercentile: number;
+}> => {
+  const hash = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    userId
+  );
+  const hashNumber = parseInt(hash.substring(0, 8), 16);
+  const userPercentile = hashNumber % 100;
+  const inRollout = userPercentile < percentage;
+  
+  return {
+    userId,
+    percentage,
+    inRollout,
+    userPercentile,
+  };
+};
+```
+
+**Deliverable:** ✅ Rollout utility created
+
+---
+
+### **Task 0.4: Update Documentation**
+
+**Goal:** Create migration checklists and update replit.md
+
+---
+
+#### **Step 1: Create migration checklist**
+
+**Create `voter-unions/MIGRATION_CHECKLIST.md`:**
+
+```markdown
+# WebAuthn Migration Checklist
+
+## Pre-Migration (Week 0) ✅
+
+- [ ] Feature flags configured (`src/config.ts`)
+- [ ] Data adapter layer created (`src/services/data/`)
+- [ ] Migration utilities built (`src/utils/migration/`)
+- [ ] Environment variables documented (`.env.example`)
+- [ ] Backup procedures tested
+- [ ] Migration branch created (`feature/webauthn-migration`)
+
+## Week 3-4: Backend Development
+
+- [ ] Auth service created (port 3001)
+- [ ] WebAuthn registration endpoint working
+- [ ] WebAuthn authentication endpoint working
+- [ ] JWT issuance working
+- [ ] Rate limiting implemented
+- [ ] PII-free logging implemented
+- [ ] Local testing complete
+
+## Week 5: Frontend Integration
+
+- [ ] WebAuthn screens created (sign up, sign in)
+- [ ] Auth service client created
+- [ ] Feature flags tested (both paths work)
+- [ ] Token storage working
+- [ ] Auth context updated
+- [ ] Navigation updated
+- [ ] End-to-end testing complete
+
+## Week 6: Production Rollout
+
+- [ ] Backend deployed to production
+- [ ] Database migration complete
+- [ ] Monitoring dashboard ready
+- [ ] Day 1: 10% rollout
+- [ ] Day 3: 25% rollout (if stable)
+- [ ] Day 5: 50% rollout (if stable)
+- [ ] Day 6: 75% rollout (if stable)
+- [ ] Day 7: 100% rollout (if stable)
+
+## Week 7: Cleanup
+
+- [ ] 1 week stable operation confirmed
+- [ ] Old auth code deleted
+- [ ] Supabase auth disabled
+- [ ] Documentation updated
+- [ ] Security audit complete
+```
+
+**Deliverable:** ✅ Migration checklist created
+
+---
+
+#### **Step 2: Update replit.md**
+
+**Edit `voter-unions/replit.md`:**
+
+Add this section after the "Recent Changes" section:
+
+```markdown
+## Migration Status
+
+### Phase 1A: Blue Spirit (WebAuthn Migration)
+- **Status**: Pre-Migration Preparation (Week 0)
+- **Started**: [Current Date]
+- **Target Completion**: [Target Date]
+
+**Completed:**
+- ✅ Feature flag system implemented
+- ✅ Data adapter layer created (Supabase + API)
+- ✅ Migration utilities built (UUID, rollout)
+- ✅ Environment configuration documented
+- ✅ Migration checklist created
+
+**Next Steps:**
+- Week 3-4: Build auth service backend
+- Week 5: Frontend WebAuthn integration
+- Week 6: Gradual production rollout
+- Week 7: Cleanup and stabilization
+
+**Risk Mitigation:**
+- UUID instead of ULID (eliminates ID migration)
+- Feature flags for easy rollback
+- Adapter pattern for gradual migration
+- Gradual rollout (10% → 100%)
+
+**Overall Risk:** 🟡 MANAGEABLE (reduced from 🔴 CRITICAL)
+```
+
+**Deliverable:** ✅ Documentation updated
+
+---
+
+### **Task 0.5: Testing & Validation**
+
+**Goal:** Verify all safety mechanisms work BEFORE starting Week 3.
+
+---
+
+#### **Test 1: Feature flags work**
+
+```bash
+# Test email verification can be disabled
+export EXPO_PUBLIC_REQUIRE_EMAIL_VERIFICATION=false
+npm start
+
+# Try creating post without verification (should work)
+# Try voting without verification (should work)
+
+# Re-enable verification
+export EXPO_PUBLIC_REQUIRE_EMAIL_VERIFICATION=true
+npm start
+
+# Try creating post without verification (should be blocked)
+```
+
+**Expected Result:** Feature flag controls email verification ✅
+
+---
+
+#### **Test 2: Adapter layer works**
+
+```typescript
+// In any component, test the adapter
+import { data, getActiveBackend } from '@/services/data/adapter';
+
+console.log('Active backend:', getActiveBackend()); // Should be 'supabase'
+
+// Test Supabase adapter
+const profile = await data.getProfile(userId);
+console.log('Profile:', profile); // Should fetch from Supabase
+
+// Test API adapter (should fail gracefully)
+// export EXPO_PUBLIC_USE_NEW_BACKEND=true
+// const profile = await data.getProfile(userId);
+// Should throw error: "API backend not yet implemented"
+```
+
+**Expected Result:** Supabase adapter works, API adapter gracefully fails ✅
+
+---
+
+#### **Test 3: UUID generation works**
+
+```typescript
+import { generateUserId, isValidUUID } from '@/utils/migration/uuid';
+
+const newId = generateUserId();
+console.log('New user ID:', newId);
+console.log('Is valid UUID:', isValidUUID(newId)); // Should be true
+
+// Test preservation
+const existingId = 'existing-supabase-uuid';
+const preservedId = getUserId(existingId);
+console.log('Preserved ID:', preservedId); // Should match existingId
+```
+
+**Expected Result:** UUID generation and validation works ✅
+
+---
+
+#### **Test 4: Rollout logic works**
+
+```typescript
+import { isUserInRollout, getRolloutStatus } from '@/utils/migration/rollout';
+
+const userId = 'test-user-123';
+
+// Test deterministic behavior
+const result1 = await isUserInRollout(userId, 50);
+const result2 = await isUserInRollout(userId, 50);
+console.log('Deterministic:', result1 === result2); // Should be true
+
+// Test different percentages
+const status0 = await getRolloutStatus(userId, 0);
+const status100 = await getRolloutStatus(userId, 100);
+console.log('0% rollout:', status0.inRollout); // Should be false
+console.log('100% rollout:', status100.inRollout); // Should be true
+```
+
+**Expected Result:** Rollout logic is deterministic and works ✅
+
+---
+
+### **Week 0 Deliverables Checklist**
+
+- [ ] `src/config.ts` created with feature flags
+- [ ] `src/services/emailVerification.ts` updated with flag check
+- [ ] `.env.example` created with all variables
+- [ ] `.gitignore` updated to exclude `.env`
+- [ ] `src/services/data/` directory created
+- [ ] `src/services/data/types.ts` with shared types
+- [ ] `src/services/data/supabase-data.ts` implemented
+- [ ] `src/services/data/api-data.ts` stub created
+- [ ] `src/services/data/adapter.ts` interface created
+- [ ] `src/utils/migration/uuid.ts` utility created
+- [ ] `src/utils/migration/rollout.ts` utility created
+- [ ] `MIGRATION_CHECKLIST.md` created
+- [ ] `replit.md` updated with migration status
+- [ ] All tests passing
+- [ ] App still works with Supabase (nothing broken!)
+
+**When all items checked:** You're ready for Week 3! 🎉
+
+---
+
+### **Key Principles for Week 0**
+
+1. **Nothing breaks** - All changes work WITH existing Supabase system
+2. **Feature flags default to OFF** - New behavior is opt-in
+3. **Graceful failures** - API adapter clearly states it's not implemented yet
+4. **Easy rollback** - Just flip flags back to defaults
+5. **Documentation first** - Write down the plan before executing
+
+**Result:** Risk reduced from 🔴 CRITICAL → 🟡 MANAGEABLE before you even start building!
 
 ---
 
