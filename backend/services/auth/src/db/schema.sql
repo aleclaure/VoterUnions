@@ -46,7 +46,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 CREATE TABLE IF NOT EXISTS device_credentials (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  public_key VARCHAR(130) NOT NULL,
+  public_key VARCHAR(130) NOT NULL UNIQUE,
   device_id VARCHAR(255) NOT NULL UNIQUE,
   device_name VARCHAR(255),
   os_name VARCHAR(100),
@@ -58,8 +58,8 @@ CREATE TABLE IF NOT EXISTS device_credentials (
 
 -- Create indexes for device credentials
 CREATE INDEX IF NOT EXISTS idx_device_credentials_user_id ON device_credentials(user_id);
-CREATE INDEX IF NOT EXISTS idx_device_credentials_public_key ON device_credentials(public_key);
-CREATE INDEX IF NOT EXISTS idx_device_credentials_device_id ON device_credentials(device_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_device_credentials_public_key ON device_credentials(public_key);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_device_credentials_device_id ON device_credentials(device_id);
 
 -- Comments for documentation
 COMMENT ON TABLE users IS 'User accounts (no PII - only UUID)';

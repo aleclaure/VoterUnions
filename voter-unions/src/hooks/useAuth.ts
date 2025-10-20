@@ -126,6 +126,11 @@ export const useAuth = () => {
     error?: Error;
   }> => {
     try {
+      // Check if device auth is enabled
+      if (!CONFIG.USE_DEVICE_AUTH) {
+        throw new Error('Device authentication is not enabled. Use Supabase authentication instead.');
+      }
+
       // Check platform support
       if (!deviceAuth.isDeviceAuthSupported()) {
         throw new Error('Device authentication not supported on this platform');
@@ -146,46 +151,67 @@ export const useAuth = () => {
       // Store keypair in secure storage
       await deviceAuth.storeDeviceKeypair(keypair.privateKey, keypair.publicKey);
 
-      // Call backend API to register device
-      const response = await fetch(`${CONFIG.API_URL}/auth/register-device`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          publicKey: keypair.publicKey,
-          deviceId: deviceInfo.deviceId,
-          deviceName: deviceInfo.deviceName,
-          osName: deviceInfo.osName,
-          osVersion: deviceInfo.osVersion,
-        }),
-      });
+      // Call backend API to register device with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Registration failed');
+      try {
+        const response = await fetch(`${CONFIG.API_URL}/auth/register-device`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            publicKey: keypair.publicKey,
+            deviceId: deviceInfo.deviceId,
+            deviceName: deviceInfo.deviceName,
+            osName: deviceInfo.osName,
+            osVersion: deviceInfo.osVersion,
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          const errorMessage = errorData.error || errorData.message || `Registration failed (${response.status})`;
+          throw new Error(errorMessage);
+        }
+
+        const responseData = await response.json();
+        
+        if (!responseData.user || !responseData.tokens) {
+          throw new Error('Invalid response from server');
+        }
+        
+        const { user, tokens } = responseData;
+
+        // Create session object
+        const sessionData = {
+          user,
+          tokens,
+        };
+
+        // Store session in secure storage for restoration
+        await deviceAuth.storeSession(sessionData);
+
+        // Update auth state
+        setUser(user as any);
+        setSession(sessionData as any);
+        setHasDeviceKeypair(true);
+
+        // Log registration audit
+        if (deviceId) {
+          await auditHelpers.loginSuccess(user.id, `device-${deviceInfo.deviceName || 'unknown'}`, deviceId);
+        }
+
+        return { data: { user, tokens } };
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Registration timed out. Please check your network connection.');
+        }
+        throw fetchError;
       }
-
-      const { user, tokens } = await response.json();
-
-      // Create session object
-      const sessionData = {
-        user,
-        tokens,
-      };
-
-      // Store session in secure storage for restoration
-      await deviceAuth.storeSession(sessionData);
-
-      // Update auth state
-      setUser(user as any);
-      setSession(sessionData as any);
-      setHasDeviceKeypair(true);
-
-      // Log registration audit
-      if (deviceId) {
-        await auditHelpers.loginSuccess(user.id, `device-${deviceInfo.deviceName || 'unknown'}`, deviceId);
-      }
-
-      return { data: { user, tokens } };
     } catch (error) {
       console.error('Device registration failed:', error);
       return { error: error as Error };
@@ -205,6 +231,11 @@ export const useAuth = () => {
     error?: Error;
   }> => {
     try {
+      // Check if device auth is enabled
+      if (!CONFIG.USE_DEVICE_AUTH) {
+        throw new Error('Device authentication is not enabled. Use Supabase authentication instead.');
+      }
+
       // Check platform support
       if (!deviceAuth.isDeviceAuthSupported()) {
         throw new Error('Device authentication not supported on this platform');
@@ -219,63 +250,91 @@ export const useAuth = () => {
       // Get device info
       const deviceInfo = await deviceAuth.getDeviceInfo();
 
-      // Call backend API to get challenge
-      const challengeResponse = await fetch(`${CONFIG.API_URL}/auth/challenge`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          publicKey: keypair.publicKey,
-        }),
-      });
+      // Request timeout controller
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-      if (!challengeResponse.ok) {
-        const errorData = await challengeResponse.json();
-        throw new Error(errorData.message || 'Failed to get challenge');
+      try {
+        // Call backend API to get challenge
+        const challengeResponse = await fetch(`${CONFIG.API_URL}/auth/challenge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            publicKey: keypair.publicKey,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!challengeResponse.ok) {
+          const errorData = await challengeResponse.json().catch(() => ({}));
+          const errorMessage = errorData.error || errorData.message || `Challenge request failed (${challengeResponse.status})`;
+          throw new Error(errorMessage);
+        }
+
+        const challengeData = await challengeResponse.json();
+        if (!challengeData.challenge) {
+          throw new Error('Invalid challenge response from server');
+        }
+
+        const { challenge } = challengeData;
+
+        // Sign challenge with device private key
+        const signature = await deviceAuth.signChallenge(challenge, keypair.privateKey);
+
+        // Send signature to backend for verification
+        const loginResponse = await fetch(`${CONFIG.API_URL}/auth/verify-device`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            publicKey: keypair.publicKey,
+            challenge,
+            signature,
+            deviceId: deviceInfo.deviceId,
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!loginResponse.ok) {
+          const errorData = await loginResponse.json().catch(() => ({}));
+          const errorMessage = errorData.error || errorData.message || `Authentication failed (${loginResponse.status})`;
+          throw new Error(errorMessage);
+        }
+
+        const loginData = await loginResponse.json();
+        if (!loginData.user || !loginData.tokens) {
+          throw new Error('Invalid authentication response from server');
+        }
+
+        const { user, tokens } = loginData;
+
+        // Create session object
+        const sessionData = {
+          user,
+          tokens,
+        };
+
+        // Store session in secure storage for restoration
+        await deviceAuth.storeSession(sessionData);
+
+        // Update auth state
+        setUser(user as any);
+        setSession(sessionData as any);
+
+        // Log login audit
+        if (deviceId) {
+          await auditHelpers.loginSuccess(user.id, `device-${deviceInfo.deviceName || 'unknown'}`, deviceId);
+        }
+
+        return { data: { user, tokens } };
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Authentication timed out. Please check your network connection.');
+        }
+        throw fetchError;
       }
-
-      const { challenge } = await challengeResponse.json();
-
-      // Sign challenge with device private key
-      const signature = await deviceAuth.signChallenge(challenge, keypair.privateKey);
-
-      // Send signature to backend for verification
-      const loginResponse = await fetch(`${CONFIG.API_URL}/auth/verify-device`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          publicKey: keypair.publicKey,
-          challenge,
-          signature,
-          deviceId: deviceInfo.deviceId,
-        }),
-      });
-
-      if (!loginResponse.ok) {
-        const errorData = await loginResponse.json();
-        throw new Error(errorData.message || 'Authentication failed');
-      }
-
-      const { user, tokens } = await loginResponse.json();
-
-      // Create session object
-      const sessionData = {
-        user,
-        tokens,
-      };
-
-      // Store session in secure storage for restoration
-      await deviceAuth.storeSession(sessionData);
-
-      // Update auth state
-      setUser(user as any);
-      setSession(sessionData as any);
-
-      // Log login audit
-      if (deviceId) {
-        await auditHelpers.loginSuccess(user.id, `device-${deviceInfo.deviceName || 'unknown'}`, deviceId);
-      }
-
-      return { data: { user, tokens } };
     } catch (error) {
       console.error('Device login failed:', error);
       return { error: error as Error };

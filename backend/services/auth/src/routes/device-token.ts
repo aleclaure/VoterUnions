@@ -9,7 +9,7 @@ import { p256 } from '@noble/curves/p256';
 import { sha256 } from '@noble/hashes/sha256';
 import { hexToBytes } from '@noble/hashes/utils';
 import { z } from 'zod';
-import { pool } from '../db/index.js';
+import { pool, redis } from '../db/index.js';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwt.js';
 import crypto from 'crypto';
 
@@ -78,18 +78,36 @@ function generateChallenge(): string {
   return `challenge-${Date.now()}-${crypto.randomBytes(32).toString('hex')}`;
 }
 
-// In-memory challenge storage (in production, use Redis)
-const challenges = new Map<string, { challenge: string; expiresAt: Date }>();
+/**
+ * Hash refresh token for secure storage
+ */
+function hashRefreshToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
 
-// Clean up expired challenges every minute
-setInterval(() => {
-  const now = new Date();
-  for (const [key, value] of challenges.entries()) {
-    if (value.expiresAt < now) {
-      challenges.delete(key);
-    }
-  }
-}, 60000);
+/**
+ * Store challenge in Redis with expiry
+ */
+async function storeChallenge(publicKey: string, challenge: string, expirySeconds: number): Promise<void> {
+  const key = `device_challenge:${publicKey}`;
+  await redis.setex(key, expirySeconds, challenge);
+}
+
+/**
+ * Get challenge from Redis
+ */
+async function getChallenge(publicKey: string): Promise<string | null> {
+  const key = `device_challenge:${publicKey}`;
+  return await redis.get(key);
+}
+
+/**
+ * Delete challenge from Redis (after use)
+ */
+async function deleteChallenge(publicKey: string): Promise<void> {
+  const key = `device_challenge:${publicKey}`;
+  await redis.del(key);
+}
 
 export async function deviceTokenRoutes(fastify: FastifyInstance) {
 
@@ -153,11 +171,12 @@ export async function deviceTokenRoutes(fastify: FastifyInstance) {
       const accessToken = generateAccessToken(user.id);
       const refreshToken = generateRefreshToken(user.id);
 
-      // Store refresh token in sessions table
+      // Store hashed refresh token in sessions table
+      const hashedRefreshToken = hashRefreshToken(refreshToken);
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
       await pool.query(
         'INSERT INTO sessions (user_id, refresh_token, expires_at) VALUES ($1, $2, $3)',
-        [user.id, refreshToken, expiresAt]
+        [user.id, hashedRefreshToken, expiresAt]
       );
 
       fastify.log.info({
@@ -231,16 +250,17 @@ export async function deviceTokenRoutes(fastify: FastifyInstance) {
 
       // Generate challenge
       const challenge = generateChallenge();
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+      const expirySeconds = 5 * 60; // 5 minutes
 
-      // Store challenge (in production, use Redis)
-      challenges.set(publicKey, { challenge, expiresAt });
+      // Store challenge in Redis with expiry
+      await storeChallenge(publicKey, challenge, expirySeconds);
 
       fastify.log.info({
         publicKey: publicKey.substring(0, 16) + '...',
         action: 'challenge_generated',
       });
 
+      const expiresAt = new Date(Date.now() + expirySeconds * 1000);
       return {
         challenge,
         expiresAt: expiresAt.toISOString(),
@@ -282,26 +302,17 @@ export async function deviceTokenRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Get stored challenge
-      const storedChallenge = challenges.get(publicKey);
+      // Get stored challenge from Redis
+      const storedChallenge = await getChallenge(publicKey);
       if (!storedChallenge) {
         return reply.code(400).send({
           error: 'Invalid challenge',
-          message: 'No challenge found. Request a new challenge.',
-        });
-      }
-
-      // Check if challenge expired
-      if (storedChallenge.expiresAt < new Date()) {
-        challenges.delete(publicKey);
-        return reply.code(400).send({
-          error: 'Challenge expired',
-          message: 'Challenge has expired. Request a new challenge.',
+          message: 'No challenge found or challenge expired. Request a new challenge.',
         });
       }
 
       // Verify challenge matches
-      if (storedChallenge.challenge !== challenge) {
+      if (storedChallenge !== challenge) {
         return reply.code(400).send({
           error: 'Invalid challenge',
           message: 'Challenge does not match',
@@ -321,8 +332,8 @@ export async function deviceTokenRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Delete used challenge
-      challenges.delete(publicKey);
+      // Delete used challenge from Redis
+      await deleteChallenge(publicKey);
 
       // Get device and user
       const deviceResult = await pool.query(
@@ -354,11 +365,12 @@ export async function deviceTokenRoutes(fastify: FastifyInstance) {
       const accessToken = generateAccessToken(device.user_id);
       const refreshToken = generateRefreshToken(device.user_id);
 
-      // Store refresh token
+      // Store hashed refresh token
+      const hashedRefreshToken = hashRefreshToken(refreshToken);
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
       await pool.query(
         'INSERT INTO sessions (user_id, refresh_token, expires_at) VALUES ($1, $2, $3)',
-        [device.user_id, refreshToken, expiresAt]
+        [device.user_id, hashedRefreshToken, expiresAt]
       );
 
       fastify.log.info({
