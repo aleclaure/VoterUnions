@@ -10,6 +10,7 @@ import rateLimit from '@fastify/rate-limit';
 import { closeConnections, checkHealth } from './db/index.js';
 import { registerRoutes } from './routes/register.js';
 import { authRoutes } from './routes/auth.js';
+import { deviceTokenRoutes } from './routes/device-token.js';
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const HOST = '0.0.0.0';
@@ -50,6 +51,7 @@ fastify.get('/health', async () => {
 // Register routes
 await fastify.register(registerRoutes);
 await fastify.register(authRoutes);
+await fastify.register(deviceTokenRoutes);
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
