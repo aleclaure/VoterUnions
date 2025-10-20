@@ -50,6 +50,44 @@ export default function DeviceAuthTest() {
     }
   };
 
+  // Web platform warning
+  // @ts-ignore - Platform.OS can be 'web' in React Native Web
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Device Auth Test</Text>
+        <Text style={styles.subtitle}>Day 1: Crypto Setup Verification</Text>
+        
+        <View style={[styles.platformInfo, styles.warningBox]}>
+          <Text style={styles.warningTitle}>⚠️ Web Platform Detected</Text>
+          <Text style={styles.warningText}>
+            Device Token Authentication is not supported on web for security reasons.
+          </Text>
+          <Text style={styles.warningText}>
+            To test this feature, please:
+          </Text>
+          <Text style={styles.instructionText}>
+            1. Install Expo Go on your iOS/Android device
+          </Text>
+          <Text style={styles.instructionText}>
+            2. Scan the QR code shown in the Replit console
+          </Text>
+          <Text style={styles.instructionText}>
+            3. Run the crypto tests on your device
+          </Text>
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            Device authentication requires hardware-backed secure storage
+            (iOS Keychain / Android Keystore) which is only available on
+            native platforms.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Device Auth Test</Text>
@@ -57,9 +95,7 @@ export default function DeviceAuthTest() {
       
       <View style={styles.platformInfo}>
         <Text style={styles.platformText}>Platform: {Platform.OS}</Text>
-        <Text style={styles.platformText}>
-          {Platform.OS === 'web' ? '❌ Not Supported' : '✅ Supported'}
-        </Text>
+        <Text style={styles.platformText}>✅ Supported</Text>
       </View>
 
       <TouchableOpacity
@@ -223,5 +259,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     textAlign: 'center',
+  },
+  warningBox: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffc107',
+  },
+  warningTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#856404',
+    marginBottom: 12,
+  },
+  warningText: {
+    fontSize: 14,
+    color: '#856404',
+    marginBottom: 8,
+  },
+  instructionText: {
+    fontSize: 14,
+    color: '#856404',
+    marginLeft: 12,
+    marginBottom: 4,
   },
 });
