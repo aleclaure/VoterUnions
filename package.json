@@ -6,6 +6,8 @@
     "@babel/parser": "^7.28.4",
     "@babel/traverse": "^7.28.4",
     "@babel/types": "^7.28.4",
+    "@noble/curves": "^2.0.1",
+    "@noble/hashes": "^2.0.1",
     "@react-navigation/material-top-tabs": "^7.3.8",
     "@testing-library/jest-native": "^5.4.3",
     "@testing-library/react-native": "^13.3.3",
@@ -21,6 +23,7 @@
     "expo-sharing": "^14.0.7",
     "react": "^19.1.0",
     "react-native": "^0.81.4",
+    "react-native-get-random-values": "^1.11.0",
     "react-native-pager-view": "^6.9.1",
     "vitest": "^3.2.4",
     "zod": "^3.25.76"
