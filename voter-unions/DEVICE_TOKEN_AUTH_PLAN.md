@@ -1,6 +1,31 @@
 # Device Token Authentication - Expo Go Compatible Alternative
 
-**Status:** Proposed Alternative to WebAuthn  
+> ⚠️ **PARTIALLY OUTDATED**  
+> **Date Created:** October 19, 2025  
+> **Status:** Implementation complete but crypto approach changed  
+>
+> **What's outdated:**
+> - References `expo-crypto` for keypair generation (doesn't have this capability)
+> - HMAC-SHA256 approach (replaced with ECDSA P-256)
+> - Missing session persistence architecture
+>
+> **Current implementation uses:**
+> - ✅ `@noble/curves` P-256 for ECDSA signatures
+> - ✅ `react-native-get-random-values` for hardware RNG
+> - ✅ SecureStore for session persistence
+>
+> **Read instead:**
+> - ✅ [IMPLEMENTATION_FINDINGS_FINAL.md](./IMPLEMENTATION_FINDINGS_FINAL.md) - Correct crypto approach
+> - ✅ [DEVICE_TOKEN_AUTH_GUIDE.md](./DEVICE_TOKEN_AUTH_GUIDE.md) - Complete guide
+> - ✅ [backend/DEVICE_TOKEN_AUTH_MIGRATION.md](../backend/DEVICE_TOKEN_AUTH_MIGRATION.md) - Backend integration
+>
+> ---
+> **Original document preserved below for architectural reference**
+> ---
+
+# Device Token Authentication - Original Plan (PARTIALLY OUTDATED)
+
+**Status:** ⚠️ Implementation complete with different crypto approach  
 **Compatibility:** ✅ Works in Expo Go  
 **Privacy:** ✅ No email collection, UUID-only users  
 **Upgrade Path:** ✅ Can migrate to WebAuthn later
