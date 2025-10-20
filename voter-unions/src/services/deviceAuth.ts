@@ -207,6 +207,42 @@ export async function deleteDeviceKeypair(): Promise<void> {
 }
 
 /**
+ * Store session data in secure storage
+ * 
+ * This allows session restoration on app restart without re-authentication.
+ * 
+ * @param session Session object with user and tokens
+ */
+export async function storeSession(session: { user: any; tokens: any }): Promise<void> {
+  await SecureStore.setItemAsync('device_session', JSON.stringify(session));
+}
+
+/**
+ * Retrieve stored session from secure storage
+ * 
+ * @returns Stored session or null if not found
+ */
+export async function getStoredSession(): Promise<{ user: any; tokens: any } | null> {
+  try {
+    const sessionString = await SecureStore.getItemAsync('device_session');
+    if (!sessionString) {
+      return null;
+    }
+    return JSON.parse(sessionString);
+  } catch (error) {
+    console.error('Failed to retrieve session:', error);
+    return null;
+  }
+}
+
+/**
+ * Delete stored session (on logout)
+ */
+export async function deleteSession(): Promise<void> {
+  await SecureStore.deleteItemAsync('device_session');
+}
+
+/**
  * Test device auth functionality
  * 
  * This function verifies that:

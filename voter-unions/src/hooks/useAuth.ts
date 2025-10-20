@@ -1,30 +1,60 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../contexts/AuthContext';
 import { auditHelpers } from '../services/auditLog';
 import { useDeviceId } from './useDeviceId';
+import { CONFIG } from '../config';
+import * as deviceAuth from '../services/deviceAuth';
 
 export const useAuth = () => {
   const { user, session, isLoading, setUser, setSession, setIsLoading, clearAuth } = useAuthStore();
   const { deviceId } = useDeviceId();
+  const [hasDeviceKeypair, setHasDeviceKeypair] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoading(false);
-    });
+    // Initialize authentication based on CONFIG flag
+    const initializeAuth = async () => {
+      if (CONFIG.USE_DEVICE_AUTH && deviceAuth.isDeviceAuthSupported()) {
+        // Check if device keypair exists
+        const keypair = await deviceAuth.getDeviceKeypair();
+        setHasDeviceKeypair(!!keypair);
+        
+        if (keypair) {
+          // Restore session from secure storage
+          const storedSession = await deviceAuth.getStoredSession();
+          if (storedSession) {
+            setUser(storedSession.user as any);
+            setSession(storedSession as any);
+          }
+        }
+        
+        setIsLoading(false);
+      } else {
+        // Use Supabase authentication
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setIsLoading(false);
+        });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoading(false);
-    });
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setIsLoading(false);
+        });
 
-    return () => subscription.unsubscribe();
+        return () => subscription.unsubscribe();
+      }
+    };
+
+    initializeAuth();
   }, [setSession, setUser, setIsLoading]);
+
+  // ============================================================================
+  // SUPABASE AUTHENTICATION METHODS (Legacy)
+  // ============================================================================
 
   const signUp = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signUp({
@@ -78,29 +108,250 @@ export const useAuth = () => {
     return { data, error };
   };
 
+  // ============================================================================
+  // DEVICE TOKEN AUTHENTICATION METHODS (Privacy-First)
+  // ============================================================================
+
+  /**
+   * Register with Device Token Authentication
+   * 
+   * Creates a cryptographic device identity without collecting email/password.
+   * The device generates an ECDSA P-256 keypair, and the backend verifies
+   * signatures to authenticate the user.
+   * 
+   * @returns Object with success flag, user data, and error
+   */
+  const registerWithDevice = async (): Promise<{
+    data?: { user: any; tokens: any };
+    error?: Error;
+  }> => {
+    try {
+      // Check platform support
+      if (!deviceAuth.isDeviceAuthSupported()) {
+        throw new Error('Device authentication not supported on this platform');
+      }
+
+      // Check if device already has a keypair (already registered)
+      const existingKeypair = await deviceAuth.getDeviceKeypair();
+      if (existingKeypair) {
+        throw new Error('Device already registered. Use loginWithDevice() instead.');
+      }
+
+      // Generate device keypair
+      const keypair = await deviceAuth.generateDeviceKeypair();
+      
+      // Get device information
+      const deviceInfo = await deviceAuth.getDeviceInfo();
+
+      // Store keypair in secure storage
+      await deviceAuth.storeDeviceKeypair(keypair.privateKey, keypair.publicKey);
+
+      // TODO: Call backend API to register device
+      // const response = await fetch(`${CONFIG.API_URL}/auth/register-device`, {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({
+      //     publicKey: keypair.publicKey,
+      //     deviceId: deviceInfo.deviceId,
+      //     deviceName: deviceInfo.deviceName,
+      //     osName: deviceInfo.osName,
+      //     osVersion: deviceInfo.osVersion,
+      //   }),
+      // });
+      //
+      // const { user, tokens } = await response.json();
+
+      // TEMPORARY: Mock response for Day 2 (backend not ready yet)
+      const mockUser = {
+        id: `device-${deviceInfo.deviceId}`,
+        deviceId: deviceInfo.deviceId,
+        publicKey: keypair.publicKey,
+        createdAt: new Date().toISOString(),
+      };
+
+      const mockTokens = {
+        accessToken: 'mock-access-token',
+        refreshToken: 'mock-refresh-token',
+      };
+
+      // Create session object
+      const sessionData = {
+        user: mockUser,
+        tokens: mockTokens,
+      };
+
+      // Store session in secure storage for restoration
+      await deviceAuth.storeSession(sessionData);
+
+      // Update auth state
+      setUser(mockUser as any);
+      setSession(sessionData as any);
+      setHasDeviceKeypair(true);
+
+      // Log registration audit
+      if (deviceId) {
+        await auditHelpers.loginSuccess(mockUser.id, `device-${deviceInfo.deviceName || 'unknown'}`, deviceId);
+      }
+
+      return { data: { user: mockUser, tokens: mockTokens } };
+    } catch (error) {
+      console.error('Device registration failed:', error);
+      return { error: error as Error };
+    }
+  };
+
+  /**
+   * Login with Device Token Authentication
+   * 
+   * Uses the device's stored private key to sign a challenge from the backend,
+   * proving device identity without passwords.
+   * 
+   * @returns Object with success flag, user data, and error
+   */
+  const loginWithDevice = async (): Promise<{
+    data?: { user: any; tokens: any };
+    error?: Error;
+  }> => {
+    try {
+      // Check platform support
+      if (!deviceAuth.isDeviceAuthSupported()) {
+        throw new Error('Device authentication not supported on this platform');
+      }
+
+      // Get device keypair
+      const keypair = await deviceAuth.getDeviceKeypair();
+      if (!keypair) {
+        throw new Error('No device keypair found. Use registerWithDevice() first.');
+      }
+
+      // TODO: Call backend API to get challenge
+      // const challengeResponse = await fetch(`${CONFIG.API_URL}/auth/challenge`, {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({
+      //     publicKey: keypair.publicKey,
+      //   }),
+      // });
+      //
+      // const { challenge } = await challengeResponse.json();
+
+      // TEMPORARY: Mock challenge for Day 2
+      const mockChallenge = `challenge-${Date.now()}-${Math.random()}`;
+
+      // Sign challenge with device private key
+      const signature = await deviceAuth.signChallenge(mockChallenge, keypair.privateKey);
+
+      // TODO: Send signature to backend for verification
+      // const loginResponse = await fetch(`${CONFIG.API_URL}/auth/verify-device`, {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({
+      //     publicKey: keypair.publicKey,
+      //     challenge: mockChallenge,
+      //     signature,
+      //   }),
+      // });
+      //
+      // const { user, tokens } = await loginResponse.json();
+
+      // TEMPORARY: Mock response for Day 2
+      const deviceInfo = await deviceAuth.getDeviceInfo();
+      const mockUser = {
+        id: `device-${deviceInfo.deviceId}`,
+        deviceId: deviceInfo.deviceId,
+        publicKey: keypair.publicKey,
+        createdAt: new Date().toISOString(),
+      };
+
+      const mockTokens = {
+        accessToken: 'mock-access-token',
+        refreshToken: 'mock-refresh-token',
+      };
+
+      // Create session object
+      const sessionData = {
+        user: mockUser,
+        tokens: mockTokens,
+      };
+
+      // Store session in secure storage for restoration
+      await deviceAuth.storeSession(sessionData);
+
+      // Update auth state
+      setUser(mockUser as any);
+      setSession(sessionData as any);
+
+      // Log login audit
+      if (deviceId) {
+        await auditHelpers.loginSuccess(mockUser.id, `device-${deviceInfo.deviceName || 'unknown'}`, deviceId);
+      }
+
+      return { data: { user: mockUser, tokens: mockTokens } };
+    } catch (error) {
+      console.error('Device login failed:', error);
+      return { error: error as Error };
+    }
+  };
+
+  /**
+   * Check if device can auto-login
+   * 
+   * Returns true if device has a stored keypair, meaning user can login
+   * automatically without any UI interaction.
+   */
+  const canAutoLogin = (): boolean => {
+    return CONFIG.USE_DEVICE_AUTH && hasDeviceKeypair;
+  };
+
+  // ============================================================================
+  // SIGN OUT (Works for both Supabase and Device Auth)
+  // ============================================================================
+
   const signOut = async () => {
-    // Log logout before signing out
-    if (user && deviceId) {
-      await auditHelpers.logout(user.id, user.email || '', deviceId);
+    try {
+      // Log logout before signing out
+      if (user && deviceId) {
+        await auditHelpers.logout(user.id, user.email || '', deviceId);
+      }
+
+      if (CONFIG.USE_DEVICE_AUTH && deviceAuth.isDeviceAuthSupported()) {
+        // Device auth logout: Delete device keypair and session
+        await deviceAuth.deleteDeviceKeypair();
+        await deviceAuth.deleteSession();
+        setHasDeviceKeypair(false);
+        clearAuth();
+        return { error: null };
+      } else {
+        // Supabase logout
+        const { error } = await supabase.auth.signOut();
+        if (!error) {
+          clearAuth();
+        }
+        return { error };
+      }
+    } catch (error) {
+      console.error('Sign out failed:', error);
+      return { error: error as Error };
     }
-    
-    const { error } = await supabase.auth.signOut();
-    if (!error) {
-      clearAuth();
-    }
-    return { error };
   };
 
   return {
     user,
     session,
     isLoading,
+    // Supabase methods (legacy)
     signUp,
     signInWithPassword,
     resetPassword,
     updatePassword,
     signInWithOTP,
     verifyOTP,
+    // Device auth methods (privacy-first)
+    registerWithDevice,
+    loginWithDevice,
+    canAutoLogin,
+    hasDeviceKeypair,
+    // Shared methods
     signOut,
   };
 };

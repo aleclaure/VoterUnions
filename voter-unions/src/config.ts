@@ -49,17 +49,26 @@ export const CONFIG = {
   ),
 
   /**
-   * WebAuthn Authentication Feature Flag
+   * Device Token Authentication Feature Flag
    * 
-   * When true: Use WebAuthn (biometric/hardware key) authentication
+   * When true: Use Device Token Auth (privacy-first, no email collection)
    * When false: Use Supabase email/password authentication
+   * 
+   * Note: Originally planned for WebAuthn, but using Device Token Auth for
+   * Expo Go compatibility. Both achieve privacy-first authentication.
    * 
    * Default: false (Supabase during migration)
    */
-  USE_WEBAUTHN: parseBoolean(
-    process.env.EXPO_PUBLIC_USE_WEBAUTHN,
+  USE_DEVICE_AUTH: parseBoolean(
+    process.env.EXPO_PUBLIC_USE_DEVICE_AUTH,
     false // Default: use Supabase
   ),
+  
+  // Deprecated: USE_WEBAUTHN renamed to USE_DEVICE_AUTH
+  // Keep for backward compatibility during migration
+  get USE_WEBAUTHN() {
+    return this.USE_DEVICE_AUTH;
+  },
 
   /**
    * Backend API Feature Flag
@@ -149,7 +158,7 @@ if (isDevelopment) {
  * Configuration Summary (logged at startup)
  */
 console.log('🔧 Application Configuration:');
-console.log(`   Authentication: ${CONFIG.USE_WEBAUTHN ? 'WebAuthn' : 'Supabase'}`);
+console.log(`   Authentication: ${CONFIG.USE_DEVICE_AUTH ? 'Device Token (Privacy-First)' : 'Supabase'}`);
 console.log(`   Backend: ${CONFIG.USE_NEW_BACKEND ? 'New API' : 'Supabase'}`);
 console.log(`   Email Verification: ${CONFIG.REQUIRE_EMAIL_VERIFICATION ? 'Enabled' : 'Disabled'}`);
 console.log(`   Environment: ${isDevelopment ? 'Development' : 'Production'}`);
