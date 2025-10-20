@@ -152,7 +152,7 @@ The application is built using Expo SDK 52 with React Native and TypeScript, ens
 - Created CRITICAL_FIXES_APPLIED.md (detailed fix documentation)
 - All authentication flows now working correctly
 
-**Final Status:**
+**Final Status (Week 5A):**
 - 7 new files created (~1600 lines total)
 - 2 files modified with critical fixes (+57 lines)
 - 0 files deleted (non-destructive migration)
@@ -162,10 +162,47 @@ The application is built using Expo SDK 52 with React Native and TypeScript, ens
 - ✅ Session persistence working
 - ✅ Architect reviewed and approved
 
+**Week 6: Backend Integration** ✅ COMPLETED (Oct 20, 2025)
+
+**Backend Endpoints Implemented:**
+- Added @noble/curves and @noble/hashes dependencies to backend
+- Created device_credentials database table with unique constraints
+- Implemented POST /auth/register-device (device registration)
+- Implemented POST /auth/challenge (challenge generation)
+- Implemented POST /auth/verify-device (signature verification & login)
+- Updated frontend useAuth.ts to use real API calls (removed mocks)
+
+**Security Hardening (Architect Review):**
+- **Issue #1 - Challenge Storage:** Migrated from in-memory Map to Redis with 5-min TTL (prevents replay attacks, survives restarts)
+- **Issue #2 - Refresh Tokens:** Added SHA-256 hashing before database storage (prevents token leakage)
+- **Issue #3 - Public Key Uniqueness:** Enforced UNIQUE constraint on public_key column (prevents duplicate registration attacks)
+- **Issue #4 - Frontend Error Handling:** Added 30-second timeouts, CONFIG flag validation, sanitized error messages, response validation
+- ✅ Passed second architect security review (all 4 critical issues resolved)
+
+**Technical Implementation:**
+- ECDSA P-256 signature verification using @noble/curves
+- Redis-backed challenge storage with automatic expiry
+- JWT token issuance (access + refresh tokens)
+- Comprehensive error handling and logging
+- Security-hardened endpoints (architect approved)
+
+**Final Status (Week 6):**
+- 1 new backend file (~400 lines)
+- 3 files modified (schema, index, useAuth)
+- 1 database table added (device_credentials)
+- 3 API endpoints implemented
+- 4 critical security issues fixed
+- 2 architect reviews (1 failed, 1 passed ✅)
+- Full stack Device Token Auth complete
+
 **Next Steps:**
-- [x] Complete all 7 days of implementation
+- [x] Complete all 7 days of frontend implementation
 - [x] Fix critical authentication bugs
-- [x] Architect review
-- [ ] Test in Expo Go on physical device (ready!)
-- [ ] Backend implementation (when ready)
+- [x] Frontend architect review
+- [x] Backend implementation
+- [x] Backend security hardening
+- [x] Backend architect review
+- [ ] End-to-end testing (frontend ↔ backend)
+- [ ] Test in Expo Go on physical device
+- [ ] Gradual rollout (0% → 10% → 100%)
 - [ ] Production deployment

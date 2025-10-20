@@ -5,7 +5,7 @@ Comprehensive checklist for migrating from Supabase to WebAuthn-based backend.
 **Project:** Voter Unions → United Unions  
 **Phase:** Blue Spirit Phase 1 (Device Token Auth + Security Infrastructure)  
 **Duration:** 14 weeks (Week 0 + Weeks 3-14)  
-**Status:** ⏳ In Progress - Week 5A Complete (Oct 20, 2025)
+**Status:** ⏳ In Progress - Week 6 Backend Integration Complete (Oct 20, 2025)
 
 ---
 
@@ -259,42 +259,87 @@ Comprehensive checklist for migrating from Supabase to WebAuthn-based backend.
 
 ---
 
-## 🧪 Week 6: Testing & Gradual Rollout
+## 🧪 Week 6: Backend Integration & Security Hardening
 
-**Goal:** Test migration and roll out to percentage of users.  
+**Goal:** Implement backend Device Token Auth endpoints and connect to frontend.  
+**Duration:** 1 day  
+**Status:** ✅ Complete (Oct 20, 2025)
+
+### Backend Implementation
+
+- [x] Add @noble/curves and @noble/hashes dependencies to backend
+- [x] Create device_credentials database table
+- [x] Implement POST /auth/register-device endpoint
+- [x] Implement POST /auth/challenge endpoint
+- [x] Implement POST /auth/verify-device endpoint
+- [x] Register routes in main server (src/index.ts)
+- [x] Update frontend useAuth.ts to use real API calls (remove mocks)
+
+### Security Hardening (Architect Review)
+
+- [x] **Issue #1:** Migrate challenge storage from in-memory Map to Redis with 5-min TTL
+- [x] **Issue #2:** Add SHA-256 hashing for refresh tokens before database storage
+- [x] **Issue #3:** Enforce UNIQUE constraint on public_key column
+- [x] **Issue #4:** Improve frontend error handling (30s timeouts, CONFIG checks, sanitized messages)
+- [x] Pass second architect security review (all 4 critical issues resolved)
+
+### Documentation
+
+- [x] Create BACKEND_INTEGRATION_COMPLETE.md with full implementation details
+- [x] Update BLUE_SPIRIT_STATUS.md to reflect Week 6 completion
+- [x] Update replit.md with backend integration status
+- [x] Update MIGRATION_CHECKLIST.md (this file)
+
+**Week 6 Summary:**
+- **Files Created:** 1 backend file (~400 lines)
+- **Files Modified:** 3 files (schema, index, useAuth)
+- **Database Tables:** 1 added (device_credentials)
+- **API Endpoints:** 3 implemented
+- **Security Issues Fixed:** 4 (all critical)
+- **Architect Reviews:** 2 (1 failed, 1 passed ✅)
+- **Status:** Full stack Device Token Auth complete
+
+---
+
+## 🧪 Week 6+: End-to-End Testing & Gradual Rollout
+
+**Goal:** Test integration and roll out to percentage of users.  
 **Duration:** 5 days  
-**Status:** ⏳ Pending
+**Status:** ⏳ Next
 
-### Day 1: Comprehensive Testing
+### Day 1: End-to-End Testing
 
-- [ ] Run all existing tests (62 security tests + unit tests)
-- [ ] Add new tests for WebAuthn flow
-- [ ] Test with 10+ real devices (iOS + Android)
-- [ ] Test edge cases (offline, slow network, device loss)
-- [ ] Fix any bugs found
+- [ ] Start backend auth service locally
+- [ ] Test frontend → backend integration
+- [ ] Verify registration flow works
+- [ ] Verify login flow works
+- [ ] Test error scenarios
+- [ ] Fix any integration bugs found
 
-### Day 2: Rollout Configuration
+### Day 2: Physical Device Testing
 
+- [ ] Test on real iOS devices
+- [ ] Test on real Android devices
+- [ ] Test offline scenarios
+- [ ] Test slow network conditions
+- [ ] Document any device-specific issues
+
+### Day 3: Rollout Configuration
+
+- [ ] Set `EXPO_PUBLIC_USE_DEVICE_AUTH=true`
 - [ ] Set `EXPO_PUBLIC_WEBAUTHN_ROLLOUT_PERCENT=10` (10% rollout)
-- [ ] Set `EXPO_PUBLIC_USE_WEBAUTHN=true`
-- [ ] Set `EXPO_PUBLIC_USE_NEW_BACKEND=false` (still using Supabase for data)
 - [ ] Deploy to production
-- [ ] Monitor auth service logs
+- [ ] Monitor backend auth service logs
+- [ ] Monitor frontend error rates
 
-### Day 3-4: Monitoring & Iteration
+### Day 4-5: Monitoring & Iteration
 
 - [ ] Monitor error rates (target: <1%)
 - [ ] Monitor authentication success rate (target: >95%)
 - [ ] Collect user feedback
-- [ ] Fix any issues
+- [ ] Fix any issues found
 - [ ] Increase rollout to 25% if stable
-
-### Day 5: Documentation
-
-- [ ] Update user documentation
-- [ ] Create troubleshooting guide
-- [ ] Document rollback procedure
-- [ ] Update `replit.md` with progress
+- [ ] Update documentation with findings
 
 ---
 

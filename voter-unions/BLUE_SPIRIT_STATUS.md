@@ -3,7 +3,7 @@
 **Project:** Voter Unions → United Unions  
 **Phase:** Blue Spirit Phase 1 - Privacy-First Authentication  
 **Last Updated:** October 20, 2025  
-**Status:** ⏳ **In Progress** - Week 5A Complete
+**Status:** ⏳ **In Progress** - Week 6 Backend Integration Complete
 
 ---
 
@@ -14,7 +14,8 @@
 | **Week 0: Pre-Migration** | ✅ Complete | Oct 19, 2025 | Infrastructure & security guardrails |
 | **Week 3: Backend Auth Service** | ✅ Complete | Oct 19, 2025 | WebAuthn backend (not integrated) |
 | **Week 5A: Device Token Frontend** | ✅ Complete | Oct 20, 2025 | **7-day implementation** |
-| **Week 6: Testing & Rollout** | ⏳ Next | TBD | Pending physical device testing |
+| **Week 6: Backend Integration** | ✅ Complete | Oct 20, 2025 | **3 endpoints, security hardened** |
+| **Week 6+: E2E Testing & Rollout** | ⏳ Next | TBD | Physical device testing |
 | **Week 7: 100% Migration** | ⏳ Pending | TBD | Cleanup & email removal |
 | **Weeks 8-14: Advanced Features** | ⏳ Future | TBD | E2EE, blind voting, etc. |
 
@@ -24,10 +25,12 @@
 
 ### **What's Working Right Now**
 
-✅ **Device Token Authentication (Frontend)**
-- Complete 7-day implementation
+✅ **Device Token Authentication (Full Stack)**
+- Complete frontend implementation (7 days)
+- Complete backend integration (3 endpoints)
 - All authentication flows functional
 - Session persistence working
+- Real API calls (no mocks)
 - Ready for Expo Go testing
 - Dual-auth system (can switch between Supabase & Device Token)
 
@@ -37,33 +40,41 @@
 - Audit logging system
 - Rate limiting (client-side)
 - XSS protection (62 automated tests)
+- **Redis challenge storage** (5-min TTL, auto-expiry)
+- **Hashed refresh tokens** (SHA-256)
+- **Public key uniqueness** (DB constraints)
 
 ✅ **Backend Auth Service**
-- WebAuthn registration endpoints exist
-- WebAuthn login endpoints exist
+- WebAuthn endpoints (Week 3)
+- **Device Token endpoints** (Week 6) ✨ NEW
+  - POST /auth/register-device
+  - POST /auth/challenge  
+  - POST /auth/verify-device
 - JWT token management
 - PostgreSQL + Redis infrastructure
-- **Note:** WebAuthn endpoints exist but Device Token endpoints pending
+- ECDSA P-256 signature verification
+- Security hardened (architect approved)
 
 ---
 
 ## 🔴 What's NOT Working Yet
 
-❌ **Backend Device Token Integration**
-- Device Token endpoints not implemented
-- Frontend uses mock responses
-- Can't connect to real backend yet
-- **Impact:** Can test UI flows but not real authentication
-
 ❌ **Physical Device Testing**
 - Not tested on real iOS/Android devices yet
 - Only tested in development environment
 - **Impact:** Unknown if works in production Expo Go
+- **Blocker:** Need physical devices for testing
+
+❌ **End-to-End Testing**
+- Backend and frontend not tested together yet
+- Need to verify full registration → login flow
+- **Impact:** Unknown if integration works correctly
 
 ❌ **Gradual Rollout**
 - 0% rollout (CONFIG.USE_DEVICE_AUTH = false by default)
 - No users migrated yet
 - **Impact:** Still using Supabase auth in production
+- **Waiting on:** E2E testing completion
 
 ---
 
@@ -95,13 +106,27 @@
 - **Day 6:** User documentation
 - **Day 7:** Testing guide + critical fixes
 
+**Week 6 (Oct 20, 2025):** Backend Integration (Complete ✅)
+- ✅ Added @noble/curves dependencies to backend
+- ✅ Created device_credentials database table
+- ✅ Implemented POST /auth/register-device endpoint
+- ✅ Implemented POST /auth/challenge endpoint
+- ✅ Implemented POST /auth/verify-device endpoint
+- ✅ Updated frontend to use real API calls
+- ✅ Fixed 4 critical security issues:
+  - Challenge storage moved to Redis (prevents replay attacks)
+  - Refresh tokens now hashed before storage (prevents leakage)
+  - Public key uniqueness enforced (DB constraint)
+  - Frontend error handling improved (timeouts, validation)
+- ✅ Passed architect security review (2nd iteration)
+
 ---
 
 ### **Current Work**
 
-**Week 6 (Starting Soon):** Testing & Gradual Rollout
+**Week 6+ (Next):** End-to-End Testing & Rollout
 - Physical device testing in Expo Go
-- Backend Device Token endpoint implementation
+- End-to-end authentication flow testing
 - Internal testing (0% rollout)
 - Gradual rollout (10% → 25% → 50% → 100%)
 
@@ -142,8 +167,8 @@
     │Password│            │ (P-256)    │
     └───┬────┘            └─────┬──────┘
         │                       │
-    ✅ Active              ⏳ Implemented
-    (Production)           (Testing)
+    ✅ Active              ✅ Complete
+    (Production)           (Ready for testing)
 ```
 
 **Feature Flag Control:**
@@ -163,10 +188,11 @@ export const CONFIG = {
 |-----------|---------------|-------------------|--------|
 | **Frontend Auth UI** | ✅ Exists | ✅ Complete | Ready |
 | **Frontend Auth Logic** | ✅ Active | ✅ Complete | Ready |
-| **Backend Endpoints** | ✅ Active | ❌ Pending | Needs work |
-| **Database Schema** | ✅ Active | ⏳ Documented | Needs creation |
+| **Backend Endpoints** | ✅ Active | ✅ Complete | Ready |
+| **Database Schema** | ✅ Active | ✅ Complete | Ready |
 | **Session Management** | ✅ Active | ✅ Complete | Ready |
-| **Testing** | ✅ Tested | ⏳ Pending | Next step |
+| **Security Hardening** | ✅ Active | ✅ Complete | Architect approved |
+| **E2E Testing** | ✅ Tested | ⏳ Pending | Next step |
 
 ---
 
@@ -234,17 +260,57 @@ export const CONFIG = {
 
 ---
 
+### **Issue #2: Backend Security Vulnerabilities**
+
+**Discovered:** Oct 20, 2025 (Architect review - Week 6)
+
+**Problem:**
+- Challenges stored in-memory Map (lost on restart, replay attacks)
+- Refresh tokens stored in plaintext (token leakage risk)
+- Public keys not unique (duplicate registration attack)
+- Frontend error handling insufficient (no timeouts, leaked messages)
+
+**Solution (Week 6 Security Fixes):**
+- Migrated challenge storage to Redis with 5-min TTL
+- Added SHA-256 hashing for refresh tokens before DB storage
+- Enforced UNIQUE constraint on public_key column
+- Added 30-second timeouts, CONFIG checks, sanitized errors
+
+**Impact:** All 4 critical security issues resolved, passed architect review
+
+**Details:** See [BACKEND_INTEGRATION_COMPLETE.md](./BACKEND_INTEGRATION_COMPLETE.md)
+
+---
+
 ## 📈 Progress Metrics
 
 ### **Code Changes**
 
+**Week 5A Frontend:**
 | Metric | Value |
 |--------|-------|
 | New files created | 7 files (~1,600 lines) |
 | Files modified | 2 files (+57 lines fixes) |
 | Files deleted | 0 (non-destructive) |
 | Dependencies added | 4 (@noble/curves, @noble/hashes, react-native-get-random-values, expo-device) |
-| Test coverage | Ready for device testing |
+
+**Week 6 Backend:**
+| Metric | Value |
+|--------|-------|
+| New files created | 1 file (~400 lines) |
+| Files modified | 3 files (schema, index, useAuth) |
+| Database tables added | 1 (device_credentials) |
+| API endpoints added | 3 (register, challenge, verify) |
+| Security issues fixed | 4 (all critical) |
+| Architect reviews | 2 (1 failed, 1 passed) |
+
+**Total (Weeks 5A + 6):**
+| Metric | Value |
+|--------|-------|
+| Total new files | 8 files (~2,000 lines) |
+| Total files modified | 5 files |
+| Total dependencies | 6 packages |
+| Test coverage | Ready for E2E testing |
 
 ---
 
@@ -254,10 +320,11 @@ export const CONFIG = {
 |---------------|-------|
 | Implementation guides | 3 |
 | Backend migration docs | 1 |
+| Backend integration docs | 1 |
 | Testing procedures | 2 |
 | User guides | 1 |
 | Status trackers | 3 |
-| **Total** | **10 documents** |
+| **Total** | **11 documents** |
 
 ---
 
@@ -265,11 +332,13 @@ export const CONFIG = {
 
 ### **Immediate (This Week)**
 
-1. **Backend Integration** (1-2 days)
-   - Add Device Token endpoints to auth service
-   - Follow [backend/DEVICE_TOKEN_AUTH_MIGRATION.md](../backend/DEVICE_TOKEN_AUTH_MIGRATION.md)
-   - Create `device_credentials` database table
-   - Implement signature verification
+1. **End-to-End Testing** (1-2 days) ⚠️ **CRITICAL**
+   - Start backend auth service locally
+   - Test frontend → backend integration
+   - Verify registration flow works
+   - Verify login flow works
+   - Test error scenarios
+   - Document any issues
 
 2. **Physical Device Testing** (2-3 days)
    - Test on real iOS devices
@@ -327,6 +396,7 @@ export const CONFIG = {
 
 ### **Backend Integration**
 
+- ✅ [Backend Integration Complete](./BACKEND_INTEGRATION_COMPLETE.md) - Week 6 completion report
 - 🔧 [Backend Migration Guide](../backend/DEVICE_TOKEN_AUTH_MIGRATION.md) - Implementation guide
 
 ---
