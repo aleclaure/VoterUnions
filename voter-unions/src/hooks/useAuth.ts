@@ -146,54 +146,46 @@ export const useAuth = () => {
       // Store keypair in secure storage
       await deviceAuth.storeDeviceKeypair(keypair.privateKey, keypair.publicKey);
 
-      // TODO: Call backend API to register device
-      // const response = await fetch(`${CONFIG.API_URL}/auth/register-device`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     publicKey: keypair.publicKey,
-      //     deviceId: deviceInfo.deviceId,
-      //     deviceName: deviceInfo.deviceName,
-      //     osName: deviceInfo.osName,
-      //     osVersion: deviceInfo.osVersion,
-      //   }),
-      // });
-      //
-      // const { user, tokens } = await response.json();
+      // Call backend API to register device
+      const response = await fetch(`${CONFIG.API_URL}/auth/register-device`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          publicKey: keypair.publicKey,
+          deviceId: deviceInfo.deviceId,
+          deviceName: deviceInfo.deviceName,
+          osName: deviceInfo.osName,
+          osVersion: deviceInfo.osVersion,
+        }),
+      });
 
-      // TEMPORARY: Mock response for Day 2 (backend not ready yet)
-      const mockUser = {
-        id: `device-${deviceInfo.deviceId}`,
-        deviceId: deviceInfo.deviceId,
-        publicKey: keypair.publicKey,
-        createdAt: new Date().toISOString(),
-      };
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Registration failed');
+      }
 
-      const mockTokens = {
-        accessToken: 'mock-access-token',
-        refreshToken: 'mock-refresh-token',
-      };
+      const { user, tokens } = await response.json();
 
       // Create session object
       const sessionData = {
-        user: mockUser,
-        tokens: mockTokens,
+        user,
+        tokens,
       };
 
       // Store session in secure storage for restoration
       await deviceAuth.storeSession(sessionData);
 
       // Update auth state
-      setUser(mockUser as any);
+      setUser(user as any);
       setSession(sessionData as any);
       setHasDeviceKeypair(true);
 
       // Log registration audit
       if (deviceId) {
-        await auditHelpers.loginSuccess(mockUser.id, `device-${deviceInfo.deviceName || 'unknown'}`, deviceId);
+        await auditHelpers.loginSuccess(user.id, `device-${deviceInfo.deviceName || 'unknown'}`, deviceId);
       }
 
-      return { data: { user: mockUser, tokens: mockTokens } };
+      return { data: { user, tokens } };
     } catch (error) {
       console.error('Device registration failed:', error);
       return { error: error as Error };
@@ -224,69 +216,66 @@ export const useAuth = () => {
         throw new Error('No device keypair found. Use registerWithDevice() first.');
       }
 
-      // TODO: Call backend API to get challenge
-      // const challengeResponse = await fetch(`${CONFIG.API_URL}/auth/challenge`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     publicKey: keypair.publicKey,
-      //   }),
-      // });
-      //
-      // const { challenge } = await challengeResponse.json();
+      // Get device info
+      const deviceInfo = await deviceAuth.getDeviceInfo();
 
-      // TEMPORARY: Mock challenge for Day 2
-      const mockChallenge = `challenge-${Date.now()}-${Math.random()}`;
+      // Call backend API to get challenge
+      const challengeResponse = await fetch(`${CONFIG.API_URL}/auth/challenge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          publicKey: keypair.publicKey,
+        }),
+      });
+
+      if (!challengeResponse.ok) {
+        const errorData = await challengeResponse.json();
+        throw new Error(errorData.message || 'Failed to get challenge');
+      }
+
+      const { challenge } = await challengeResponse.json();
 
       // Sign challenge with device private key
-      const signature = await deviceAuth.signChallenge(mockChallenge, keypair.privateKey);
+      const signature = await deviceAuth.signChallenge(challenge, keypair.privateKey);
 
-      // TODO: Send signature to backend for verification
-      // const loginResponse = await fetch(`${CONFIG.API_URL}/auth/verify-device`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     publicKey: keypair.publicKey,
-      //     challenge: mockChallenge,
-      //     signature,
-      //   }),
-      // });
-      //
-      // const { user, tokens } = await loginResponse.json();
+      // Send signature to backend for verification
+      const loginResponse = await fetch(`${CONFIG.API_URL}/auth/verify-device`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          publicKey: keypair.publicKey,
+          challenge,
+          signature,
+          deviceId: deviceInfo.deviceId,
+        }),
+      });
 
-      // TEMPORARY: Mock response for Day 2
-      const deviceInfo = await deviceAuth.getDeviceInfo();
-      const mockUser = {
-        id: `device-${deviceInfo.deviceId}`,
-        deviceId: deviceInfo.deviceId,
-        publicKey: keypair.publicKey,
-        createdAt: new Date().toISOString(),
-      };
+      if (!loginResponse.ok) {
+        const errorData = await loginResponse.json();
+        throw new Error(errorData.message || 'Authentication failed');
+      }
 
-      const mockTokens = {
-        accessToken: 'mock-access-token',
-        refreshToken: 'mock-refresh-token',
-      };
+      const { user, tokens } = await loginResponse.json();
 
       // Create session object
       const sessionData = {
-        user: mockUser,
-        tokens: mockTokens,
+        user,
+        tokens,
       };
 
       // Store session in secure storage for restoration
       await deviceAuth.storeSession(sessionData);
 
       // Update auth state
-      setUser(mockUser as any);
+      setUser(user as any);
       setSession(sessionData as any);
 
       // Log login audit
       if (deviceId) {
-        await auditHelpers.loginSuccess(mockUser.id, `device-${deviceInfo.deviceName || 'unknown'}`, deviceId);
+        await auditHelpers.loginSuccess(user.id, `device-${deviceInfo.deviceName || 'unknown'}`, deviceId);
       }
 
-      return { data: { user: mockUser, tokens: mockTokens } };
+      return { data: { user, tokens } };
     } catch (error) {
       console.error('Device login failed:', error);
       return { error: error as Error };
