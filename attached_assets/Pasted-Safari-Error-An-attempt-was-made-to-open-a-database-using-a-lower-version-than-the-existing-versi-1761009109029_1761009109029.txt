@@ -1,0 +1,75 @@
+Safari:
+Error: "An attempt was made to open a database using a lower version than the existing version." in No stacktrace available
+...
+18
+Safari:
+🔗 Supabase connecting to: https://yznjhfaeplbwozbhhull.supabase.co...
+Safari:
+🔑 Using anon key: eyJhbGciOiJIUzI1NiIs...
+Safari:
+🔧 Application Configuration:
+Safari:
+   Authentication: Supabase
+Safari:
+   Backend: Supabase
+Safari:
+   Email Verification: Enabled
+Safari:
+   Environment: Production
+Safari:
+🔗 Supabase connecting to: https://yznjhfaeplbwozbhhull.supabase.co...
+Safari:
+🔑 Using anon key: eyJhbGciOiJIUzI1NiIs...
+Safari:
+🔧 Application Configuration:
+Safari:
+   Authentication: Supabase
+Safari:
+   Backend: Supabase
+Safari:
+   Email Verification: Enabled
+Safari:
+   Environment: Production
+Safari:
+Error: "Failed to store record in an IDBObjectStore: The transaction is read-only." in put@[native code] << Promise@[native code]
+...
+Safari:
+🔗 Supabase connecting to: https://yznjhfaeplbwozbhhull.supabase.co...
+Safari:
+🔑 Using anon key: eyJhbGciOiJIUzI1NiIs...
+Safari:
+Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+iPhone:
+SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+iPhone:
+🔗 Supabase connecting to: https://yznjhfaeplbwozbhhull.supabase.co...
+iPhone:
+🔑 Using anon key: eyJhbGciOiJIUzI1NiIs...
+iPhone:
+🔧 Application Configuration:
+iPhone:
+   Authentication: Supabase
+iPhone:
+   Backend: Supabase
+iPhone:
+   Email Verification: Enabled
+iPhone:
+   Environment: Production
+Safari:
+Error: "Failed to store record in an IDBObjectStore: The transaction is read-only." in put@[native code] << Promise@[native code]
+...
+9
+Safari:
+🔗 Supabase connecting to: https://yznjhfaeplbwozbhhull.supabase.co...
+Safari:
+🔑 Using anon key: eyJhbGciOiJIUzI1NiIs...
+Safari:
+🔧 Application Configuration:
+Safari:
+   Authentication: Supabase
+Safari:
+   Backend: Supabase
+Safari:
+   Email Verification: Enabled
+Safari:
+   Environment: Production

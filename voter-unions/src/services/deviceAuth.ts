@@ -16,9 +16,9 @@
  * - ❌ Web (disabled for security)
  */
 
-import { p256 } from '@noble/curves/p256';
-import { sha256 } from '@noble/hashes/sha256';
-import { hexToBytes, bytesToHex } from '@noble/hashes/utils';
+import { p256 } from '@noble/curves/nist.js';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js';
 import * as SecureStore from 'expo-secure-store';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
@@ -54,7 +54,7 @@ export async function generateDeviceKeypair(): Promise<{
   }
   
   // Generate private key with secure randomness
-  const privateKey = p256.utils.randomPrivateKey();
+  const privateKey = p256.utils.randomSecretKey();
   
   // Derive public key from private key
   const publicKey = p256.getPublicKey(privateKey);
