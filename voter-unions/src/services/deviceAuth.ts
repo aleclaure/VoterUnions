@@ -189,6 +189,45 @@ export async function getDeviceInfo(): Promise<{
 }
 
 /**
+ * Store session data in secure storage
+ * 
+ * Saves user and tokens for automatic restoration on app restart
+ * 
+ * @param sessionData Session object containing user and tokens
+ */
+export async function storeSession(sessionData: any): Promise<void> {
+  await SecureStore.setItemAsync('device_session', JSON.stringify(sessionData));
+}
+
+/**
+ * Retrieve stored session from secure storage
+ * 
+ * @returns Stored session if exists, null otherwise
+ */
+export async function getStoredSession(): Promise<any | null> {
+  const sessionString = await SecureStore.getItemAsync('device_session');
+  if (!sessionString) {
+    return null;
+  }
+  
+  try {
+    return JSON.parse(sessionString);
+  } catch (error) {
+    console.error('Failed to parse stored session:', error);
+    return null;
+  }
+}
+
+/**
+ * Delete stored session from secure storage
+ * 
+ * Called during logout
+ */
+export async function deleteSession(): Promise<void> {
+  await SecureStore.deleteItemAsync('device_session');
+}
+
+/**
  * Delete device keypair from secure storage
  * 
  * Called during logout to remove credentials

@@ -24,6 +24,9 @@ import { SessionManager } from '../components/SessionManager';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
 import { Text } from 'react-native';
+import { CONFIG } from '../config';
+import { DeviceRegisterScreen } from '../screens/DeviceRegisterScreen';
+import { DeviceLoginScreen } from '../screens/DeviceLoginScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -129,12 +132,27 @@ const MainStack = () => {
 };
 
 export const AppNavigator = () => {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, hasDeviceKeypair, canAutoLogin } = useAuth();
   const { needsOnboarding, isLoading: profileLoading } = useProfile();
 
   if (authLoading || (user && profileLoading)) {
     return null;
   }
+
+  // Determine which authentication screen to show
+  const getAuthScreen = () => {
+    if (CONFIG.USE_DEVICE_AUTH) {
+      // Device Token Auth: Show register or login based on keypair existence
+      if (hasDeviceKeypair || canAutoLogin()) {
+        return <Stack.Screen name="DeviceLogin" component={DeviceLoginScreen} />;
+      } else {
+        return <Stack.Screen name="DeviceRegister" component={DeviceRegisterScreen} />;
+      }
+    } else {
+      // Traditional Supabase Auth
+      return <Stack.Screen name="Auth" component={AuthScreen} />;
+    }
+  };
 
   return (
     <NavigationContainer>
@@ -142,7 +160,7 @@ export const AppNavigator = () => {
       <SessionManager />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
-          <Stack.Screen name="Auth" component={AuthScreen} />
+          getAuthScreen()
         ) : needsOnboarding ? (
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         ) : (

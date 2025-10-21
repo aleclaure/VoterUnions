@@ -61,7 +61,7 @@ export const CONFIG = {
    */
   USE_DEVICE_AUTH: parseBoolean(
     process.env.EXPO_PUBLIC_USE_DEVICE_AUTH,
-    false // Default: use Supabase
+    true // Default: use Device Token Auth (privacy-first)
   ),
   
   // Deprecated: USE_WEBAUTHN renamed to USE_DEVICE_AUTH

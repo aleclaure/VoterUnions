@@ -3,6 +3,8 @@
 ## Overview
 Voter Unions is a cross-platform mobile application built with Expo and Supabase, designed to empower communities through political engagement, structured policy debates, and collective action. It aims to connect online discussions with real-world political impact, enabling working-class voters to organize, coordinate vote pledging, track campaign progress, and participate in democratic decision-making. Key capabilities include union management, enhanced debate systems, transparency tools (Power Tracker), collaborative policy drafting (People's Agenda, People's Terms), and specialized organizing platforms for consumers and workers (Consumer Union, Workers Union). The platform also provides educational content on corporate and labor power dynamics, fostering collective action and increasing political efficacy.
 
+**Current Status (Oct 21, 2025):** Device Token Authentication is now **ENABLED** by default. The app uses privacy-first cryptographic authentication with automatic login - no email/password required.
+
 ## User Preferences
 - Expo Go compatibility enforced (no custom native modules)
 - TypeScript strict mode enabled
@@ -38,6 +40,11 @@ The application is built using Expo SDK 52 with React Native and TypeScript, ens
 - **Admin Audit Logging & Transparency**: Comprehensive audit logs for authentication, moderation, and admin actions.
 - **Rate Limiting**: Client-side rate limiting prevents abuse across various action types.
 - **Blue Spirit Phase 1 Migration**: Transitioning from Supabase email/password authentication to a WebAuthn-based, privacy-first architecture, with a "Device Token Auth" path for Expo Go compatibility. This involves removing email collection, implementing a zero-knowledge architecture, blind-signature voting, E2EE messaging, and encrypted memberships. The migration uses feature flags, a data adapter layer, and security guardrails. The system now utilizes the `elliptic` library for cryptographic operations due to Expo Go compatibility.
+- **Device Token Auth Status (ENABLED)**: As of Oct 21, 2025, Device Token Authentication is enabled by default (`CONFIG.USE_DEVICE_AUTH = true`). The system automatically handles:
+  - **First-time users**: Shows DeviceRegisterScreen with one-tap registration (generates ECDSA P-256 keypair)
+  - **Returning users**: Shows DeviceLoginScreen with automatic login (no UI interaction needed)
+  - **Session persistence**: Stores session in expo-secure-store for app restart
+  - **Navigation routing**: AppNavigator checks keypair existence and routes to appropriate screen
 
 ## External Dependencies
 - **Expo SDK 52 (React Native)**: Core mobile application development.
