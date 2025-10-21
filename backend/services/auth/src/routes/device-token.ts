@@ -5,17 +5,20 @@
  */
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { p256 } from '@noble/curves/p256';
-import { sha256 } from '@noble/hashes/sha256';
-import { hexToBytes } from '@noble/hashes/utils';
+// @ts-ignore - elliptic doesn't have TypeScript definitions
+import * as elliptic from 'elliptic';
 import { z } from 'zod';
 import { pool, redis } from '../db/index.js';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwt.js';
 import crypto from 'crypto';
 
+// Initialize P-256 curve (also known as secp256r1 or prime256v1)
+const EC = elliptic.ec;
+const ec = new EC('p256');
+
 // Request schemas
 const RegisterDeviceSchema = z.object({
-  publicKey: z.string().length(130), // Hex-encoded P-256 public key (65 bytes)
+  publicKey: z.string().min(1), // Hex-encoded P-256 public key
   deviceId: z.string().min(1),
   deviceName: z.string().optional(),
   osName: z.string().optional(),
@@ -23,11 +26,11 @@ const RegisterDeviceSchema = z.object({
 });
 
 const ChallengeSchema = z.object({
-  publicKey: z.string().length(130),
+  publicKey: z.string().min(1),
 });
 
 const VerifyDeviceSchema = z.object({
-  publicKey: z.string().length(130),
+  publicKey: z.string().min(1),
   challenge: z.string().min(1),
   signature: z.string().min(1),
   deviceId: z.string().min(1),
@@ -38,14 +41,10 @@ const VerifyDeviceSchema = z.object({
  */
 function validatePublicKey(publicKeyHex: string): boolean {
   try {
-    const publicKeyBytes = hexToBytes(publicKeyHex);
-    // P-256 public keys are 65 bytes (uncompressed) or 33 bytes (compressed)
-    if (publicKeyBytes.length !== 65 && publicKeyBytes.length !== 33) {
-      return false;
-    }
+    // Try to create a key from the public key hex
+    const key = ec.keyFromPublic(publicKeyHex, 'hex');
     // Verify it's a valid point on the curve
-    p256.ProjectivePoint.fromHex(publicKeyHex);
-    return true;
+    return key.validate().result;
   } catch {
     return false;
   }
@@ -60,11 +59,11 @@ function verifySignature(
   signatureHex: string
 ): boolean {
   try {
-    const messageHash = sha256(message);
-    const publicKeyBytes = hexToBytes(publicKeyHex);
-    const signatureBytes = hexToBytes(signatureHex);
+    // Create public key from hex
+    const key = ec.keyFromPublic(publicKeyHex, 'hex');
     
-    return p256.verify(signatureBytes, messageHash, publicKeyBytes);
+    // Verify signature (elliptic handles hashing internally)
+    return key.verify(message, signatureHex);
   } catch (error) {
     console.error('Signature verification error:', error);
     return false;

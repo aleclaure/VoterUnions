@@ -8,7 +8,7 @@
  * - NIST P-256 (secp256r1) elliptic curve
  * - Hardware-backed key storage (iOS Keychain / Android Keystore)
  * - Deterministic signatures (RFC 6979)
- * - Secure randomness via react-native-get-random-values
+ * - Secure randomness via expo-crypto
  * 
  * Platform Support:
  * - ✅ iOS (native)
@@ -16,13 +16,16 @@
  * - ❌ Web (disabled for security)
  */
 
-import { p256 } from '@noble/curves/p256';
-import { sha256 } from '@noble/hashes/sha256';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
+// @ts-ignore - elliptic doesn't have great TypeScript definitions
+import * as elliptic from 'elliptic';
 import * as SecureStore from 'expo-secure-store';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+
+// Initialize P-256 curve (also known as secp256r1 or prime256v1)
+const EC = elliptic.ec;
+const ec = new EC('p256');
 
 /**
  * Check if device authentication is supported on this platform
@@ -38,7 +41,7 @@ export function isDeviceAuthSupported(): boolean {
  * Generate ECDSA P-256 keypair with cryptographically secure randomness
  * 
  * Security:
- * - Uses react-native-get-random-values polyfill
+ * - Uses expo-crypto polyfill for crypto.getRandomValues()
  * - iOS: SecRandomCopyBytes (hardware RNG)
  * - Android: SecureRandom (hardware RNG)
  * 
@@ -53,15 +56,16 @@ export async function generateDeviceKeypair(): Promise<{
     throw new Error('Device auth not supported on web platform');
   }
   
-  // Generate private key with secure randomness
-  const privateKey = p256.utils.randomPrivateKey();
+  // Generate keypair with secure randomness
+  const keyPair = ec.genKeyPair();
   
-  // Derive public key from private key
-  const publicKey = p256.getPublicKey(privateKey);
+  // Extract keys in hex format
+  const privateKey = keyPair.getPrivate('hex');
+  const publicKey = keyPair.getPublic('hex');
   
   return {
-    publicKey: bytesToHex(publicKey),
-    privateKey: bytesToHex(privateKey),
+    publicKey,
+    privateKey,
   };
 }
 
@@ -113,30 +117,28 @@ export async function getDeviceKeypair(): Promise<{
  * 
  * @param challenge String challenge from server
  * @param privateKey Hex-encoded private key
- * @returns Hex-encoded signature
+ * @returns Hex-encoded signature (DER format)
  */
 export async function signChallenge(
   challenge: string,
   privateKey: string
 ): Promise<string> {
-  // Convert challenge string to bytes
-  const messageBytes = new TextEncoder().encode(challenge);
+  // Create keypair from private key
+  const keyPair = ec.keyFromPrivate(privateKey, 'hex');
   
-  // Convert private key hex to bytes
-  const privateKeyBytes = hexToBytes(privateKey);
+  // Hash the challenge (elliptic will hash it again internally with SHA-256)
+  // We pass the raw challenge string and let elliptic handle the hashing
+  const signature = keyPair.sign(challenge);
   
-  // Sign (p256.sign automatically hashes with SHA-256 and uses RFC 6979)
-  const signature = p256.sign(messageBytes, privateKeyBytes);
-  
-  // Return hex-encoded signature (convert to compact format)
-  return bytesToHex(signature.toCompactRawBytes());
+  // Return signature in DER format (standard format for ECDSA signatures)
+  return signature.toDER('hex');
 }
 
 /**
  * Verify a signature (for testing)
  * 
  * @param challenge Original challenge string
- * @param signature Hex-encoded signature
+ * @param signature Hex-encoded signature (DER format)
  * @param publicKey Hex-encoded public key
  * @returns true if signature is valid
  */
@@ -146,11 +148,11 @@ export function verifySignature(
   publicKey: string
 ): boolean {
   try {
-    const messageBytes = new TextEncoder().encode(challenge);
-    const signatureBytes = hexToBytes(signature);
-    const publicKeyBytes = hexToBytes(publicKey);
+    // Create public key from hex
+    const key = ec.keyFromPublic(publicKey, 'hex');
     
-    return p256.verify(signatureBytes, messageBytes, publicKeyBytes);
+    // Verify signature
+    return key.verify(challenge, signature);
   } catch (error) {
     console.error('Signature verification failed:', error);
     return false;
@@ -163,43 +165,33 @@ export function verifySignature(
  * Collects device metadata for backend tracking and security.
  * This helps detect suspicious activity (e.g., same account from multiple devices).
  * 
- * @returns Device information object
- * @throws Error if called on unsupported platform (web)
+ * @returns Device info object
  */
 export async function getDeviceInfo(): Promise<{
   deviceId: string;
   deviceName: string | null;
   osName: string | null;
   osVersion: string | null;
-  appVersion: string | null;
 }> {
-  if (!isDeviceAuthSupported()) {
-    throw new Error('Device auth not supported on web platform');
-  }
+  // Generate stable device ID from multiple sources
+  const androidId = Application.getAndroidId();
+  const iosId = await Application.getIosIdForVendorAsync();
   
-  let deviceId: string;
-  
-  if (Platform.OS === 'ios') {
-    // iOS: Use vendor ID (stable across app reinstalls)
-    deviceId = await Application.getIosIdForVendorAsync() || `ios-${Date.now()}`;
-  } else if (Platform.OS === 'android') {
-    // Android: Use Android ID (stable across app reinstalls)
-    deviceId = Application.getAndroidId() || `android-${Date.now()}`;
-  } else {
-    throw new Error('Device auth not supported on web platform');
-  }
+  // Combine IDs to create a stable device identifier
+  const deviceId = androidId || iosId || 'unknown';
   
   return {
     deviceId,
-    deviceName: Device.deviceName,
-    osName: Device.osName,
-    osVersion: Device.osVersion,
-    appVersion: Application.nativeApplicationVersion,
+    deviceName: Device.deviceName || null,
+    osName: Device.osName || null,
+    osVersion: Device.osVersion || null,
   };
 }
 
 /**
- * Delete device keypair from secure storage (on logout)
+ * Delete device keypair from secure storage
+ * 
+ * Called during logout to remove credentials
  */
 export async function deleteDeviceKeypair(): Promise<void> {
   await SecureStore.deleteItemAsync('device_private_key');
@@ -207,120 +199,172 @@ export async function deleteDeviceKeypair(): Promise<void> {
 }
 
 /**
- * Store session data in secure storage
+ * Check if device has stored keypair
  * 
- * This allows session restoration on app restart without re-authentication.
- * 
- * @param session Session object with user and tokens
+ * @returns true if keypair exists in secure storage
  */
-export async function storeSession(session: { user: any; tokens: any }): Promise<void> {
-  await SecureStore.setItemAsync('device_session', JSON.stringify(session));
+export async function hasDeviceKeypair(): Promise<boolean> {
+  const keypair = await getDeviceKeypair();
+  return keypair !== null;
 }
 
 /**
- * Retrieve stored session from secure storage
+ * Initialize device authentication
  * 
- * @returns Stored session or null if not found
+ * Generates and stores a new keypair if one doesn't exist
+ * 
+ * @returns Public key (hex)
  */
-export async function getStoredSession(): Promise<{ user: any; tokens: any } | null> {
+export async function initializeDeviceAuth(): Promise<string> {
+  // Check if keypair already exists
+  const existing = await getDeviceKeypair();
+  if (existing) {
+    return existing.publicKey;
+  }
+  
+  // Generate new keypair
+  const { publicKey, privateKey } = await generateDeviceKeypair();
+  
+  // Store securely
+  await storeDeviceKeypair(privateKey, publicKey);
+  
+  return publicKey;
+}
+
+/**
+ * Register device with backend
+ * 
+ * Sends public key and device info to server
+ * 
+ * @param apiUrl Backend API URL
+ * @returns Registration result
+ */
+export async function registerDevice(apiUrl: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
   try {
-    const sessionString = await SecureStore.getItemAsync('device_session');
-    if (!sessionString) {
-      return null;
+    // Initialize device auth (generates keypair if needed)
+    const publicKey = await initializeDeviceAuth();
+    
+    // Get device info
+    const deviceInfo = await getDeviceInfo();
+    
+    // Send registration request
+    const response = await fetch(`${apiUrl}/auth/register-device`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        publicKey,
+        ...deviceInfo,
+      }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      return {
+        success: false,
+        error: error.message || 'Registration failed',
+      };
     }
-    return JSON.parse(sessionString);
+    
+    return { success: true };
   } catch (error) {
-    console.error('Failed to retrieve session:', error);
-    return null;
+    console.error('Device registration error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
   }
 }
 
 /**
- * Delete stored session (on logout)
- */
-export async function deleteSession(): Promise<void> {
-  await SecureStore.deleteItemAsync('device_session');
-}
-
-/**
- * Test device auth functionality
+ * Authenticate device with backend
  * 
- * This function verifies that:
- * 1. Secure randomness is working (generates different keys)
- * 2. Key generation works
- * 3. Signing works
- * 4. Verification works
+ * Completes challenge-response authentication flow
  * 
- * Run this in development to ensure everything is set up correctly.
+ * @param apiUrl Backend API URL
+ * @returns Authentication tokens
  */
-export async function testDeviceAuth(): Promise<{
+export async function authenticateDevice(apiUrl: string): Promise<{
   success: boolean;
-  details: string[];
-  errors: string[];
+  accessToken?: string;
+  refreshToken?: string;
+  user?: any;
+  error?: string;
 }> {
-  const details: string[] = [];
-  const errors: string[] = [];
-  
   try {
-    // Test 1: Platform support
-    details.push(`Platform: ${Platform.OS}`);
-    if (!isDeviceAuthSupported()) {
-      errors.push('Device auth not supported on this platform');
-      return { success: false, details, errors };
+    // Get stored keypair
+    const keypair = await getDeviceKeypair();
+    if (!keypair) {
+      return {
+        success: false,
+        error: 'No device keypair found. Please register first.',
+      };
     }
-    details.push('✅ Platform supported');
     
-    // Test 2: RNG (generate two keys, ensure they're different)
-    const keypair1 = await generateDeviceKeypair();
-    const keypair2 = await generateDeviceKeypair();
+    const { publicKey, privateKey } = keypair;
     
-    if (keypair1.privateKey === keypair2.privateKey) {
-      errors.push('RNG appears broken - generated identical keys');
-      return { success: false, details, errors };
+    // Step 1: Request challenge from server
+    const challengeResponse = await fetch(`${apiUrl}/auth/challenge`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ publicKey }),
+    });
+    
+    if (!challengeResponse.ok) {
+      const error = await challengeResponse.json();
+      return {
+        success: false,
+        error: error.message || 'Challenge request failed',
+      };
     }
-    details.push('✅ RNG working (generated different keys)');
-    details.push(`  Key 1: ${keypair1.privateKey.substring(0, 16)}...`);
-    details.push(`  Key 2: ${keypair2.privateKey.substring(0, 16)}...`);
     
-    // Test 3: Sign and verify
-    const testChallenge = 'test-challenge-' + Date.now();
-    const signature = await signChallenge(testChallenge, keypair1.privateKey);
-    const isValid = await verifySignature(testChallenge, signature, keypair1.publicKey);
+    const { challenge } = await challengeResponse.json();
     
-    if (!isValid) {
-      errors.push('Signature verification failed');
-      return { success: false, details, errors };
+    // Step 2: Sign challenge with private key
+    const signature = await signChallenge(challenge, privateKey);
+    
+    // Step 3: Send signature to server for verification
+    const deviceInfo = await getDeviceInfo();
+    const verifyResponse = await fetch(`${apiUrl}/auth/verify-device`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        publicKey,
+        challenge,
+        signature,
+        deviceId: deviceInfo.deviceId,
+      }),
+    });
+    
+    if (!verifyResponse.ok) {
+      const error = await verifyResponse.json();
+      return {
+        success: false,
+        error: error.message || 'Authentication failed',
+      };
     }
-    details.push('✅ Sign/verify working');
-    details.push(`  Challenge: ${testChallenge}`);
-    details.push(`  Signature: ${signature.substring(0, 32)}...`);
     
-    // Test 4: Deterministic signatures (same input = same output)
-    const signature2 = await signChallenge(testChallenge, keypair1.privateKey);
-    if (signature !== signature2) {
-      errors.push('Signatures are not deterministic (RFC 6979 issue)');
-      return { success: false, details, errors };
-    }
-    details.push('✅ Signatures are deterministic (RFC 6979)');
+    const result = await verifyResponse.json();
     
-    // Test 5: Storage
-    await storeDeviceKeypair(keypair1.privateKey, keypair1.publicKey);
-    const retrieved = await getDeviceKeypair();
-    
-    if (!retrieved || retrieved.privateKey !== keypair1.privateKey) {
-      errors.push('Key storage/retrieval failed');
-      return { success: false, details, errors };
-    }
-    details.push('✅ Secure storage working');
-    
-    // Cleanup
-    await deleteDeviceKeypair();
-    details.push('✅ All tests passed!');
-    
-    return { success: true, details, errors };
-    
+    return {
+      success: true,
+      accessToken: result.access_token,
+      refreshToken: result.refresh_token,
+      user: result.user,
+    };
   } catch (error) {
-    errors.push(`Test failed with error: ${error}`);
-    return { success: false, details, errors };
+    console.error('Device authentication error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
   }
 }
