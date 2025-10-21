@@ -58,22 +58,34 @@ npm install @noble/curves@1.4.2 @noble/hashes@1.4.0 --legacy-peer-deps
 
 ---
 
-### ✅ Fix #2: Import Crypto Polyfill at App Entry
+### ✅ Fix #2: Use expo-crypto Polyfill (Expo Go Compatible)
+
+**Removed:** `react-native-get-random-values` (requires native modules, doesn't work in Expo Go)  
+**Installed:** `expo-crypto` (official Expo package, works in Expo Go)
 
 Updated `index.ts`:
 
 ```typescript
-// CRITICAL: Import crypto polyfill FIRST before any other imports
-// This provides crypto.getRandomValues() for @noble/curves on React Native
-import 'react-native-get-random-values';
+// CRITICAL: Polyfill crypto.getRandomValues() FIRST before any other imports
+// This provides secure randomness for @noble/curves on React Native
+import { getRandomValues } from 'expo-crypto';
+
+// Polyfill global crypto object for @noble/curves
+if (typeof global.crypto !== 'object') {
+  global.crypto = {} as any;
+}
+if (typeof global.crypto.getRandomValues !== 'function') {
+  global.crypto.getRandomValues = getRandomValues as any;
+}
 
 export { default } from './App';
 ```
 
-**Why this works:**
-- Polyfill must load BEFORE any module that uses `crypto.getRandomValues()`
-- `react-native-get-random-values` provides hardware RNG on iOS/Android
-- Without this, @noble/curves fails with "crypto is not defined" error
+**Why expo-crypto instead of react-native-get-random-values:**
+- ✅ expo-crypto is an **official Expo SDK package** (works in Expo Go)
+- ✅ Provides hardware-backed RNG on iOS/Android
+- ✅ No native compilation required (pure Expo API)
+- ❌ react-native-get-random-values requires native modules (fails in Expo Go Snackager)
 
 ---
 
@@ -142,12 +154,12 @@ return bytesToHex(signature.toCompactRawBytes()); // Convert to bytes first
 - Server starts without errors
 - Ready to accept connections from Expo Go
 
-### ✅ Package Versions: Downgraded
+### ✅ Package Versions: Downgraded & Updated
 ```json
 {
   "@noble/curves": "1.4.2",
   "@noble/hashes": "1.4.0",
-  "react-native-get-random-values": "^1.11.0"
+  "expo-crypto": "^14.2.4"
 }
 ```
 
@@ -185,11 +197,12 @@ return bytesToHex(signature.toCompactRawBytes()); // Convert to bytes first
 
 ## Key Learnings
 
-1. **Expo Go Snackager has limitations** - Cannot handle v2.x ESM-only exports
+1. **Expo Go Snackager has limitations** - Cannot handle v2.x ESM-only exports or packages with native modules
 2. **v1.x is the safe choice for Expo Go** - Same security, better compatibility
-3. **Polyfill must load first** - Import `react-native-get-random-values` at app entry
-4. **v1.x API differences** - Use `randomPrivateKey()` and `.toCompactRawBytes()`
-5. **Use --legacy-peer-deps** for peer dependency conflicts in Expo
+3. **Use expo-crypto, not react-native-get-random-values** - expo-crypto works in Expo Go, react-native-get-random-values requires native compilation
+4. **Polyfill must load first** - Set up `global.crypto.getRandomValues` at app entry point
+5. **v1.x API differences** - Use `randomPrivateKey()` and `.toCompactRawBytes()`
+6. **Use --legacy-peer-deps** for peer dependency conflicts in Expo
 
 ---
 
@@ -209,4 +222,4 @@ return bytesToHex(signature.toCompactRawBytes()); // Convert to bytes first
 - @noble/curves v1.4.2: https://github.com/paulmillr/noble-curves/releases/tag/1.4.2
 - @noble/hashes v1.4.0: https://github.com/paulmillr/noble-hashes/releases/tag/1.4.0
 - Expo Go Limitations: https://docs.expo.dev/workflow/expo-go/
-- react-native-get-random-values: https://github.com/LinusU/react-native-get-random-values
+- expo-crypto Documentation: https://docs.expo.dev/versions/latest/sdk/crypto/

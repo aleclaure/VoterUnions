@@ -200,7 +200,7 @@ The application is built using Expo SDK 52 with React Native and TypeScript, ens
 - **Root Cause:** Expo Go's Snackager has fundamental incompatibility with @noble v2.x modern package.json exports
 - **Solution: Downgrade to v1.x:**
   - ✅ Downgraded to @noble/curves@1.4.2 and @noble/hashes@1.4.0 (Expo Go compatible)
-  - ✅ Added crypto polyfill import at app entry (`react-native-get-random-values`)
+  - ✅ Added crypto polyfill using expo-crypto (official Expo SDK package, works in Expo Go)
   - ✅ Created metro.config.js with resolver configuration
   - ✅ Updated code for v1.x API (`randomPrivateKey()`, `.toCompactRawBytes()`)
   - ✅ Applied same fixes to backend for consistency
