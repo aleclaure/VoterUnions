@@ -938,3 +938,27 @@ export interface Report {
   created_at: string;
   deleted_at: string | null;
 }
+
+// ============================================================================
+// Authentication Types
+// ============================================================================
+
+export type {
+  AuthUser,
+  DeviceKeypair,
+  DeviceInfo,
+  SessionData,
+  DeviceRegistrationRequest,
+  DeviceRegistrationResponse,
+  ChallengeRequest,
+  ChallengeResponse,
+  DeviceVerificationRequest,
+  DeviceAuthenticationResponse,
+  DeviceAuthenticationResult,
+  TokenRefreshRequest,
+  TokenRefreshResponse,
+  AuthResult,
+  DeviceRegistrationResult,
+  LogoutOptions,
+  SessionValidationResult,
+} from './auth';

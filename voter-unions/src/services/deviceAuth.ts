@@ -1,27 +1,34 @@
 /**
  * Device Token Authentication Service
- * 
+ *
  * Provides cryptographic device-based authentication using ECDSA P-256 signatures.
  * This enables privacy-first authentication without email collection.
- * 
+ *
  * Security:
  * - NIST P-256 (secp256r1) elliptic curve
  * - Hardware-backed key storage (iOS Keychain / Android Keystore)
  * - Deterministic signatures (RFC 6979)
  * - Secure randomness via expo-crypto
- * 
+ *
  * Platform Support:
  * - ✅ iOS (native)
  * - ✅ Android (native)
  * - ❌ Web (disabled for security)
  */
 
-// @ts-ignore - elliptic doesn't have great TypeScript definitions
 import * as elliptic from 'elliptic';
 import * as SecureStore from 'expo-secure-store';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import type {
+  DeviceKeypair,
+  DeviceInfo,
+  SessionData,
+  DeviceRegistrationResponse,
+  DeviceAuthenticationResult,
+  ChallengeResponse,
+} from '../types/auth';
 
 // Initialize P-256 curve (also known as secp256r1 or prime256v1)
 const EC = elliptic.ec;
@@ -39,30 +46,27 @@ export function isDeviceAuthSupported(): boolean {
 
 /**
  * Generate ECDSA P-256 keypair with cryptographically secure randomness
- * 
+ *
  * Security:
  * - Uses expo-crypto polyfill for crypto.getRandomValues()
  * - iOS: SecRandomCopyBytes (hardware RNG)
  * - Android: SecureRandom (hardware RNG)
- * 
+ *
  * @returns Object containing hex-encoded public and private keys
  * @throws Error if called on unsupported platform (web)
  */
-export async function generateDeviceKeypair(): Promise<{
-  publicKey: string;
-  privateKey: string;
-}> {
+export async function generateDeviceKeypair(): Promise<DeviceKeypair> {
   if (!isDeviceAuthSupported()) {
     throw new Error('Device auth not supported on web platform');
   }
-  
+
   // Generate keypair with secure randomness
   const keyPair = ec.genKeyPair();
-  
+
   // Extract keys in hex format
   const privateKey = keyPair.getPrivate('hex');
   const publicKey = keyPair.getPublic('hex');
-  
+
   return {
     publicKey,
     privateKey,
@@ -89,20 +93,17 @@ export async function storeDeviceKeypair(
 
 /**
  * Retrieve device keypair from secure storage
- * 
+ *
  * @returns Keypair if exists, null otherwise
  */
-export async function getDeviceKeypair(): Promise<{
-  publicKey: string;
-  privateKey: string;
-} | null> {
+export async function getDeviceKeypair(): Promise<DeviceKeypair | null> {
   const privateKey = await SecureStore.getItemAsync('device_private_key');
   const publicKey = await SecureStore.getItemAsync('device_public_key');
-  
+
   if (!privateKey || !publicKey) {
     return null;
   }
-  
+
   return { publicKey, privateKey };
 }
 
@@ -161,25 +162,20 @@ export function verifySignature(
 
 /**
  * Get device information for registration
- * 
+ *
  * Collects device metadata for backend tracking and security.
  * This helps detect suspicious activity (e.g., same account from multiple devices).
- * 
+ *
  * @returns Device info object
  */
-export async function getDeviceInfo(): Promise<{
-  deviceId: string;
-  deviceName: string | null;
-  osName: string | null;
-  osVersion: string | null;
-}> {
+export async function getDeviceInfo(): Promise<DeviceInfo> {
   // Generate stable device ID from multiple sources
   const androidId = Application.getAndroidId();
   const iosId = await Application.getIosIdForVendorAsync();
-  
+
   // Combine IDs to create a stable device identifier
   const deviceId = androidId || iosId || 'unknown';
-  
+
   return {
     deviceId,
     deviceName: Device.deviceName || null,
@@ -190,28 +186,36 @@ export async function getDeviceInfo(): Promise<{
 
 /**
  * Store session data in secure storage
- * 
+ *
  * Saves user and tokens for automatic restoration on app restart
- * 
+ *
  * @param sessionData Session object containing user and tokens
  */
-export async function storeSession(sessionData: any): Promise<void> {
+export async function storeSession(sessionData: SessionData): Promise<void> {
   await SecureStore.setItemAsync('device_session', JSON.stringify(sessionData));
 }
 
 /**
  * Retrieve stored session from secure storage
- * 
+ *
  * @returns Stored session if exists, null otherwise
  */
-export async function getStoredSession(): Promise<any | null> {
+export async function getStoredSession(): Promise<SessionData | null> {
   const sessionString = await SecureStore.getItemAsync('device_session');
   if (!sessionString) {
     return null;
   }
-  
+
   try {
-    return JSON.parse(sessionString);
+    const session = JSON.parse(sessionString) as SessionData;
+
+    // Validate session structure
+    if (!session.user || !session.accessToken || !session.refreshToken) {
+      console.error('Invalid session structure in stored session');
+      return null;
+    }
+
+    return session;
   } catch (error) {
     console.error('Failed to parse stored session:', error);
     return null;
@@ -272,23 +276,20 @@ export async function initializeDeviceAuth(): Promise<string> {
 
 /**
  * Register device with backend
- * 
+ *
  * Sends public key and device info to server
- * 
+ *
  * @param apiUrl Backend API URL
  * @returns Registration result
  */
-export async function registerDevice(apiUrl: string): Promise<{
-  success: boolean;
-  error?: string;
-}> {
+export async function registerDevice(apiUrl: string): Promise<DeviceRegistrationResponse> {
   try {
     // Initialize device auth (generates keypair if needed)
     const publicKey = await initializeDeviceAuth();
-    
+
     // Get device info
     const deviceInfo = await getDeviceInfo();
-    
+
     // Send registration request
     const response = await fetch(`${apiUrl}/auth/register-device`, {
       method: 'POST',
@@ -300,16 +301,17 @@ export async function registerDevice(apiUrl: string): Promise<{
         ...deviceInfo,
       }),
     });
-    
+
     if (!response.ok) {
-      const error = await response.json();
+      const error = await response.json() as { message?: string };
       return {
         success: false,
         error: error.message || 'Registration failed',
       };
     }
-    
-    return { success: true };
+
+    const result = await response.json() as DeviceRegistrationResponse;
+    return { success: true, ...result };
   } catch (error) {
     console.error('Device registration error:', error);
     return {
@@ -321,19 +323,13 @@ export async function registerDevice(apiUrl: string): Promise<{
 
 /**
  * Authenticate device with backend
- * 
+ *
  * Completes challenge-response authentication flow
- * 
+ *
  * @param apiUrl Backend API URL
  * @returns Authentication tokens
  */
-export async function authenticateDevice(apiUrl: string): Promise<{
-  success: boolean;
-  accessToken?: string;
-  refreshToken?: string;
-  user?: any;
-  error?: string;
-}> {
+export async function authenticateDevice(apiUrl: string): Promise<DeviceAuthenticationResult> {
   try {
     // Get stored keypair
     const keypair = await getDeviceKeypair();
@@ -343,9 +339,9 @@ export async function authenticateDevice(apiUrl: string): Promise<{
         error: 'No device keypair found. Please register first.',
       };
     }
-    
+
     const { publicKey, privateKey } = keypair;
-    
+
     // Step 1: Request challenge from server
     const challengeResponse = await fetch(`${apiUrl}/auth/challenge`, {
       method: 'POST',
@@ -354,20 +350,21 @@ export async function authenticateDevice(apiUrl: string): Promise<{
       },
       body: JSON.stringify({ publicKey }),
     });
-    
+
     if (!challengeResponse.ok) {
-      const error = await challengeResponse.json();
+      const error = await challengeResponse.json() as { message?: string };
       return {
         success: false,
         error: error.message || 'Challenge request failed',
       };
     }
-    
-    const { challenge } = await challengeResponse.json();
-    
+
+    const challengeData = await challengeResponse.json() as ChallengeResponse;
+    const { challenge } = challengeData;
+
     // Step 2: Sign challenge with private key
     const signature = await signChallenge(challenge, privateKey);
-    
+
     // Step 3: Send signature to server for verification
     const deviceInfo = await getDeviceInfo();
     const verifyResponse = await fetch(`${apiUrl}/auth/verify-device`, {
@@ -382,17 +379,21 @@ export async function authenticateDevice(apiUrl: string): Promise<{
         deviceId: deviceInfo.deviceId,
       }),
     });
-    
+
     if (!verifyResponse.ok) {
-      const error = await verifyResponse.json();
+      const error = await verifyResponse.json() as { message?: string };
       return {
         success: false,
         error: error.message || 'Authentication failed',
       };
     }
-    
-    const result = await verifyResponse.json();
-    
+
+    const result = await verifyResponse.json() as {
+      access_token: string;
+      refresh_token: string;
+      user: any;
+    };
+
     return {
       success: true,
       accessToken: result.access_token,
