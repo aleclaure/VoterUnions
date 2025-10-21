@@ -15,8 +15,6 @@
     "lint:security": "eslint src --ext .ts,.tsx --plugin security"
   },
   "dependencies": {
-    "@noble/curves": "^1.4.2",
-    "@noble/hashes": "^1.4.0",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-navigation/bottom-tabs": "^7.4.8",
     "@react-navigation/material-top-tabs": "^7.0.8",
@@ -27,8 +25,10 @@
     "@tanstack/react-query-persist-client": "^5.90.2",
     "elliptic": "^6.5.4",
     "expo": "~54.0.12",
+    "expo-application": "~7.0.7",
     "expo-constants": "~17.1.7",
     "expo-crypto": "^15.0.7",
+    "expo-device": "~8.0.9",
     "expo-file-system": "~19.0.17",
     "expo-haptics": "~14.1.4",
     "expo-image": "~2.4.0",
