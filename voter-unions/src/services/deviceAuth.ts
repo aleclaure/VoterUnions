@@ -16,9 +16,9 @@
  * - ❌ Web (disabled for security)
  */
 
-import { p256 } from '@noble/curves/nist.js';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js';
+import { p256 } from '@noble/curves/p256';
+import { sha256 } from '@noble/hashes/sha256';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import * as SecureStore from 'expo-secure-store';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
@@ -54,7 +54,7 @@ export async function generateDeviceKeypair(): Promise<{
   }
   
   // Generate private key with secure randomness
-  const privateKey = p256.utils.randomSecretKey();
+  const privateKey = p256.utils.randomPrivateKey();
   
   // Derive public key from private key
   const publicKey = p256.getPublicKey(privateKey);
@@ -128,8 +128,8 @@ export async function signChallenge(
   // Sign (p256.sign automatically hashes with SHA-256 and uses RFC 6979)
   const signature = p256.sign(messageBytes, privateKeyBytes);
   
-  // Return hex-encoded signature
-  return bytesToHex(signature);
+  // Return hex-encoded signature (convert to compact format)
+  return bytesToHex(signature.toCompactRawBytes());
 }
 
 /**

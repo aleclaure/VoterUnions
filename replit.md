@@ -196,15 +196,17 @@ The application is built using Expo SDK 52 with React Native and TypeScript, ens
 - Full stack Device Token Auth complete
 
 **Module Resolution Blocker Fixed (Oct 21, 2025):**
-- **Issue:** Unable to resolve `@noble/curves/p256.js` - critical blocker preventing app from running
-- **Root Causes:** (1) Packages not installed, (2) Metro bundler config missing, (3) Incorrect import paths, (4) Wrong API method name
-- **Fixes Applied:**
-  - Installed @noble/curves@2.0.1 and @noble/hashes@2.0.1 with --legacy-peer-deps
-  - Created metro.config.js with `unstable_conditionNames: ['require', 'browser', 'react-native']`
-  - Corrected imports: `@noble/curves/nist.js` (not p256), `@noble/hashes/sha2.js` (not sha256.js)
-  - Fixed API: `randomSecretKey()` (not randomPrivateKey())
-- **Status:** ✅ All LSP errors resolved, Metro bundler running successfully, ready for Expo Go testing
-- **Documentation:** See MODULE_RESOLUTION_FIX.md for complete details
+- **Issue:** Unable to resolve `@noble/curves` in Expo Go - Snackager cannot bundle v2.x ESM-only exports
+- **Root Cause:** Expo Go's Snackager has fundamental incompatibility with @noble v2.x modern package.json exports
+- **Solution: Downgrade to v1.x:**
+  - ✅ Downgraded to @noble/curves@1.4.2 and @noble/hashes@1.4.0 (Expo Go compatible)
+  - ✅ Added crypto polyfill import at app entry (`react-native-get-random-values`)
+  - ✅ Created metro.config.js with resolver configuration
+  - ✅ Updated code for v1.x API (`randomPrivateKey()`, `.toCompactRawBytes()`)
+  - ✅ Applied same fixes to backend for consistency
+- **Security:** No downgrade - v1.x uses same P-256 curve, RFC 6979, and cryptographic primitives
+- **Status:** ✅ All LSP errors resolved, ready for Expo Go testing
+- **Documentation:** See MODULE_RESOLUTION_FIX.md for complete technical details
 
 **Next Steps:**
 - [x] Complete all 7 days of frontend implementation
