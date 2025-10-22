@@ -1,8 +1,47 @@
-# Railway Deployment - Quick Start Checklist
+# Railway Deployment - URGENT FIXES NEEDED
 
-**Status**: Ready to deploy
+**Status**: 🔴 DEPLOYMENT STALLED - Backend running OLD code
 **Backend**: backend/services/auth
 **Target**: https://voterunions-production.up.railway.app
+**Branch**: `claude/code-investigation-011CULV8bQvr5aPNNVprVFu9`
+**Latest Commit**: `e30400c8` (NOT deployed yet)
+
+---
+
+## 🔴 Current Issues (Fix These First!)
+
+### Issue 1: Railway Not Deploying Latest Code
+**Evidence**: Backend still returns CORS header `localhost:5000` instead of `*`
+
+**Your Action**:
+1. Go to Railway dashboard: https://railway.app/dashboard
+2. Click on your **auth service** project
+3. Go to **Settings** → **Source**
+4. Verify **Branch** is set to: `claude/code-investigation-011CULV8bQvr5aPNNVprVFu9`
+5. Check **Auto-Deploy** is enabled
+6. If branch is wrong, update it and click "Deploy"
+
+### Issue 2: Database Connection Failing
+**Error**: `password authentication failed for user "postgres"`
+
+**Your Action**:
+1. In Railway dashboard, go to your auth service
+2. Click **Variables** tab
+3. Find `DATABASE_URL` - it should look like:
+   ```
+   postgresql://${{Postgres.PGUSER}}:${{Postgres.PGPASSWORD}}@${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}
+   ```
+4. If it doesn't match, update it to use Railway's Postgres service references
+5. Click "Deploy" to trigger redeploy
+
+### Issue 3: Manual Redeploy Needed
+**Your Action**:
+1. After fixing above issues, go to **Deployments** tab
+2. Click **"Deploy"** button (top right)
+3. Watch the build logs - should see:
+   - ✅ `npm ci` (with bcrypt@6.0.0)
+   - ✅ `npm run build`
+   - ✅ Service starts successfully
 
 ---
 
@@ -244,6 +283,76 @@ npx @railway/cli rollback <deployment-id>
 
 ---
 
-**Ready to Deploy**: ✅ YES
+## ✅ Verification After Fixes
 
-**Next Command**: `npx @railway/cli login`
+Once you've fixed the issues above and Railway shows "Active" deployment, run these tests:
+
+### Test 1: Health Check
+
+```bash
+node -e "fetch('https://voterunions-production.up.railway.app/health').then(async r => { console.log('Status:', r.status); console.log('CORS:', r.headers.get('access-control-allow-origin')); console.log('Body:', JSON.stringify(await r.json(), null, 2)); })"
+```
+
+**Expected**:
+- Status: `200`
+- CORS: `*` (wildcard)
+- Body: Contains `"status": "healthy"`
+
+**If you still get `localhost:5000`**, Railway hasn't deployed the latest code yet!
+
+### Test 2: Registration Flow
+
+Once backend is healthy:
+
+1. **Clear browser storage** (open browser console at `localhost:8081`):
+   ```javascript
+   localStorage.clear();
+   const dbs = await indexedDB.databases();
+   for (const db of dbs) { indexedDB.deleteDatabase(db.name); }
+   location.reload();
+   ```
+
+2. **Try creating account**:
+   - Fill in username and password
+   - Click "Create Account"
+   - Watch browser console for detailed logs (green checkmarks)
+   - Should automatically log you in
+
+3. **Expected logs**:
+   ```
+   🔐 [DeviceRegister] Step 1: Calling registerWithDevice...
+   [registerWithDevice] ✅ Backend response received
+   [registerWithDevice] ✅ Session stored successfully
+   🔐 [AuthContext] setUser called: { hasUser: true, userId: '...', userEmail: '...' }
+   ```
+
+---
+
+## 📋 What Was Fixed in Commit e30400c8
+
+These fixes are ready to deploy (already committed):
+
+1. **Web Crypto Fix** (`src/services/webDeviceAuth.ts:66`)
+   - Fixed: `TypeError: p256.utils.randomPrivateKey is not a function`
+   - Changed to: Native Web Crypto API `crypto.getRandomValues()`
+
+2. **CORS Configuration** (`backend/services/auth/src/index.ts:46-50`)
+   - Now defaults to `origin: '*'` when CORS_ORIGIN not set
+   - No environment variable needed for development
+
+3. **Package Lock** (`backend/services/auth/package-lock.json`)
+   - Regenerated to sync with package.json (bcrypt@6.0.0)
+   - Should fix previous `npm ci` errors
+
+4. **Comprehensive Logging**
+   - Added detailed logs throughout registration flow
+   - Makes debugging much easier
+
+---
+
+**Current Status**: 🔴 Waiting for Railway fixes
+
+**Next Steps**:
+1. Fix Railway branch + DATABASE_URL (see top of this document)
+2. Trigger manual redeploy
+3. Run verification tests above
