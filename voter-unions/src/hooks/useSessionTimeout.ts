@@ -52,8 +52,8 @@ export const useSessionTimeout = () => {
       console.log('🔒 Session expired due to inactivity');
       
       // Log audit event
-      if (user.email && deviceId) {
-        await auditHelpers.sessionExpired(user.id, user.email, deviceId);
+      if ((user.email || user.username) && deviceId) {
+        await auditHelpers.sessionExpired(user.id, user.email || user.username!, deviceId);
       }
       
       // Sign out user
@@ -88,9 +88,9 @@ export const useSessionTimeout = () => {
         if (timeSinceLastActivity >= SESSION_TIMEOUT_MS) {
           // Session expired while in background
           console.log('🔒 Session expired while app was in background');
-          
-          if (user.email && deviceId) {
-            await auditHelpers.sessionExpired(user.id, user.email, deviceId);
+
+          if ((user.email || user.username) && deviceId) {
+            await auditHelpers.sessionExpired(user.id, user.email || user.username!, deviceId);
           }
           
           await signOut();

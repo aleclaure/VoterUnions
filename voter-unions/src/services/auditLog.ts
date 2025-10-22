@@ -54,63 +54,107 @@ export const logAuditEvent = async (params: AuditLogParams): Promise<void> => {
 };
 
 // Helper functions for common audit events
+// Phase 0: Updated to handle username OR email gracefully
 export const auditHelpers = {
-  loginSuccess: (userId: string, username: string, deviceId?: string | null) =>
-    logAuditEvent({
+  /**
+   * Log successful login
+   * @param userId - User ID
+   * @param identifier - Username or email (auto-detected)
+   * @param deviceId - Optional device ID
+   */
+  loginSuccess: (userId: string, identifier: string, deviceId?: string | null) => {
+    const isEmail = identifier.includes('@');
+    return logAuditEvent({
       userId,
-      username,
+      username: isEmail ? null : identifier,
       actionType: 'login_success',
       entityType: 'user',
       entityId: userId,
-      description: 'User logged in successfully',
+      description: `User logged in successfully${isEmail ? ' (email)' : ' (username)'}`,
+      metadata: isEmail ? { email: identifier } : undefined,
       deviceId,
-    }),
+    });
+  },
 
-  loginFailed: (email: string, errorMessage: string, deviceId?: string | null) =>
-    logAuditEvent({
+  /**
+   * Log failed login attempt
+   * @param identifier - Username or email (auto-detected)
+   * @param errorMessage - Error message
+   * @param deviceId - Optional device ID
+   */
+  loginFailed: (identifier: string, errorMessage: string, deviceId?: string | null) => {
+    const isEmail = identifier.includes('@');
+    return logAuditEvent({
       actionType: 'login_failed',
       entityType: 'user',
       entityId: null,
-      description: `Failed login attempt for ${email}`,
-      metadata: { email },
+      description: `Failed login attempt for ${identifier}`,
+      metadata: isEmail ? { email: identifier } : { username: identifier },
       errorMessage,
       success: false,
       deviceId,
-    }),
+    });
+  },
 
-  logout: (userId: string, username: string, deviceId?: string | null) =>
-    logAuditEvent({
+  /**
+   * Log successful logout
+   * @param userId - User ID
+   * @param identifier - Username or email (auto-detected)
+   * @param deviceId - Optional device ID
+   */
+  logout: (userId: string, identifier: string, deviceId?: string | null) => {
+    const isEmail = identifier.includes('@');
+    return logAuditEvent({
       userId,
-      username,
+      username: isEmail ? null : identifier,
       actionType: 'logout',
       entityType: 'user',
       entityId: userId,
       description: 'User logged out',
+      metadata: isEmail ? { email: identifier } : undefined,
       deviceId,
-    }),
+    });
+  },
 
-  signupSuccess: (userId: string, email: string, deviceId?: string | null) =>
-    logAuditEvent({
+  /**
+   * Log successful signup
+   * @param userId - User ID
+   * @param identifier - Username or email (auto-detected)
+   * @param deviceId - Optional device ID
+   */
+  signupSuccess: (userId: string, identifier: string, deviceId?: string | null) => {
+    const isEmail = identifier.includes('@');
+    return logAuditEvent({
       userId,
-      username: email,
+      username: isEmail ? null : identifier,
       actionType: 'signup_success',
       entityType: 'user',
       entityId: userId,
-      description: 'New account created',
+      description: `New account created${isEmail ? ' (email)' : ' (username)'}`,
+      metadata: isEmail ? { email: identifier } : undefined,
       deviceId,
-    }),
+    });
+  },
 
-  signupFailed: (email: string, errorMessage: string, deviceId?: string | null) =>
-    logAuditEvent({
+  /**
+   * Log failed signup attempt
+   * @param identifier - Username or email (auto-detected)
+   * @param errorMessage - Error message
+   * @param deviceId - Optional device ID
+   */
+  signupFailed: (identifier: string, errorMessage: string, deviceId?: string | null) => {
+    const isEmail = identifier.includes('@');
+    return logAuditEvent({
       actionType: 'signup_failed',
       entityType: 'user',
       entityId: null,
-      description: `Failed signup attempt for ${email}`,
-      metadata: { email },
+      description: `Failed signup attempt for ${identifier}`,
+      metadata: isEmail ? { email: identifier } : { username: identifier },
       errorMessage,
       success: false,
       deviceId,
-    }),
+    });
+  },
 
   passwordChanged: (userId: string, username: string, deviceId?: string | null) =>
     logAuditEvent({
@@ -133,16 +177,25 @@ export const auditHelpers = {
       deviceId,
     }),
 
-  sessionExpired: (userId: string, username: string, deviceId?: string | null) =>
-    logAuditEvent({
+  /**
+   * Log session expiration
+   * @param userId - User ID
+   * @param identifier - Username or email (auto-detected)
+   * @param deviceId - Optional device ID
+   */
+  sessionExpired: (userId: string, identifier: string, deviceId?: string | null) => {
+    const isEmail = identifier.includes('@');
+    return logAuditEvent({
       userId,
-      username,
+      username: isEmail ? null : identifier,
       actionType: 'session_expired',
       entityType: 'user',
       entityId: userId,
       description: 'Session expired due to inactivity',
+      metadata: isEmail ? { email: identifier } : undefined,
       deviceId,
-    }),
+    });
+  },
 
   rateLimitTriggered: (identifier: string, actionType: string, deviceId?: string | null) =>
     logAuditEvent({

@@ -14,11 +14,17 @@ interface AuthState {
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  console.log('🔐 [AuthProvider] Component rendering...');
   const [user, setUserState] = useState<User | null>(null);
   const [session, setSessionState] = useState<any | null>(null);
   const [isLoading, setIsLoadingState] = useState(true);
 
   const setUser = useCallback((user: User | null) => {
+    console.log('🔐 [AuthContext] setUser called:', {
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+    });
     setUserState(user);
   }, []);
 

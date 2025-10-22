@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>Voter Unions</title>
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        overflow: hidden;
+      }
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">Loading...</div>
+    <script>
+      console.log('HTML loaded, about to load bundle');
+      window.addEventListener('error', (e) => {
+        console.error('Global error caught:', e.error);
+        document.getElementById('root').innerHTML = '<div style="color: red; padding: 20px;">Error: ' + e.message + '</div>';
+      });
+    </script>
+    <script src="http://localhost:8081/index.bundle?platform=web&dev=true&hot=false&lazy=false"></script>
+    <script>
+      // After bundle loads, try to initialize the app
+      setTimeout(() => {
+        console.log('Checking if app rendered...');
+        const root = document.getElementById('root');
+        if (root.innerHTML === 'Loading...') {
+          console.error('App did not render! React might not have mounted.');
+          console.log('Available globals:', Object.keys(window).filter(k => k.includes('React') || k.includes('expo')));
+        }
+      }, 2000);
+    </script>
+  </body>
+</html>

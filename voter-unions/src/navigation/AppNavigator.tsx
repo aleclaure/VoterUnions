@@ -132,12 +132,25 @@ const MainStack = () => {
 };
 
 export const AppNavigator = () => {
+  console.log('🗺️ [AppNavigator] Component rendering...');
+  console.log('🗺️ [AppNavigator] Calling useAuth...');
   const { user, isLoading: authLoading, hasDeviceKeypair, canAutoLogin } = useAuth();
+  console.log('🗺️ [AppNavigator] useAuth returned:', { user: !!user, authLoading, hasDeviceKeypair });
+
+  console.log('🗺️ [AppNavigator] Calling useProfile...');
   const { needsOnboarding, isLoading: profileLoading } = useProfile();
+  console.log('🗺️ [AppNavigator] useProfile returned:', { needsOnboarding, profileLoading });
 
   if (authLoading || (user && profileLoading)) {
+    console.log('🗺️ [AppNavigator] Still loading, showing blank screen...', { authLoading, profileLoading });
     return null;
   }
+
+  console.log('🗺️ [AppNavigator] Navigation decision:', {
+    user: !!user,
+    needsOnboarding,
+    screen: !user ? 'Auth' : needsOnboarding ? 'Onboarding' : 'Main'
+  });
 
   // Determine which authentication screen to show
   const getAuthScreen = () => {

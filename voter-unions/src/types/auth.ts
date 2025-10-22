@@ -8,6 +8,8 @@
 /**
  * Authenticated user object from authentication service
  * Note: This is different from the Profile type which contains user profile data
+ *
+ * Phase 0: Added username field for hybrid authentication
  */
 export interface AuthUser {
   id: string;
@@ -15,6 +17,7 @@ export interface AuthUser {
   last_login_at?: string;
   email?: string;
   email_verified?: boolean;
+  username?: string; // Phase 0: Optional username for hybrid auth
 }
 
 /**

@@ -15,6 +15,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
@@ -24,24 +25,45 @@ import {
 } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
 import { CONFIG } from '../config';
-import { isDeviceAuthSupported } from '../services/deviceAuth';
+import { isDeviceAuthSupported } from '../services/platformDeviceAuth';
+import { ProgressLoadingScreen } from '../components/ProgressLoadingScreen';
 
 export const DeviceLoginScreen = () => {
   const [loading, setLoading] = useState(false);
   const [autoLoggingIn, setAutoLoggingIn] = useState(false);
-  const { loginWithDevice, canAutoLogin, hasDeviceKeypair } = useAuth();
+  const [progressStep, setProgressStep] = useState<'generating' | 'creating' | 'authenticating' | 'verifying'>('authenticating');
+  const [progress, setProgress] = useState(0);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const { loginWithDevice, loginWithHybridAuth, canAutoLogin, hasDeviceKeypair } = useAuth();
 
   // Check if device auth is supported
   const isPlatformSupported = isDeviceAuthSupported();
   const isDeviceAuthEnabled = CONFIG.USE_DEVICE_AUTH;
 
   // Auto-login on mount if possible
+  // Phase 1: Disable auto-login for hybrid auth (requires username/password)
   useEffect(() => {
     const attemptAutoLogin = async () => {
+      // Skip auto-login if hybrid auth is enabled
+      if (CONFIG.USE_HYBRID_AUTH) {
+        console.log('Skipping auto-login: hybrid auth enabled (username/password required)');
+        return;
+      }
+
       if (canAutoLogin()) {
         setAutoLoggingIn(true);
         try {
+          // Phase 5: Show progress during auto-login
+          setProgressStep('authenticating');
+          setProgress(0);
+
+          await new Promise(resolve => setTimeout(resolve, 300));
+          setProgress(50);
+
           const { error } = await loginWithDevice();
+          setProgress(100);
+
           if (error) {
             console.error('Auto-login failed:', error);
             Alert.alert(
@@ -61,16 +83,56 @@ export const DeviceLoginScreen = () => {
   }, [canAutoLogin, loginWithDevice]);
 
   const handleManualLogin = async () => {
+    // Phase 1: Hybrid Auth - Validate username/password if enabled
+    if (CONFIG.USE_HYBRID_AUTH) {
+      if (!username || !password) {
+        Alert.alert(
+          'Missing Credentials',
+          'Please enter both username and password'
+        );
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
-      const { data, error } = await loginWithDevice();
+      // Phase 5: Show progress - Step 1: Authenticating token
+      setProgressStep('authenticating');
+      setProgress(0);
 
-      if (error) {
-        Alert.alert('Login Failed', error.message);
-      } else if (data) {
-        // Success - user will be automatically navigated
-        console.log('Login successful');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      setProgress(33);
+
+      // Phase 1: Use hybrid login if enabled, otherwise device-only
+      if (CONFIG.USE_HYBRID_AUTH) {
+        // Phase 5: Show progress - Step 2: Verifying credentials
+        setProgressStep('verifying');
+        setProgress(50);
+
+        // Call hybrid login method (verifies both device token AND username/password)
+        const { data, error } = await loginWithHybridAuth(username, password);
+        setProgress(100);
+
+        if (error) {
+          Alert.alert('Login Failed', error.message);
+        } else if (data) {
+          // Success - user is now logged in, AppNavigator will navigate automatically
+          console.log('✅ [DeviceLogin] Hybrid login successful!');
+          console.log('✅ [DeviceLogin] User logged in, navigation will happen automatically');
+        }
+      } else {
+        // Device-only login (current implementation)
+        const { data, error } = await loginWithDevice();
+        setProgress(100);
+
+        if (error) {
+          Alert.alert('Login Failed', error.message);
+        } else if (data) {
+          // Success - user is now logged in, AppNavigator will navigate automatically
+          console.log('✅ [DeviceLogin] Device-only login successful!');
+          console.log('✅ [DeviceLogin] User logged in, navigation will happen automatically');
+        }
       }
     } catch (error) {
       Alert.alert(
@@ -153,18 +215,29 @@ export const DeviceLoginScreen = () => {
     );
   }
 
-  // Show auto-login progress
+  // Phase 5: Show auto-login progress
   if (autoLoggingIn) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Logging in automatically...</Text>
-          <Text style={styles.loadingHint}>
-            Verifying device identity with cryptographic signature
-          </Text>
-        </View>
-      </SafeAreaView>
+      <ProgressLoadingScreen
+        step={progressStep}
+        progress={progress}
+        subtitle="Verifying device signature automatically"
+      />
+    );
+  }
+
+  // Phase 5: Show manual login progress
+  if (loading) {
+    return (
+      <ProgressLoadingScreen
+        step={progressStep}
+        progress={progress}
+        subtitle={
+          progressStep === 'authenticating'
+            ? 'Signing challenge with device key'
+            : 'Verifying username and password'
+        }
+      />
     );
   }
 
@@ -186,23 +259,74 @@ export const DeviceLoginScreen = () => {
           </Text>
         </View>
 
-        <View style={styles.featuresList}>
-          <View style={styles.featureItem}>
-            <Text style={styles.featureIcon}>✅</Text>
-            <Text style={styles.featureText}>No password entry</Text>
+        {/* Phase 1: Show features for device-only auth */}
+        {!CONFIG.USE_HYBRID_AUTH && (
+          <View style={styles.featuresList}>
+            <View style={styles.featureItem}>
+              <Text style={styles.featureIcon}>✅</Text>
+              <Text style={styles.featureText}>No password entry</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Text style={styles.featureIcon}>⚡</Text>
+              <Text style={styles.featureText}>Instant authentication</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Text style={styles.featureIcon}>🔒</Text>
+              <Text style={styles.featureText}>
+                {Platform.OS === 'web'
+                  ? 'IndexedDB + AES-256-GCM encryption'
+                  : `Hardware-backed security (${Platform.OS === 'ios' ? 'Keychain' : 'Keystore'})`
+                }
+              </Text>
+            </View>
           </View>
-          <View style={styles.featureItem}>
-            <Text style={styles.featureIcon}>⚡</Text>
-            <Text style={styles.featureText}>Instant authentication</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <Text style={styles.featureIcon}>🔒</Text>
-            <Text style={styles.featureText}>
-              Hardware-backed security (
-              {Platform.OS === 'ios' ? 'Keychain' : 'Keystore'})
+        )}
+
+        {/* Phase 1: Hybrid Auth - Username/Password Fields */}
+        {CONFIG.USE_HYBRID_AUTH && (
+          <View style={styles.hybridAuthSection}>
+            <Text style={styles.sectionTitle}>
+              🔐 Two-Factor Authentication
             </Text>
+            <Text style={styles.sectionDescription}>
+              Enter your username and password. Your device signature will be verified automatically.
+            </Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Username *</Text>
+              <TextInput
+                style={styles.input}
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Enter username"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Password *</Text>
+              <TextInput
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Enter password"
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+              />
+            </View>
+
+            <View style={styles.securityNote}>
+              <Text style={styles.securityNoteIcon}>🛡️</Text>
+              <Text style={styles.securityNoteText}>
+                Both your device token and password are required for login
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
@@ -386,5 +510,65 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 8,
     paddingLeft: 16,
+  },
+  // Phase 1: Hybrid Auth Styles
+  hybridAuthSection: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  sectionDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 6,
+  },
+  input: {
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#333',
+  },
+  securityNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f5e9',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+  },
+  securityNoteIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  securityNoteText: {
+    fontSize: 12,
+    color: '#2e7d32',
+    flex: 1,
+    lineHeight: 18,
   },
 });

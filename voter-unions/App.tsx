@@ -14,6 +14,8 @@ LogBox.ignoreLogs([
 ]);
 
 export default function App() {
+  console.log('🚀 [App] Component rendering...');
+
   return (
     <ErrorBoundary>
       <AuthProvider>
@@ -24,3 +26,5 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
+console.log('✅ [App] Module loaded successfully');

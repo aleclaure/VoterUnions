@@ -64,16 +64,23 @@ export const OnboardingScreen = () => {
       });
 
       // Create or update profile with sanitized data
+      // Phase 4: Make email optional for hybrid auth users (username-only)
+      const profileData: any = {
+        id: user.id,
+        display_name: sanitizedProfile.display_name,
+        username_normalized: (sanitizedProfile.username || '').toLowerCase(),
+        bio: sanitizedProfile.bio,
+        last_seen: new Date().toISOString(),
+      };
+
+      // Only include email if user has one (Supabase users have email, hybrid auth users may not)
+      if (user.email) {
+        profileData.email = user.email;
+      }
+
       const { error: upsertError } = await supabase
         .from('profiles')
-        .upsert({
-          id: user.id,
-          email: user.email!,
-          display_name: sanitizedProfile.display_name,
-          username_normalized: (sanitizedProfile.username || '').toLowerCase(),
-          bio: sanitizedProfile.bio,
-          last_seen: new Date().toISOString(),
-        }, {
+        .upsert(profileData, {
           onConflict: 'id'
         });
 

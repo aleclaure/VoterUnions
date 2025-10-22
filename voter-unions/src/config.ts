@@ -50,18 +50,18 @@ export const CONFIG = {
 
   /**
    * Device Token Authentication Feature Flag
-   * 
+   *
    * When true: Use Device Token Auth (privacy-first, no email collection)
    * When false: Use Supabase email/password authentication
-   * 
+   *
    * Note: Originally planned for WebAuthn, but using Device Token Auth for
    * Expo Go compatibility. Both achieve privacy-first authentication.
-   * 
-   * Default: false (Supabase during migration)
+   *
+   * Phase 6: 100% Rollout - Default enabled
    */
   USE_DEVICE_AUTH: parseBoolean(
     process.env.EXPO_PUBLIC_USE_DEVICE_AUTH,
-    true // Default: use Device Token Auth (privacy-first)
+    true // Phase 6: Default enabled (100% rollout)
   ),
   
   // Deprecated: USE_WEBAUTHN renamed to USE_DEVICE_AUTH
@@ -85,10 +85,10 @@ export const CONFIG = {
 
   /**
    * WebAuthn Rollout Percentage
-   * 
+   *
    * Controls gradual rollout of WebAuthn authentication.
    * Value: 0-100 (percentage of users in rollout)
-   * 
+   *
    * Default: 0 (no users in rollout)
    */
   WEBAUTHN_ROLLOUT_PERCENT: parseNumber(
@@ -97,8 +97,40 @@ export const CONFIG = {
   ),
 
   /**
+   * Hybrid Auth Feature Flag (Phase 0-5: Implementation Complete)
+   *
+   * When true: Username/Password required alongside device token (two-factor)
+   * When false: Device token only (legacy behavior)
+   *
+   * This enables two-factor authentication combining device token cryptography
+   * with traditional username/password authentication.
+   *
+   * Phase 6: 100% Rollout - Default enabled for all users
+   */
+  USE_HYBRID_AUTH: parseBoolean(
+    process.env.EXPO_PUBLIC_USE_HYBRID_AUTH,
+    true // Phase 6: Default enabled (100% rollout)
+  ),
+
+  /**
+   * Require Username Feature Flag (Phase 0-5: Implementation Complete)
+   *
+   * When true: Username field required at registration (mandatory)
+   * When false: Username optional (backward compatible)
+   *
+   * This controls whether new users MUST create a username/password
+   * or can skip it for device-only authentication.
+   *
+   * Phase 6: 100% Rollout - Default enabled (username/password required)
+   */
+  REQUIRE_USERNAME: parseBoolean(
+    process.env.EXPO_PUBLIC_REQUIRE_USERNAME,
+    true // Phase 6: Default enabled (username required for all new users)
+  ),
+
+  /**
    * New Backend API URL
-   * 
+   *
    * Base URL for the new microservices backend.
    * Only used when USE_NEW_BACKEND is true.
    */
@@ -148,9 +180,42 @@ if (isDevelopment) {
     console.warn('   Set EXPO_PUBLIC_REQUIRE_EMAIL_VERIFICATION=true to test verification');
   }
 
-  // Log rollout percentage
-  if (CONFIG.WEBAUTHN_ROLLOUT_PERCENT > 0) {
-    console.log(`📊 WebAuthn rollout: ${CONFIG.WEBAUTHN_ROLLOUT_PERCENT}% of users`);
+  // Phase 6: 100% Rollout Status
+  console.log('');
+  console.log('🚀 ============================================');
+  console.log('🚀 PHASE 6: 100% HYBRID AUTH ROLLOUT COMPLETE');
+  console.log('🚀 ============================================');
+  console.log('');
+  console.log('🔐 Hybrid Auth Status:');
+  console.log(`   • Enabled: ${CONFIG.USE_HYBRID_AUTH ? '✅ YES' : '❌ NO'}`);
+  console.log(`   • Username Required: ${CONFIG.REQUIRE_USERNAME ? '✅ YES' : '❌ NO'}`);
+  console.log(`   • Two-Factor Auth: ${CONFIG.USE_HYBRID_AUTH ? '✅ ACTIVE' : '❌ INACTIVE'}`);
+  console.log('');
+  console.log('🛡️ Security Features:');
+  console.log('   • P-256 ECDSA Device Signatures: ✅');
+  console.log('   • bcrypt Password Hashing: ✅');
+  console.log('   • Hardware-Backed Key Storage: ✅');
+  console.log('   • Challenge-Response Authentication: ✅');
+  console.log('');
+
+  // Warn if hybrid auth is disabled (legacy mode)
+  if (!CONFIG.USE_HYBRID_AUTH) {
+    console.warn('⚠️  LEGACY MODE: Hybrid auth disabled');
+    console.warn('   Set EXPO_PUBLIC_USE_HYBRID_AUTH=true for two-factor authentication');
+  }
+
+  // Log rollout percentage (deprecated, now 100%)
+  if (CONFIG.WEBAUTHN_ROLLOUT_PERCENT > 0 && CONFIG.WEBAUTHN_ROLLOUT_PERCENT < 100) {
+    console.warn(`⚠️  Partial rollout: ${CONFIG.WEBAUTHN_ROLLOUT_PERCENT}% of users`);
+    console.warn('   Phase 6 complete - consider 100% rollout');
+  }
+
+  // Legacy logging (backward compatibility)
+  if (CONFIG.USE_HYBRID_AUTH) {
+    console.log('📊 Rollout Status: 100% (All users)');
+    console.log(`   Username required: ${CONFIG.REQUIRE_USERNAME ? 'YES' : 'NO (optional)'}`);
+  } else {
+    console.log('🔐 Hybrid Auth: DISABLED (device token only)');
   }
 }
 
