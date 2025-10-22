@@ -24,16 +24,18 @@ const HOST = process.env.HOST || '0.0.0.0';
 
 // Initialize Fastify
 const app = Fastify({
-  logger: {
-    level: process.env.LOG_LEVEL || 'info',
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        translateTime: 'HH:MM:ss Z',
-        ignore: 'pid,hostname',
+  logger: process.env.NODE_ENV === 'production'
+    ? { level: process.env.LOG_LEVEL || 'info' } // JSON logging in production
+    : { // Pretty logging in development
+        level: process.env.LOG_LEVEL || 'info',
+        transport: {
+          target: 'pino-pretty',
+          options: {
+            translateTime: 'HH:MM:ss Z',
+            ignore: 'pid,hostname',
+          },
+        },
       },
-    },
-  },
 });
 
 async function start() {
