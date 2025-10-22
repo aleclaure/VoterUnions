@@ -11,6 +11,7 @@ import { generateAccessToken, generateRefreshToken } from '../utils/jwt.js';
 import crypto from 'crypto';
 import { p256 } from '@noble/curves/p256';
 import { sha256 } from '@noble/hashes/sha256';
+import { hashPassword, verifyPassword, validatePasswordStrength, validateUsername } from '../utils/password.js';
 
 // Request schemas
 const RegisterDeviceSchema = z.object({
@@ -401,6 +402,213 @@ export async function deviceTokenRoutes(fastify: FastifyInstance) {
       return reply.code(500).send({
         error: 'Authentication failed',
       });
+    }
+  });
+
+  // ============================================================================
+  // HYBRID AUTH ENDPOINTS - Add username/password to device token auth
+  // ============================================================================
+
+  /**
+   * POST /auth/set-password
+   * Set username and password for existing device user (hybrid auth)
+   */
+  fastify.post('/auth/set-password', async (
+    request: FastifyRequest<{
+      Body: {
+        userId: string;
+        username: string;
+        password: string;
+        deviceId: string;
+      };
+    }>,
+    reply: FastifyReply
+  ) => {
+    try {
+      const { userId, username, password, deviceId } = request.body;
+
+      // Validate username
+      const usernameValidation = validateUsername(username);
+      if (!usernameValidation.valid) {
+        return reply.code(400).send({ error: usernameValidation.error });
+      }
+
+      // Validate password strength
+      const passwordValidation = validatePasswordStrength(password);
+      if (!passwordValidation.valid) {
+        return reply.code(400).send({
+          error: passwordValidation.error || 'Password does not meet requirements'
+        });
+      }
+
+      // Check if username is already taken
+      const existingUser = await pool.query(
+        'SELECT id FROM users WHERE username = $1',
+        [username]
+      );
+
+      if (existingUser.rows.length > 0 && existingUser.rows[0].id !== userId) {
+        return reply.code(409).send({ error: 'Username already taken' });
+      }
+
+      // Hash password
+      const passwordHash = await hashPassword(password);
+
+      // Update user with username and password
+      await pool.query(
+        'UPDATE users SET username = $1, password_hash = $2 WHERE id = $3',
+        [username, passwordHash, userId]
+      );
+
+      fastify.log.info({
+        userId,
+        deviceId,
+        action: 'password_set',
+      });
+
+      return {
+        message: 'Password set successfully',
+        username,
+      };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Failed to set password' });
+    }
+  });
+
+  /**
+   * POST /auth/login-hybrid
+   * Login with device token AND username/password (two-factor auth)
+   */
+  fastify.post('/auth/login-hybrid', async (
+    request: FastifyRequest<{
+      Body: {
+        username: string;
+        password: string;
+        publicKey: string;
+        challenge: string;
+        signature: string;
+        deviceId: string;
+      };
+    }>,
+    reply: FastifyReply
+  ) => {
+    try {
+      const {
+        username,
+        password,
+        publicKey,
+        challenge,
+        signature,
+        deviceId,
+      } = request.body;
+
+      // Step 1: Get user by username
+      const userResult = await pool.query(
+        'SELECT id, password_hash FROM users WHERE username = $1',
+        [username]
+      );
+
+      if (userResult.rows.length === 0) {
+        return reply.code(401).send({ error: 'Invalid credentials' });
+      }
+
+      const user = userResult.rows[0];
+
+      // Verify user has hybrid auth set up
+      if (!user.password_hash) {
+        return reply.code(401).send({
+          error: 'Hybrid authentication not set up for this user',
+        });
+      }
+
+      // Step 2: Verify password (Layer 1 - Password Auth)
+      const isValidPassword = await verifyPassword(password, user.password_hash);
+
+      if (!isValidPassword) {
+        return reply.code(401).send({ error: 'Invalid credentials' });
+      }
+
+      // Step 3: Get device credentials
+      const deviceResult = await pool.query(
+        'SELECT * FROM device_credentials WHERE user_id = $1 AND device_id = $2',
+        [user.id, deviceId]
+      );
+
+      if (deviceResult.rows.length === 0) {
+        return reply.code(401).send({ error: 'Device not found for this user' });
+      }
+
+      const device = deviceResult.rows[0];
+
+      // Get stored challenge
+      const storedChallenge = await getChallenge(device.public_key);
+      if (!storedChallenge || storedChallenge !== challenge) {
+        return reply.code(400).send({
+          error: 'Invalid challenge',
+          message: 'Challenge does not match or has expired',
+        });
+      }
+
+      // Step 4: Verify device signature (Layer 2 - Device Auth)
+      const isValidSignature = verifySignature(device.public_key, challenge, signature);
+
+      if (!isValidSignature) {
+        fastify.log.warn({
+          userId: user.id,
+          deviceId,
+          action: 'hybrid_auth_signature_failed',
+        });
+        return reply.code(401).send({ error: 'Invalid device signature' });
+      }
+
+      // Both layers verified - delete used challenge
+      await deleteChallenge(device.public_key);
+
+      // Update timestamps
+      await pool.query(
+        'UPDATE device_credentials SET last_used_at = CURRENT_TIMESTAMP WHERE id = $1',
+        [device.id]
+      );
+
+      await pool.query(
+        'UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1',
+        [user.id]
+      );
+
+      // Generate tokens
+      const accessToken = generateAccessToken(user.id);
+      const refreshToken = generateRefreshToken(user.id);
+
+      // Store hashed refresh token
+      const hashedRefreshToken = hashRefreshToken(refreshToken);
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await pool.query(
+        'INSERT INTO sessions (user_id, refresh_token, expires_at) VALUES ($1, $2, $3)',
+        [user.id, hashedRefreshToken, expiresAt]
+      );
+
+      fastify.log.info({
+        userId: user.id,
+        username,
+        deviceId,
+        action: 'hybrid_login_success',
+      });
+
+      return {
+        user: {
+          id: user.id,
+          username,
+          deviceId,
+        },
+        tokens: {
+          accessToken,
+          refreshToken,
+        },
+      };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Login failed' });
     }
   });
 }
