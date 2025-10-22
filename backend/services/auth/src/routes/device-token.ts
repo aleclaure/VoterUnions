@@ -1,20 +1,16 @@
 /**
  * Device Token Authentication Routes
- * 
+ *
  * ECDSA P-256 signature-based authentication (Expo Go compatible)
  */
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-// @ts-ignore - elliptic doesn't have TypeScript definitions
-import * as elliptic from 'elliptic';
 import { z } from 'zod';
 import { pool, redis } from '../db/index.js';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwt.js';
 import crypto from 'crypto';
-
-// Initialize P-256 curve (also known as secp256r1 or prime256v1)
-const EC = elliptic.ec;
-const ec = new EC('p256');
+import { p256 } from '@noble/curves/p256';
+import { sha256 } from '@noble/hashes/sha256';
 
 // Request schemas
 const RegisterDeviceSchema = z.object({
@@ -41,10 +37,10 @@ const VerifyDeviceSchema = z.object({
  */
 function validatePublicKey(publicKeyHex: string): boolean {
   try {
-    // Try to create a key from the public key hex
-    const key = ec.keyFromPublic(publicKeyHex, 'hex');
-    // Verify it's a valid point on the curve
-    return key.validate().result;
+    // Verify it's a valid point on the P-256 curve
+    // This will throw if the hex string is invalid or not a valid curve point
+    p256.ProjectivePoint.fromHex(publicKeyHex);
+    return true;
   } catch {
     return false;
   }
@@ -59,11 +55,14 @@ function verifySignature(
   signatureHex: string
 ): boolean {
   try {
-    // Create public key from hex
-    const key = ec.keyFromPublic(publicKeyHex, 'hex');
-    
-    // Verify signature (elliptic handles hashing internally)
-    return key.verify(message, signatureHex);
+    // Hash the message with SHA-256 (required for ECDSA)
+    const messageHash = sha256(message);
+
+    // Verify signature using P-256 curve
+    // Both signature and publicKey can be hex strings
+    const isValid = p256.verify(signatureHex, messageHash, publicKeyHex);
+
+    return isValid;
   } catch (error) {
     console.error('Signature verification error:', error);
     return false;
