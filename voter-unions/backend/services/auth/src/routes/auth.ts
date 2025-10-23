@@ -13,6 +13,7 @@ import { generateChallenge, verifySignature } from '../crypto';
 import { generateTokens } from '../tokens';
 import { ulid } from 'ulid';
 import { hashPassword, verifyPassword, validatePasswordStrength, validateUsername } from '../utils/password';
+import { auditService } from '../audit/AuditService';
 
 export async function registerRoutes(app: FastifyInstance) {
   /**
@@ -111,6 +112,21 @@ export async function registerRoutes(app: FastifyInstance) {
           deviceId: deviceId.substring(0, 8),
         });
 
+        // Log failed registration - duplicate device
+        await auditService.logEvent({
+          userId: 'unknown',
+          actionType: 'signup_failed',
+          entityType: 'user',
+          entityId: null,
+          deviceId,
+          platform,
+          success: false,
+          errorMessage: 'Device already registered',
+          metadata: {
+            failureReason: 'device_already_registered',
+          },
+        });
+
         return reply.code(409).send({
           error: 'Device already registered',
           message: 'This device is already registered. Use login instead.',
@@ -150,6 +166,21 @@ export async function registerRoutes(app: FastifyInstance) {
         deviceId: deviceId.substring(0, 8),
       });
 
+      // Log successful registration to audit system
+      await auditService.logEvent({
+        userId,
+        username: displayName,
+        actionType: 'signup_success',
+        entityType: 'user',
+        entityId: userId,
+        deviceId,
+        platform,
+        success: true,
+        metadata: {
+          registrationMethod: 'device-only',
+        },
+      });
+
       return {
         success: true,
         user: {
@@ -163,6 +194,20 @@ export async function registerRoutes(app: FastifyInstance) {
       };
     } catch (error) {
       app.log.error({ error }, 'Device registration failed');
+
+      // Log failed registration to audit system
+      const body = request.body as any;
+      await auditService.logEvent({
+        userId: 'unknown',
+        actionType: 'signup_failed',
+        entityType: 'user',
+        entityId: null,
+        deviceId: body.deviceId || 'unknown',
+        platform: body.platform || 'web',
+        success: false,
+        errorMessage: error instanceof Error ? error.message : 'Registration failed',
+      });
+
       return reply.code(500).send({
         error: 'Registration failed',
         message: 'An error occurred during registration. Please try again.',
@@ -210,6 +255,22 @@ export async function registerRoutes(app: FastifyInstance) {
           reason: 'invalid_or_expired_challenge',
         });
 
+        // Log failed authentication - expired challenge
+        await auditService.logEvent({
+          userId: 'unknown',
+          actionType: 'login_failed',
+          entityType: 'user',
+          entityId: null,
+          deviceId,
+          platform: 'unknown',
+          success: false,
+          errorMessage: 'Challenge expired or not found',
+          metadata: {
+            authMethod: 'device-signature',
+            failureReason: 'expired_challenge',
+          },
+        });
+
         return reply.code(401).send({
           error: 'Invalid or expired challenge',
           message: 'Please request a new challenge',
@@ -253,6 +314,23 @@ export async function registerRoutes(app: FastifyInstance) {
           deviceId: deviceId.substring(0, 8),
         });
 
+        // Log failed authentication - invalid signature
+        await auditService.logEvent({
+          userId: user.user_id,
+          username: user.username || user.display_name || undefined,
+          actionType: 'login_failed',
+          entityType: 'user',
+          entityId: user.user_id,
+          deviceId,
+          platform: user.platform,
+          success: false,
+          errorMessage: 'Invalid signature',
+          metadata: {
+            authMethod: 'device-signature',
+            failureReason: 'invalid_signature',
+          },
+        });
+
         return reply.code(401).send({
           error: 'Invalid signature',
           message: 'Authentication failed. Signature verification failed.',
@@ -265,6 +343,23 @@ export async function registerRoutes(app: FastifyInstance) {
           action: 'verification_failed',
           reason: 'public_key_mismatch',
           deviceId: deviceId.substring(0, 8),
+        });
+
+        // Log failed authentication - public key mismatch
+        await auditService.logEvent({
+          userId: user.user_id,
+          username: user.username || user.display_name || undefined,
+          actionType: 'login_failed',
+          entityType: 'user',
+          entityId: user.user_id,
+          deviceId,
+          platform: user.platform,
+          success: false,
+          errorMessage: 'Device public key mismatch',
+          metadata: {
+            authMethod: 'device-signature',
+            failureReason: 'public_key_mismatch',
+          },
         });
 
         return reply.code(401).send({
@@ -300,6 +395,21 @@ export async function registerRoutes(app: FastifyInstance) {
         platform: user.platform,
         userId: user.user_id.substring(0, 8),
         deviceId: deviceId.substring(0, 8),
+      });
+
+      // Log successful device authentication
+      await auditService.logEvent({
+        userId: user.user_id,
+        username: user.username || user.display_name || undefined,
+        actionType: 'login_success',
+        entityType: 'user',
+        entityId: user.user_id,
+        deviceId,
+        platform: user.platform,
+        success: true,
+        metadata: {
+          authMethod: 'device-signature',
+        },
       });
 
       return {
@@ -384,6 +494,18 @@ export async function registerRoutes(app: FastifyInstance) {
       app.log.info({
         action: 'token_refreshed',
         userId: user.user_id.substring(0, 8),
+      });
+
+      // Log successful token refresh
+      await auditService.logEvent({
+        userId: user.user_id,
+        username: user.username || user.display_name || undefined,
+        actionType: 'token_refreshed',
+        entityType: 'session',
+        entityId: session.session_id,
+        deviceId: user.device_id,
+        platform: user.platform,
+        success: true,
       });
 
       return {
@@ -471,6 +593,23 @@ export async function registerRoutes(app: FastifyInstance) {
           username,
         });
 
+        // Log failed hybrid login - user not found
+        await auditService.logEvent({
+          userId: 'unknown',
+          username: username,
+          actionType: 'login_failed',
+          entityType: 'user',
+          entityId: null,
+          deviceId,
+          platform: 'unknown',
+          success: false,
+          errorMessage: 'User not found',
+          metadata: {
+            authMethod: 'hybrid',
+            failureReason: 'user_not_found',
+          },
+        });
+
         return reply.code(401).send({
           error: 'Invalid credentials',
           message: 'Username or password is incorrect',
@@ -485,6 +624,23 @@ export async function registerRoutes(app: FastifyInstance) {
           action: 'hybrid_login_failed',
           reason: 'password_not_set',
           username,
+        });
+
+        // Log failed hybrid login - password not set
+        await auditService.logEvent({
+          userId: user.user_id,
+          username: username,
+          actionType: 'login_failed',
+          entityType: 'user',
+          entityId: user.user_id,
+          deviceId,
+          platform: user.platform,
+          success: false,
+          errorMessage: 'Password not set for this account',
+          metadata: {
+            authMethod: 'hybrid',
+            failureReason: 'password_not_set',
+          },
         });
 
         return reply.code(401).send({
@@ -539,6 +695,23 @@ export async function registerRoutes(app: FastifyInstance) {
           deviceId: deviceId.substring(0, 8),
         });
 
+        // Log failed hybrid login - device mismatch
+        await auditService.logEvent({
+          userId: user.user_id,
+          username: username,
+          actionType: 'login_failed',
+          entityType: 'user',
+          entityId: user.user_id,
+          deviceId,
+          platform: user.platform,
+          success: false,
+          errorMessage: 'Device mismatch',
+          metadata: {
+            authMethod: 'hybrid',
+            failureReason: 'device_mismatch',
+          },
+        });
+
         return reply.code(401).send({
           error: 'Device mismatch',
           message: 'This account is registered to a different device',
@@ -553,6 +726,23 @@ export async function registerRoutes(app: FastifyInstance) {
           action: 'hybrid_login_failed',
           reason: 'invalid_password',
           username,
+        });
+
+        // Log failed hybrid login - invalid password
+        await auditService.logEvent({
+          userId: user.user_id,
+          username: username,
+          actionType: 'login_failed',
+          entityType: 'user',
+          entityId: user.user_id,
+          deviceId,
+          platform: user.platform,
+          success: false,
+          errorMessage: 'Invalid password',
+          metadata: {
+            authMethod: 'hybrid',
+            failureReason: 'invalid_password',
+          },
         });
 
         return reply.code(401).send({
@@ -589,6 +779,23 @@ export async function registerRoutes(app: FastifyInstance) {
         username,
         userId: user.user_id.substring(0, 8),
         deviceId: deviceId.substring(0, 8),
+      });
+
+      // Log successful hybrid login
+      await auditService.logEvent({
+        userId: user.user_id,
+        username: user.username || user.display_name || undefined,
+        actionType: 'login_success',
+        entityType: 'user',
+        entityId: user.user_id,
+        deviceId,
+        platform: user.platform,
+        success: true,
+        metadata: {
+          authMethod: 'hybrid',
+          usedPassword: true,
+          usedDeviceSignature: true,
+        },
       });
 
       return {
@@ -715,6 +922,22 @@ export async function registerRoutes(app: FastifyInstance) {
         userId: userId.substring(0, 8),
       });
 
+      // Log successful password change
+      await auditService.logEvent({
+        userId: user.user_id,
+        username: username,
+        actionType: 'password_changed',
+        entityType: 'user',
+        entityId: user.user_id,
+        deviceId,
+        platform: user.platform,
+        success: true,
+        metadata: {
+          method: 'authenticated_set_password',
+          hadPreviousPassword: !!user.password_hash,
+        },
+      });
+
       return {
         success: true,
         message: 'Username and password set successfully',
@@ -726,6 +949,21 @@ export async function registerRoutes(app: FastifyInstance) {
       };
     } catch (error) {
       app.log.error({ error }, 'Set password failed');
+
+      // Log failed password change
+      const body = request.body as any;
+      await auditService.logEvent({
+        userId: body.userId || 'unknown',
+        username: body.username,
+        actionType: 'password_changed',
+        entityType: 'user',
+        entityId: body.userId || null,
+        deviceId: body.deviceId || 'unknown',
+        platform: 'unknown',
+        success: false,
+        errorMessage: error instanceof Error ? error.message : 'Password change failed',
+      });
+
       return reply.code(500).send({
         error: 'Failed to set password',
         message: 'An error occurred. Please try again.',

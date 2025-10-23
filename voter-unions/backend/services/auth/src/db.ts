@@ -3,11 +3,13 @@
  */
 
 import { Pool } from 'pg';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 20,
+  max: 40, // ✅ Increased from 20 to 40 for audit logging
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });
@@ -64,6 +66,19 @@ export async function initDatabase() {
     await db.query(`
       DELETE FROM auth_challenges WHERE expires_at < NOW();
     `);
+
+    // ============================================================================
+    // ✅ NEW: Initialize Secure Audit Logs Table
+    // ============================================================================
+    try {
+      const auditSchemaPath = path.join(__dirname, 'audit', 'schema.sql');
+      const auditSchema = fs.readFileSync(auditSchemaPath, 'utf8');
+      await db.query(auditSchema);
+      console.log('✅ Secure audit logs table initialized');
+    } catch (auditError) {
+      console.error('⚠️  Warning: Audit logs table initialization failed:', auditError);
+      // Don't throw - allow app to start even if audit init fails
+    }
 
     console.log('✅ Database tables initialized');
   } catch (error) {
