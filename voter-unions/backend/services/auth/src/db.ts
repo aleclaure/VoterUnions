@@ -77,6 +77,8 @@ export async function initDatabase() {
       console.log('✅ Secure audit logs table initialized');
     } catch (auditError) {
       console.error('⚠️  Warning: Audit logs table initialization failed:', auditError);
+      console.error('Schema path attempted:', path.join(__dirname, 'audit', 'schema.sql'));
+      console.error('__dirname:', __dirname);
       // Don't throw - allow app to start even if audit init fails
     }
 
