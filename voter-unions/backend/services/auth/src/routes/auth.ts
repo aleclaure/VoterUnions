@@ -184,7 +184,8 @@ export async function registerRoutes(app: FastifyInstance) {
       return {
         success: true,
         user: {
-          userId,
+          id: userId,  // Frontend expects 'id' field
+          userId,      // Keep for backward compatibility
           displayName,
           platform,
         },
@@ -415,6 +416,7 @@ export async function registerRoutes(app: FastifyInstance) {
       return {
         success: true,
         user: {
+          id: user.user_id, // Frontend expects 'id' field
           userId: user.user_id,
           displayName: user.display_name,
           platform: user.platform,
@@ -801,6 +803,7 @@ export async function registerRoutes(app: FastifyInstance) {
       return {
         success: true,
         user: {
+          id: user.user_id, // Frontend expects 'id' field
           userId: user.user_id,
           username: user.username,
           displayName: user.display_name,
@@ -942,6 +945,7 @@ export async function registerRoutes(app: FastifyInstance) {
         success: true,
         message: 'Username and password set successfully',
         user: {
+          id: user.user_id, // Frontend expects 'id' field
           userId: user.user_id,
           username,
           displayName: user.display_name,

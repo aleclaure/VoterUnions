@@ -1,11 +1,10 @@
 -- Users table for device token authentication with hybrid auth support
 CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY,
+  user_id TEXT PRIMARY KEY,
   device_id TEXT NOT NULL,
   public_key TEXT NOT NULL,
-  device_name TEXT,
-  os_name TEXT,
-  os_version TEXT,
+  platform TEXT,
+  display_name TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_login TIMESTAMP,
   username TEXT UNIQUE,
