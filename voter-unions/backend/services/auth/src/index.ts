@@ -22,6 +22,54 @@ config();
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
+/**
+ * Parse CORS origins from environment variable
+ *
+ * Production: Requires CORS_ORIGIN to be set (crashes if missing)
+ * Development: Uses CORS_ORIGIN if set, otherwise allows all origins with warning
+ *
+ * @returns CORS origin configuration (string, string[], or boolean)
+ */
+function parseCorsOrigins(): string | string[] | boolean {
+  const corsOrigin = process.env.CORS_ORIGIN;
+
+  // Production: Require explicit configuration
+  if (process.env.NODE_ENV === 'production') {
+    if (!corsOrigin) {
+      throw new Error(
+        'CRITICAL SECURITY: CORS_ORIGIN must be set in production. ' +
+        'Example: CORS_ORIGIN=https://voterunions.com,https://app.voterunions.com'
+      );
+    }
+
+    // Parse comma-separated origins
+    const origins = corsOrigin.split(',').map(o => o.trim()).filter(Boolean);
+
+    if (origins.length === 0) {
+      throw new Error('CRITICAL SECURITY: CORS_ORIGIN cannot be empty in production');
+    }
+
+    // Validate origins are HTTPS in production
+    const invalidOrigins = origins.filter(o => !o.startsWith('https://') && !o.startsWith('http://localhost'));
+    if (invalidOrigins.length > 0) {
+      throw new Error(
+        `CRITICAL SECURITY: Production CORS origins must use HTTPS: ${invalidOrigins.join(', ')}`
+      );
+    }
+
+    return origins;
+  }
+
+  // Development: Use env var or allow all with warning
+  if (corsOrigin) {
+    const origins = corsOrigin.split(',').map(o => o.trim()).filter(Boolean);
+    return origins.length === 1 ? origins[0] : origins;
+  }
+
+  console.warn('⚠️  WARNING: CORS allows all origins - NOT SAFE FOR PRODUCTION');
+  return '*';
+}
+
 // Initialize Fastify
 const app = Fastify({
   logger: process.env.NODE_ENV === 'production'
@@ -45,9 +93,9 @@ async function start() {
       contentSecurityPolicy: false, // Allow for API
     });
 
-    // Allow all origins for development (CORS)
+    // Register CORS with environment-aware configuration
     await app.register(cors, {
-      origin: process.env.CORS_ORIGIN || '*',
+      origin: parseCorsOrigins(),
       credentials: true,
     });
 
