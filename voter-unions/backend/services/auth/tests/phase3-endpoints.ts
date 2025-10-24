@@ -38,23 +38,79 @@ async function request(method: string, path: string, body?: any): Promise<any> {
 
 // Helper: Generate ECDSA P-256 keypair
 function generateKeypair() {
-  const { publicKey, privateKey } = crypto.generateKeyPairSync('ec', {
-    namedCurve: 'prime256v1',
-    publicKeyEncoding: { type: 'spki', format: 'pem' },
-    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-  });
+  const ecdh = crypto.createECDH('prime256v1');
+  ecdh.generateKeys();
 
-  return { publicKey, privateKey };
+  // Get keys in uncompressed format (0x04 prefix + 64 bytes)
+  const publicKeyBuffer = ecdh.getPublicKey();
+  const privateKeyBuffer = ecdh.getPrivateKey();
+
+  // Convert to hex strings (server expects hex)
+  const publicKey = publicKeyBuffer.toString('hex');
+  const privateKey = privateKeyBuffer.toString('hex');
+
+  return { publicKey, privateKey, ecdh };
 }
 
 // Helper: Sign challenge with private key
-function signChallenge(challenge: string, privateKey: string): string {
+function signChallenge(challenge: string, privateKey: string, ecdh: crypto.ECDH): string {
+  // Hash the challenge with SHA-256 (same as server does)
+  const hash = crypto.createHash('sha256').update(challenge).digest();
+
+  // Sign the hash using ECDSA
   const sign = crypto.createSign('SHA256');
   sign.update(challenge);
   sign.end();
 
-  const signature = sign.sign(privateKey, 'base64');
-  return signature;
+  // Create a temporary key object from the ECDH private key
+  const keyObject = crypto.createPrivateKey({
+    key: Buffer.concat([
+      Buffer.from('308187020100301306072a8648ce3d020106082a8648ce3d030107046d306b0201010420', 'hex'),
+      Buffer.from(privateKey, 'hex'),
+      Buffer.from('a144034200', 'hex'),
+      ecdh.getPublicKey()
+    ]),
+    format: 'der',
+    type: 'pkcs8'
+  });
+
+  const signature = crypto.sign('SHA256', Buffer.from(challenge), keyObject);
+
+  // Convert DER signature to raw r,s format (64 bytes total, 32 bytes each)
+  // DER format: 0x30 [len] 0x02 [r-len] [r] 0x02 [s-len] [s]
+  const parsedSig = parseDERSig(signature);
+
+  return parsedSig;
+}
+
+// Helper: Parse DER signature and convert to hex compact format
+function parseDERSig(derSig: Buffer): string {
+  let offset = 0;
+
+  if (derSig[offset++] !== 0x30) throw new Error('Invalid DER');
+  offset++; // skip total length
+
+  if (derSig[offset++] !== 0x02) throw new Error('Invalid DER');
+  const rLen = derSig[offset++];
+  let r = derSig.slice(offset, offset + rLen);
+  offset += rLen;
+
+  if (derSig[offset++] !== 0x02) throw new Error('Invalid DER');
+  const sLen = derSig[offset++];
+  let s = derSig.slice(offset, offset + sLen);
+
+  // Remove leading zero padding
+  if (r.length === 33 && r[0] === 0x00) r = r.slice(1);
+  if (s.length === 33 && s[0] === 0x00) s = s.slice(1);
+
+  // Pad to 32 bytes
+  const rPadded = Buffer.alloc(32);
+  const sPadded = Buffer.alloc(32);
+  r.copy(rPadded, 32 - r.length);
+  s.copy(sPadded, 32 - s.length);
+
+  // Return as hex string
+  return Buffer.concat([rPadded, sPadded]).toString('hex');
 }
 
 // Helper: Check if audit log exists
@@ -88,7 +144,7 @@ async function test8_RegisterDevice() {
   console.log('\nTest 8: Device Registration (signup_success)...');
 
   try {
-    const { publicKey } = generateKeypair();
+    const { publicKey, privateKey, ecdh } = generateKeypair();
     const deviceId = `test-device-${Date.now()}`;
 
     const { status, data } = await request('POST', '/auth/register-device', {
@@ -118,7 +174,7 @@ async function test8_RegisterDevice() {
       console.log('⚠️  WARNING: Audit log not found (may be processing)');
     }
 
-    return { userId: data.user.userId, deviceId, publicKey };
+    return { userId: data.user.userId, deviceId, publicKey, privateKey, ecdh };
   } catch (error: any) {
     results.push({
       name: 'Test 8: Device Registration',
@@ -171,7 +227,7 @@ async function test9_DuplicateDevice(deviceId: string, publicKey: string) {
 }
 
 // Test 10: Device Authentication (login_success)
-async function test10_DeviceAuth(deviceId: string, publicKey: string, privateKey: string) {
+async function test10_DeviceAuth(deviceId: string, publicKey: string, privateKey: string, ecdh: crypto.ECDH) {
   console.log('\nTest 10: Device Authentication (login_success)...');
 
   try {
@@ -186,7 +242,7 @@ async function test10_DeviceAuth(deviceId: string, publicKey: string, privateKey
     }
 
     const challenge = challengeResp.data.challenge;
-    const signature = signChallenge(challenge, privateKey);
+    const signature = signChallenge(challenge, privateKey, ecdh);
 
     // Verify device
     const { status, data } = await request('POST', '/auth/verify-device', {
@@ -230,13 +286,13 @@ async function test10_DeviceAuth(deviceId: string, publicKey: string, privateKey
 }
 
 // Test 11: Expired Challenge (login_failed)
-async function test11_ExpiredChallenge(deviceId: string, publicKey: string, privateKey: string) {
+async function test11_ExpiredChallenge(deviceId: string, publicKey: string, privateKey: string, ecdh: crypto.ECDH) {
   console.log('\nTest 11: Expired Challenge (login_failed)...');
 
   try {
     // Use fake expired challenge
     const expiredChallenge = 'expired-challenge-' + Date.now();
-    const signature = signChallenge(expiredChallenge, privateKey);
+    const signature = signChallenge(expiredChallenge, privateKey, ecdh);
 
     const { status } = await request('POST', '/auth/verify-device', {
       challenge: expiredChallenge,
@@ -323,7 +379,8 @@ async function test13_HybridLogin(
   password: string,
   deviceId: string,
   publicKey: string,
-  privateKey: string
+  privateKey: string,
+  ecdh: crypto.ECDH
 ) {
   console.log('\nTest 13: Hybrid Login (login_success)...');
 
@@ -335,7 +392,7 @@ async function test13_HybridLogin(
     });
 
     const challenge = challengeResp.data.challenge;
-    const signature = signChallenge(challenge, privateKey);
+    const signature = signChallenge(challenge, privateKey, ecdh);
 
     // Hybrid login
     const { status, data } = await request('POST', '/auth/login-hybrid', {
@@ -382,7 +439,8 @@ async function test14_InvalidPassword(
   username: string,
   deviceId: string,
   publicKey: string,
-  privateKey: string
+  privateKey: string,
+  ecdh: crypto.ECDH
 ) {
   console.log('\nTest 14: Invalid Password (login_failed)...');
 
@@ -393,7 +451,7 @@ async function test14_InvalidPassword(
     });
 
     const challenge = challengeResp.data.challenge;
-    const signature = signChallenge(challenge, privateKey);
+    const signature = signChallenge(challenge, privateKey, ecdh);
 
     const { status } = await request('POST', '/auth/login-hybrid', {
       username,
@@ -504,20 +562,17 @@ async function runTests() {
   console.log('');
 
   try {
-    // Generate keypair for all tests
-    const { publicKey, privateKey } = generateKeypair();
-
-    // Test 8: Register device
-    const { userId, deviceId } = await test8_RegisterDevice();
+    // Test 8: Register device (generates keypair)
+    const { userId, deviceId, publicKey, privateKey, ecdh } = await test8_RegisterDevice();
 
     // Test 9: Duplicate device (error path)
     await test9_DuplicateDevice(deviceId, publicKey);
 
     // Test 10: Device authentication
-    const { refreshToken } = await test10_DeviceAuth(deviceId, publicKey, privateKey);
+    const { refreshToken } = await test10_DeviceAuth(deviceId, publicKey, privateKey, ecdh);
 
     // Test 11: Expired challenge (error path)
-    await test11_ExpiredChallenge(deviceId, publicKey, privateKey);
+    await test11_ExpiredChallenge(deviceId, publicKey, privateKey, ecdh);
 
     // Test 12: Set password
     const username = await test12_SetPassword(userId, deviceId);
@@ -528,11 +583,12 @@ async function runTests() {
       'SecureP@ssw0rd123',
       deviceId,
       publicKey,
-      privateKey
+      privateKey,
+      ecdh
     );
 
     // Test 14: Invalid password (error path)
-    await test14_InvalidPassword(username, deviceId, publicKey, privateKey);
+    await test14_InvalidPassword(username, deviceId, publicKey, privateKey, ecdh);
 
     // Test 15: Token refresh
     await test15_TokenRefresh(hybridRefreshToken || refreshToken);
