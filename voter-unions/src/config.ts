@@ -133,8 +133,11 @@ export const CONFIG = {
    *
    * Base URL for the new microservices backend.
    * Only used when USE_NEW_BACKEND is true.
+   *
+   * Production: https://voterunions-production.up.railway.app
+   * Development: http://localhost:3001
    */
-  API_URL: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001',
+  API_URL: process.env.EXPO_PUBLIC_API_URL || 'https://voterunions-production.up.railway.app',
 
   /**
    * Supabase Configuration
