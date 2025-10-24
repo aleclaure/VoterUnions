@@ -78,6 +78,7 @@ async function start() {
     // Start server
     await app.listen({ port: PORT, host: HOST });
     app.log.info(`Auth service listening on ${HOST}:${PORT}`);
+    app.log.info(`Build timestamp: ${new Date().toISOString()}`);
   } catch (err) {
     app.log.error(err);
     process.exit(1);
