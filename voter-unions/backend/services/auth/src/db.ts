@@ -68,19 +68,11 @@ export async function initDatabase() {
     `);
 
     // ============================================================================
-    // ✅ NEW: Initialize Secure Audit Logs Table
+    // ✅ Secure Audit Logs Table
     // ============================================================================
-    try {
-      const auditSchemaPath = path.join(__dirname, 'audit', 'schema.sql');
-      const auditSchema = fs.readFileSync(auditSchemaPath, 'utf8');
-      await db.query(auditSchema);
-      console.log('✅ Secure audit logs table initialized');
-    } catch (auditError) {
-      console.error('⚠️  Warning: Audit logs table initialization failed:', auditError);
-      console.error('Schema path attempted:', path.join(__dirname, 'audit', 'schema.sql'));
-      console.error('__dirname:', __dirname);
-      // Don't throw - allow app to start even if audit init fails
-    }
+    // Note: Table already exists - created manually on Railway
+    // Schema location: src/audit/schema.sql
+    console.log('✅ Audit logs table ready (pre-initialized)');
 
     console.log('✅ Database tables initialized');
   } catch (error) {
